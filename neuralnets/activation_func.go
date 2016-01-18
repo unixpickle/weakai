@@ -10,7 +10,7 @@ type ActivationFunction interface {
 type SigmoidFunction struct{}
 
 func (s SigmoidFunction) Evaluate(x float64) float64 {
-	return 1.0 / (1.0 * math.Exp(-x))
+	return 1.0 / (1.0 + math.Exp(-x))
 }
 
 func (s SigmoidFunction) EvaluateDerivative(x float64) float64 {

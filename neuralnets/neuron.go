@@ -1,5 +1,7 @@
 package main
 
+import "math/rand"
+
 type Input interface {
 	Value() float64
 }
@@ -14,8 +16,13 @@ type Neuron struct {
 }
 
 func NewNeuron(inputs []Input, activation ActivationFunction) *Neuron {
+	randomWeights := make([]float64, len(inputs)+1)
+	for i := range randomWeights {
+		randomWeights[i] = rand.Float64()*10.0 - 5.0
+	}
+
 	return &Neuron{
-		weights:    make([]float64, len(inputs)+1),
+		weights:    randomWeights,
 		inputs:     inputs,
 		activation: activation,
 	}

@@ -3,7 +3,7 @@ package main
 import "math/rand"
 
 type Input interface {
-	Value() float64
+	Value(useCache bool) float64
 }
 
 type Neuron struct {
@@ -28,17 +28,20 @@ func NewNeuron(inputs []Input, activation ActivationFunction) *Neuron {
 	}
 }
 
-func (n *Neuron) Value() float64 {
+func (n *Neuron) Value(useCache bool) float64 {
+	if useCache {
+		return n.valueCache
+	}
 	n.sumCache = 0
 	for i, weight := range n.weights {
-		n.sumCache += weight * n.inputValue(i)
+		n.sumCache += weight * n.inputValue(i, false)
 	}
 	n.valueCache = n.activation.Evaluate(n.sumCache)
 	return n.valueCache
 }
 
 func (n *Neuron) BackPropagate(desired, velocity float64) {
-	actual := n.Value()
+	actual := n.Value(false)
 	errorPerOutput := (desired - actual)
 	n.backPropagate(errorPerOutput, velocity)
 }
@@ -48,7 +51,7 @@ func (n *Neuron) backPropagate(errorPerOutput, velocity float64) {
 	oldWeights := make([]float64, len(n.weights))
 	copy(oldWeights, n.weights)
 	for i, weight := range n.weights {
-		errorPerWeight := n.inputValue(i) * errorPerSum
+		errorPerWeight := n.inputValue(i, true) * errorPerSum
 		n.weights[i] = weight + errorPerWeight*velocity
 	}
 	for i, input := range n.inputs {
@@ -59,11 +62,11 @@ func (n *Neuron) backPropagate(errorPerOutput, velocity float64) {
 	}
 }
 
-func (n *Neuron) inputValue(i int) float64 {
+func (n *Neuron) inputValue(i int, useCache bool) float64 {
 	// NOTE: the first input value is the threshold.
 	if i == 0 {
 		return -1
 	} else {
-		return n.inputs[i-1].Value()
+		return n.inputs[i-1].Value(useCache)
 	}
 }

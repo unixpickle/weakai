@@ -4,7 +4,7 @@ type NumericInput struct {
 	Number float64
 }
 
-func (n *NumericInput) Value() float64 {
+func (n *NumericInput) Value(bool) float64 {
 	return n.Number
 }
 
@@ -45,7 +45,7 @@ func (n *Network) Adjust(desired []float64, velocity float64) {
 func (n *Network) Evaluate() []float64 {
 	res := make([]float64, len(n.outputs))
 	for i, output := range n.outputs {
-		res[i] = output.Value()
+		res[i] = output.Value(false)
 	}
 	return res
 }

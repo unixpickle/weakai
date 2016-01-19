@@ -55,17 +55,24 @@ func horizontalLineTest() {
 
 	for test := 0; test < 10; test++ {
 		network := NewNetwork(GridSize*GridSize, 1, 0, 10, SigmoidFunction{})
-		for i := 0; i < 500000; i++ {
+		grids := make([][]float64, 4000)
+		desired := make([]float64, len(grids))
+		for i := range grids {
 			input := make([]float64, GridSize*GridSize)
 			for j := range input {
 				input[j] = float64(rand.Intn(2))
 			}
-			desired := 1.0
+			desired[i] = 1.0
 			if bitmapHasHorizontal(input) {
-				desired = 0.0
+				desired[i] = 0.0
 			}
+			grids[i] = input
+		}
+		for i := 0; i < 500000; i++ {
+			input := grids[i%len(grids)]
+			desiredValue := desired[i%len(grids)]
 			network.SetInput(input)
-			network.Adjust([]float64{desired}, 1)
+			network.Adjust([]float64{desiredValue}, 1)
 		}
 		for i := 0; i < 1000; i++ {
 			maxError += 1

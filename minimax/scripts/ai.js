@@ -11,7 +11,9 @@
     // Allow a redraw before doing all our computation on the UI thread.
     // TODO: do Minimax in a WebWorker so that we don't need to do this.
     window.requestAnimationFrame(function() {
-      callback(minimaxRoot(gameState));
+      window.requestAnimationFrame(function() {
+        callback(minimaxRoot(gameState));
+      });
     });
   };
 

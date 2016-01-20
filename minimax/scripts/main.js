@@ -26,7 +26,7 @@
 
   function playAITurn() {
     boardView.element().className = 'board-ai-turn';
-    getAITurn(function(moves) {
+    window.app.optimalTurn(gameState, function(moves) {
       if (moves.length === 0) {
         handleAILoss();
         return;
@@ -47,21 +47,6 @@
       };
       setTimeout(triggerNext, 300);
     });
-  }
-
-  function getAITurn(cb) {
-    // TODO: use the minimax algorithm here.
-    var g = gameState;
-    var res = [];
-    while (g.playerTurn() === 2) {
-      var m = g.availableMoves();
-      if (m.length === 0) {
-        break;
-      }
-      g = g.stateAfterMove(m[0]);
-      res.push(m[0]);
-    }
-    cb(res);
   }
 
   function handleAILoss() {

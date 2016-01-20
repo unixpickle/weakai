@@ -21,3 +21,26 @@
     top: calc(50% - 280px);
   }
 }
+
+.board-piece {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: 100% 100%;
+}
+
+.board-piece-player1 {
+  background-image: url('../images/player1_piece.svg');
+}
+
+.board-piece-player2 {
+  background-image: url('../images/player2_piece.svg');
+}
+
+.board-piece-player1-king {
+  background-image: url('../images/player1_king.svg');
+}
+
+.board-piece-player2-king {
+  background-image: url('../images/player2_king.svg');
+}

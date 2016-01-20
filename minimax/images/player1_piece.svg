@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1"
+     viewBox="0 0 30 30">
+  <defs>
+    <linearGradient id="piece-shine" x1="0" x2="100%" y1="0" y2="100%">
+      <stop offset="0%" stop-color="#111" />
+      <stop offset="49%" stop-color="#444" />
+      <stop offset="49.0001%" stop-color="#000" />
+      <stop offset="100%" stop-color="#555" />
+    </linearGradient>
+  </defs>
+  <circle cx="15" cy="15" r="12" fill="url(#piece-shine)" />
+</svg>

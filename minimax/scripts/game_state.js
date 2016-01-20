@@ -50,21 +50,21 @@
   };
 
   GameState.prototype.stateAfterMove = function(move) {
-    var state = Object.create(GameState);
+    var state = Object.create(GameState.prototype);
     state._playerTurn = this._playerTurn;
     state._specificJumpingPosition = null;
     state._board = this._board.slice();
 
     state._setPieceAtPosition(move.getSource(), null);
-    var jumpedPos = move.getJumpedPosition();
+    var jumpedPos = move.jumpedPosition();
     if (jumpedPos !== null) {
       state._setPieceAtPosition(jumpedPos, null);
     }
 
     if ((move.getDestination().y === 0 && state._playerTurn === 1) ||
         (move.getDestination().y === GameState.BOARD_SIZE-1 && state._playerTurn === 2)) {
-      var newPiece = new PieceState(move.getPiece().getId(), move.getPiece().getPlayer(), true);
-      state._setPieceAtPosition(move.getDestination(), newPiece);
+      var kingPiece = new PieceState(move.getPiece().getId(), move.getPiece().getPlayer(), true);
+      state._setPieceAtPosition(move.getDestination(), kingPiece);
     } else {
       state._setPieceAtPosition(move.getDestination(), move.getPiece());
     }
@@ -75,6 +75,8 @@
       state._playerTurn = (this._playerTurn === 1 ? 2 : 1);
       state._specificJumpingPosition = null;
     }
+
+    return state;
   };
 
   GameState.prototype._availableJumps = function() {
@@ -159,6 +161,7 @@
         }
       }
     }
+    return res;
   };
 
   GameState.prototype._setPieceAtPosition = function(pos, piece) {
@@ -168,7 +171,7 @@
   function PieceState(id, player, isKing) {
     this._id = id;
     this._player = player;
-    this._isKing = false;
+    this._isKing = isKing;
   }
 
   PieceState.prototype.getId = function() {
@@ -213,5 +216,6 @@
   };
 
   window.app.GameState = GameState;
+  window.app.Move = Move;
 
 })();

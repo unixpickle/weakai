@@ -1,6 +1,8 @@
 (function() {
 
   function BoardView() {
+    window.EventEmitter.call(this);
+
     this._pieces = {};
     this._element = document.getElementById('board');
 
@@ -11,12 +13,21 @@
         if (state === null) {
           continue;
         }
-        var piece = new Piece(state.getPlayer(), {x: x, y: y});
+        var piece = new Piece(state.getId(), state.getPlayer(), {x: x, y: y});
         this._element.appendChild(piece.element());
         this._pieces[state.getId()] = piece;
       }
     }
+
+    this._registerMouseEvents();
   }
+
+  BoardView.prototype = Object.create(window.EventEmitter.prototype);
+  BoardView.prototype.constructor = BoardView;
+
+  BoardView.prototype.element = function() {
+    return this._element;
+  };
 
   BoardView.prototype.updateWithState = function(gameState) {
     this._element.innerHTML = '';
@@ -36,9 +47,72 @@
     }
   };
 
-  function Piece(player, position) {
+  BoardView.prototype._registerMouseEvents = function() {
+    this._element.addEventListener('mousedown', this._startMouseDragging.bind(this));
+  };
+
+  BoardView.prototype._startMouseDragging = function(e) {
+    // This prevents the cursor from being an IBeam
+    e.preventDefault();
+
+    var movePiece = null;
+    var startPosition = null;
+    var pieceIds = Object.keys(this._pieces);
+    for (var i = 0, len = pieceIds.length; i < len; ++i) {
+      var piece = this._pieces[pieceIds[i]];
+      if (!piece.element().parentNode || piece.getPlayer() !== 1) {
+        continue;
+      }
+      var pieceRect = piece.element().getBoundingClientRect();
+      var pieceSize = piece.element().offsetWidth;
+      if (e.clientX >= pieceRect.left && e.clientY >= pieceRect.top &&
+          e.clientX < pieceRect.left+pieceSize &&
+          e.clientY < pieceRect.top+pieceSize) {
+        movePiece = piece;
+        startPosition = piece.getPosition();
+        break;
+      }
+    }
+
+    if (movePiece === null) {
+      return;
+    }
+
+    var upHandler, moveHandler;
+    upHandler = function() {
+      window.removeEventListener('mouseup', upHandler);
+      window.removeEventListener('mousemove', moveHandler);
+      this._finishMovingPiece(movePiece);
+    }.bind(this);
+    moveHandler = function(newEvent) {
+      var width = this._element.offsetWidth;
+      var height = this._element.offsetHeight;
+      var xOffset = newEvent.clientX - e.clientX;
+      var yOffset = newEvent.clientY - e.clientY;
+      var scaler = window.app.GameState.BOARD_SIZE / width;
+      movePiece.setPosition({
+        x: startPosition.x + xOffset*scaler,
+        y: startPosition.y + yOffset*scaler
+      });
+    }.bind(this);
+    window.addEventListener('mouseup', upHandler);
+    window.addEventListener('mousemove', moveHandler);
+  };
+
+  BoardView.prototype._finishMovingPiece = function(piece) {
+    var position = piece.getPosition();
+    var roundedPos = {
+      x: Math.round(position.x),
+      y: Math.round(position.y)
+    };
+    this.emit('move', piece.getId(), roundedPos);
+  };
+
+  function Piece(id, player, position) {
+    this._id = id;
     this._element = document.createElement('div');
     this._element.className = 'board-piece board-piece-player' + player;
+    this._element.style.pointerEvents = 'none';
     this._player = player;
     this._isKing = false;
     this._position = position;
@@ -47,6 +121,10 @@
 
   Piece.prototype.element = function() {
     return this._element;
+  };
+
+  Piece.prototype.getId = function() {
+    return this._id;
   };
 
   Piece.prototype.getPlayer = function() {
@@ -74,8 +152,9 @@
   };
 
   Piece.prototype._repositionElement = function() {
-    this._element.style.left = ((this._position.x / 8)*100).toFixed(2) + '%';
-    this._element.style.top = ((this._position.y / 8)*100).toFixed(2) + '%';
+    var size = window.app.GameState.BOARD_SIZE;
+    this._element.style.left = ((this._position.x/size)*100).toFixed(2) + '%';
+    this._element.style.top = ((this._position.y/size)*100).toFixed(2) + '%';
   };
 
   window.app.BoardView = BoardView;

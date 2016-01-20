@@ -22,6 +22,11 @@
   }
 }
 
+.board-ai-turn {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .board-piece {
   position: absolute;
   width: 12.5%;

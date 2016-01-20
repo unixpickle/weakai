@@ -45,7 +45,7 @@
           setTimeout(triggerNext, 500);
         }
       };
-      setTimeout(triggerNext, 300);
+      triggerNext();
     });
   }
 

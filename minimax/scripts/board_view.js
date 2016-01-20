@@ -20,6 +20,10 @@
     }
 
     this._registerMouseEvents();
+
+    if ('ontouchstart' in window) {
+      this._registerTouchEvents();
+    }
   }
 
   BoardView.prototype = Object.create(window.EventEmitter.prototype);
@@ -48,15 +52,68 @@
   };
 
   BoardView.prototype._registerMouseEvents = function() {
-    this._element.addEventListener('mousedown', this._startMouseDragging.bind(this));
+    this._element.addEventListener('mousedown', function(e) {
+      // This prevents the cursor from being an IBeam
+      e.preventDefault();
+
+      this._startDragging(false, e);
+    }.bind(this));
   };
 
-  BoardView.prototype._startMouseDragging = function(e) {
-    // This prevents the cursor from being an IBeam
-    e.preventDefault();
+  BoardView.prototype._registerTouchEvents = function() {
+    this._element.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      var touch = e.touches[0];
+      this._startDragging(true, {clientX: touch.clientX, clientY: touch.clientY});
+    }.bind(this));
+  };
 
+  BoardView.prototype._startDragging = function(touch, e) {
+    var movePiece = this._pieceForEvent(e);
+    if (movePiece === null) {
+      return;
+    }
+    var startPosition = movePiece.getPosition();
+
+    var upHandler, moveHandler;
+
+    upHandler = function() {
+      if (touch) {
+        this._element.removeEventListener('touchend', upHandler);
+        this._element.removeEventListener('touchcancel', upHandler);
+        this._element.removeEventListener('touchmove', moveHandler);
+      } else {
+        window.removeEventListener('mouseup', upHandler);
+        window.removeEventListener('mousemove', moveHandler);
+      }
+      this._finishMovingPiece(movePiece);
+    }.bind(this);
+
+    moveHandler = function(newEvent) {
+      if (touch) {
+        newEvent = newEvent.touches[0];
+      }
+      var xOffset = newEvent.clientX - e.clientX;
+      var yOffset = newEvent.clientY - e.clientY;
+      var scaler = window.app.GameState.BOARD_SIZE / this._element.offsetWidth;
+      movePiece.setPosition({
+        x: startPosition.x + xOffset*scaler,
+        y: startPosition.y + yOffset*scaler
+      });
+    }.bind(this);
+
+    if (touch) {
+      this._element.addEventListener('touchend', upHandler);
+      this._element.addEventListener('touchcancel', upHandler);
+      this._element.addEventListener('touchmove', moveHandler);
+    } else {
+      window.addEventListener('mouseup', upHandler);
+      window.addEventListener('mousemove', moveHandler);
+    }
+  };
+
+  BoardView.prototype._pieceForEvent = function(e) {
     var movePiece = null;
-    var startPosition = null;
     var pieceIds = Object.keys(this._pieces);
     for (var i = 0, len = pieceIds.length; i < len; ++i) {
       var piece = this._pieces[pieceIds[i]];
@@ -68,35 +125,10 @@
       if (e.clientX >= pieceRect.left && e.clientY >= pieceRect.top &&
           e.clientX < pieceRect.left+pieceSize &&
           e.clientY < pieceRect.top+pieceSize) {
-        movePiece = piece;
-        startPosition = piece.getPosition();
-        break;
+        return piece;
       }
     }
-
-    if (movePiece === null) {
-      return;
-    }
-
-    var upHandler, moveHandler;
-    upHandler = function() {
-      window.removeEventListener('mouseup', upHandler);
-      window.removeEventListener('mousemove', moveHandler);
-      this._finishMovingPiece(movePiece);
-    }.bind(this);
-    moveHandler = function(newEvent) {
-      var width = this._element.offsetWidth;
-      var height = this._element.offsetHeight;
-      var xOffset = newEvent.clientX - e.clientX;
-      var yOffset = newEvent.clientY - e.clientY;
-      var scaler = window.app.GameState.BOARD_SIZE / width;
-      movePiece.setPosition({
-        x: startPosition.x + xOffset*scaler,
-        y: startPosition.y + yOffset*scaler
-      });
-    }.bind(this);
-    window.addEventListener('mouseup', upHandler);
-    window.addEventListener('mousemove', moveHandler);
+    return null;
   };
 
   BoardView.prototype._finishMovingPiece = function(piece) {

@@ -6,5 +6,5 @@ I have begun watching some of [MIT's OpenCourseware AI lectures](http://ocw.mit.
 
 Here are the weak AI demos I've implemented:
 
- * [minimax](minimax) - checkers AI that uses the minimax algorithm. This is an HTML+CSS+SVG+JavaScript application for Desktops&mdash;it does not support touch screens.
- * [neuralnets](neuralnets) - an implementation of basic neural networks with back-propagation. I wrote two tests for the neural net, the second of which demonstrates ANNs' ability to generalize what they've learned.
+ * [minimax](minimax) - checkers AI that uses the minimax algorithm. This is an HTML+CSS+SVG+JavaScript application.
+ * [neuralnets](neuralnets) - a Go implementation of basic neural networks and back-propagation. I wrote two tests for the neural net, the second of which demonstrates ANNs' ability to generalize what they've learned.

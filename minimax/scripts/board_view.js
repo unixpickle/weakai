@@ -1,23 +1,40 @@
 (function() {
 
   function BoardView() {
-    this._pieces = [];
+    this._pieces = {};
     this._element = document.getElementById('board');
-    for (var i = 0; i < 3; ++i) {
-      for (var j = 0; j < 8; ++j) {
-        if ((j & 1) !== (i & 1)) {
+
+    var gameState = new window.app.GameState();
+    for (var x = 0; x < window.app.GameState.BOARD_SIZE; ++x) {
+      for (var y = 0; y < window.app.GameState.BOARD_SIZE; ++y) {
+        var state = gameState.pieceAtPosition({x: x, y: y});
+        if (state === null) {
           continue;
         }
-        for (var player = 1; player < 3; ++player) {
-          var x = (player === 1 ? j : 7-j);
-          var y = (player === 1 ? 7-i : i);
-          var piece = new Piece(player, {x: x, y: y});
-          this._pieces.push(piece);
-          this._element.appendChild(piece.element());
-        }
+        var piece = new Piece(state.getPlayer(), {x: x, y: y});
+        this._element.appendChild(piece.element());
+        this._pieces[state.getId()] = piece;
       }
     }
   }
+
+  BoardView.prototype.updateWithState = function(gameState) {
+    this._element.innerHTML = '';
+    for (var x = 0; x < window.app.GameState.BOARD_SIZE; ++x) {
+      for (var y = 0; y < window.app.GameState.BOARD_SIZE; ++y) {
+        var state = gameState.pieceAtPosition({x: x, y: y});
+        if (state === null) {
+          continue;
+        }
+        var piece = this._pieces[state.getId()];
+        piece.setPosition({x: x, y: y});
+        if (state.isKing() && !piece.isKing()) {
+          piece.becomeKing();
+        }
+        this._element.appendChild(piece.element());
+      }
+    }
+  };
 
   function Piece(player, position) {
     this._element = document.createElement('div');

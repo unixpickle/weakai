@@ -1,0 +1,23 @@
+@media (max-height: 600px), (max-width: 600px) {
+  #board {
+    position: absolute;
+    background-image: url('../images/board.svg');
+    background-size: 64px 64px;
+    width: 256px;
+    height: 256px;
+    left: calc(50% - 128px);
+    top: calc(50% - 128px);
+  }
+}
+
+@media (min-height: 600px) and (min-width: 600px) {
+  #board {
+    position: absolute;
+    background-image: url('../images/board.svg');
+    background-size: 140px 140px;
+    width: 560px;
+    height: 560px;
+    left: calc(50% - 280px);
+    top: calc(50% - 280px);
+  }
+}

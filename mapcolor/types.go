@@ -9,7 +9,7 @@ type Constraint interface {
 	// RestrictedDomain computes the domain for one of the
 	// two variables (specified by idx) given the domain of
 	// the other variable.
-	RestrictedDomain(idx int, d []Value) []Value
+	RestrictedDomain(idx int, d Domain) Domain
 }
 
 type Variable interface {

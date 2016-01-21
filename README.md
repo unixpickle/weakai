@@ -8,3 +8,4 @@ Here are the weak AI demos I've implemented:
 
  * [minimax](minimax) - checkers AI that uses the minimax algorithm. This is an HTML+CSS+SVG+JavaScript application.
  * [neuralnets](neuralnets) - a Go implementation of basic neural networks and back-propagation. I wrote two tests for the neural net, the second of which demonstrates ANNs' ability to generalize what they've learned.
+ * [mapcolor](mapcolor) - four-color a map of the USA using a constraint search. This is a Go program that modifies an SVG of the USA and outputs the result.

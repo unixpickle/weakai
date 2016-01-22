@@ -46,13 +46,17 @@
 
     // On chrome, onloadedmetadata will never be called, so we
     // use a timeout to start emitting frames anyway.
-    var loadTimeout = setInterval(function() {
-      this._video.onloadedmetadata = null;
-      this._beginEmittingFrames();
-    }.bind(this), 1000);
+    var loadInterval;
+    loadInterval = setInterval(function() {
+      if (this._video.videoWidth) {
+        clearInterval(loadInterval);
+        this._video.onloadedmetadata = null;
+        this._beginEmittingFrames();
+      }
+    }.bind(this), 500);
 
     this._video.onloadedmetadata = function() {
-      clearTimeout(loadTimeout);
+      clearInterval(loadInterval);
       this._beginEmittingFrames();
     }.bind(this);
   };

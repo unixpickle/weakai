@@ -8,6 +8,7 @@
 
     this._canRecognize = false;
     this._snapped = false;
+    this._training = false;
 
     this._setEnabledStates([false, false, false]);
     this._registerEvents();
@@ -17,28 +18,34 @@
   Controls.prototype.constructor = Controls;
 
   Controls.prototype.enable = function() {
-    this._setEnabledStates([false, false, true]);
+    this._updateState();
   };
 
   Controls.prototype.setCanRecognize = function(flag) {
     this._canRecognize = flag;
-    if (this._snapped) {
-      if (this._canRecognize) {
-        this._setEnabledStates([true, true, true]);
-      } else {
-        this._setEnabledStates([true, false, true]);
-      }
-    }
+    this._updateState();
   };
 
   Controls.prototype.setSnapped = function(flag) {
-    if (flag === this._snapped) {
-      return;
-    }
     this._snapped = flag;
+    this._updateState();
+  };
+
+  Controls.prototype.setTraining = function(flag) {
+    this._training = flag;
+    this._updateState();
+  };
+
+  Controls.prototype._updateState = function() {
     if (this._snapped) {
-      this._setEnabledStates([true, this._canRecognize, true]);
       this._snapButton.innerText = 'Back to Camera';
+      if (this._training) {
+        this._setEnabledStates([true, false, false]);
+        this._trainButton.innerText = 'Cancel Training';
+      } else {
+        this._setEnabledStates([true, this._canRecognize, true]);
+        this._trainButton.innerText = 'Train';
+      }
     } else {
       this._setEnabledStates([false, false, true]);
       this._snapButton.innerText = 'Freeze Picture';
@@ -53,7 +60,15 @@
   };
 
   Controls.prototype._registerEvents = function() {
-    this._trainButton.addEventListener('click', this.emit.bind(this, 'train'));
+    this._trainButton.addEventListener('click', function() {
+      if (this._training) {
+        this.setTraining(false);
+        this.emit('cancelTrain');
+      } else {
+        this.setTraining(true);
+        this.emit('train');
+      }
+    }.bind(this));
     this._recognizeButton.addEventListener('click', this.emit.bind(this, 'recognize'));
     this._snapButton.addEventListener('click', function() {
       if (this._snapped) {

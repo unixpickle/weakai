@@ -40,7 +40,16 @@
   };
 
   App.prototype.recognize = function() {
-    // TODO: this.
+    var match = window.app.findSubImage(this._canvas, this._trainedImage);
+
+    this._drawLastFrame();
+    var ctx = this._canvas.getContext('2d');
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.rect(match.x, match.y, this._trainedImage.width, this._trainedImage.height);
+    ctx.stroke();
   };
 
   App.prototype._registerCameraEvents = function() {

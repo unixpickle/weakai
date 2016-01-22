@@ -1,0 +1,19 @@
+body {
+  font-family: sans-serif;
+}
+
+#controls {
+  text-align: center;
+}
+
+#canvas {
+  position: absolute;
+  margin-top: 20px;
+}
+
+#error {
+  text-align: center;
+  font-size: 30px;
+  color: red;
+  margin-top: 30px;
+}

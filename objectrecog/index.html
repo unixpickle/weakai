@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Object Recognition</title>
+    <link rel="stylesheet" href="styles/main.css" type="text/css">
+    <script type="text/javascript">
+    window.app = {};
+    </script>
+    <script src="scripts/eventemitter.js"></script>
+    <script src="scripts/camera.js"></script>
+    <script src="scripts/controls.js"></script>
+    <script src="scripts/main.js"></script>
+  </head>
+  <body>
+    <div id="controls">
+      <button id="train-button">Train</button>
+      <button id="recognize-button">Recognize</button>
+      <button id="snap-button">Freeze Picture</button>
+    </div>
+    <canvas id="canvas">
+      Your device does not support canvas.
+    </canvas>
+  </body>
+</html>

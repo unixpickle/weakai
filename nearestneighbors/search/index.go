@@ -84,6 +84,9 @@ func (i *Index) vectorForKeywordMap(m map[string]int) []float64 {
 	var magnitude float64
 	for keyword, count := range m {
 		idx := sort.SearchStrings(i.keywords, keyword)
+		if idx == len(i.keywords) || i.keywords[idx] != keyword {
+			continue
+		}
 		vector[idx] += float64(count)
 		magnitude += float64(count)
 	}

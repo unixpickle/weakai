@@ -82,9 +82,10 @@ func (i *Index) SearchResults(query string) []string {
 func (i *Index) vectorForKeywordMap(m map[string]int) []float64 {
 	vector := make([]float64, len(i.keywords))
 	var magnitude float64
-	for j, keyword := range i.keywords {
-		vector[j] = float64(m[keyword])
-		magnitude += math.Pow(vector[j], 2)
+	for keyword, count := range m {
+		idx := sort.SearchStrings(i.keywords, keyword)
+		vector[idx] += float64(count)
+		magnitude += float64(count)
 	}
 	magnitude = math.Sqrt(magnitude)
 	if magnitude == 0 {
@@ -116,6 +117,8 @@ func keywordsFromEntries(entries []rawIndexEntry) []string {
 	for word := range words {
 		res = append(res, word)
 	}
+
+	sort.Strings(res)
 
 	return res
 }

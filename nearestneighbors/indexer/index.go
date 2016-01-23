@@ -18,13 +18,13 @@ type IndexedPage struct {
 	KeywordCount map[string]int `json:"keywords"`
 }
 
-func IndexWikipedia(keywords []string, maxCount int, startPage string) ([]IndexedPage, error) {
+func IndexWikipedia(maxCount int, startPage string) ([]IndexedPage, error) {
 	visited := []string{}
 	toVisit := []string{startPage}
 	res := make([]IndexedPage, 0, maxCount)
 
 	for len(toVisit) > 0 {
-		indexes, branches, err := indexPages(keywords, toVisit)
+		indexes, branches, err := indexPages(toVisit)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +51,7 @@ func IndexWikipedia(keywords []string, maxCount int, startPage string) ([]Indexe
 	return res, nil
 }
 
-func indexPages(keywords, pages []string) (ind []IndexedPage, branches []string, err error) {
+func indexPages(pages []string) (ind []IndexedPage, branches []string, err error) {
 	failChan := make(chan struct{})
 	errorChan := make(chan error, 1)
 
@@ -82,7 +82,7 @@ func indexPages(keywords, pages []string) (ind []IndexedPage, branches []string,
 					return
 				}
 
-				res, newBranches, err := indexPage(keywords, page)
+				res, newBranches, err := indexPage(page)
 				if err != nil {
 					select {
 					case errorChan <- err:
@@ -108,7 +108,7 @@ func indexPages(keywords, pages []string) (ind []IndexedPage, branches []string,
 	}
 }
 
-func indexPage(keywords []string, page string) (ind map[string]int, branches []string, err error) {
+func indexPage(page string) (ind map[string]int, branches []string, err error) {
 	resp, err := http.Get(page)
 	if err != nil {
 		return
@@ -131,16 +131,9 @@ func indexPage(keywords []string, page string) (ind map[string]int, branches []s
 	}
 	words := strings.Fields(strings.ToLower(pageText))
 
-	keywordsSet := map[string]bool{}
-	for _, kw := range keywords {
-		keywordsSet[kw] = true
-	}
-
 	ind = map[string]int{}
 	for _, word := range words {
-		if keywordsSet[word] {
-			ind[word] = ind[word] + 1
-		}
+		ind[word] = ind[word] + 1
 	}
 
 	links := findWikiLinks(content)

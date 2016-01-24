@@ -1,0 +1,27 @@
+_Name,Age,Children,Sings,Acts,Active,*HasBeenMarried,Female
+Leonardo DiCaprio,41,0,false,false,true,false,false
+Johnny Depp,52,2,false,false,true,true,false
+Brad Pitt,52,6,false,false,true,true,false
+Tom Cruise,53,3,false,false,true,true,false
+Tom Hanks,59,4,false,false,true,true,false
+Christian Bale,41,2,false,false,true,true,false
+Will Smith,47,0,false,false,true,true,false
+Denzel Washington,61,4,false,false,true,true,false
+Robert Downey Jr.,50,3,false,false,true,true,false
+Justin Bieber,21,0,false,false,true,false,false
+Kanye West,38,2,false,false,true,true,false
+Eminem,43,3,false,false,true,true,false
+Chris Martin,38,0,false,false,false,true,false
+Angelina Jolie,40,6,false,false,true,true,true
+Jennifer Lawrence,25,0,false,false,true,false,true
+Natalie Portman,34,1,false,false,true,true,true
+Scarlett Johansson,31,1,false,false,true,true,true
+Jennifer Aniston,46,0,false,false,true,true,true
+Emma Stone,27,0,false,false,true,false,true
+Mila Kunis,32,1,false,false,true,true,true
+Sandra Bullock,51,2,false,false,true,true,true
+Kristen Stewart,25,0,false,false,true,false,true
+Kendall Jenner,20,0,false,false,true,false,true
+Chloë Grace Moretz,18,0,false,false,true,false,true
+Snooki,28,2,false,false,true,true,true
+Selena Gomez,23,0,false,false,true,false,true

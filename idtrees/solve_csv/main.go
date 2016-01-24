@@ -2,67 +2,43 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
+	"strconv"
 
 	"github.com/unixpickle/weakai/idtrees"
 )
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "Usage: idtrees <people.csv>")
+		fmt.Fprintln(os.Stderr, "Usage: idtrees <data.csv>")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "  The first row of the input CSV file specifies field names.")
+		fmt.Fprintln(os.Stderr, "  Fields with names starting with _ are ignored.")
+		fmt.Fprintln(os.Stderr, "  The field whose name begins with * is identified by the tree.")
+		fmt.Fprintln(os.Stderr, "")
 		os.Exit(1)
 	}
 
-	contents, err := ioutil.ReadFile(os.Args[1])
+	csv, err := ReadCSVFile(os.Args[1])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	lines := strings.Split(string(contents), "\n")
-	people := []*Person{}
-	for i, line := range lines {
-		if i == 0 {
-			continue
+	numSpecial := 0
+	for _, field := range csv.Fields {
+		if field.Special {
+			numSpecial++
 		}
-		trimmed := strings.TrimSpace(line)
-		if len(trimmed) == 0 {
-			continue
-		}
-		person, err := ParsePerson(trimmed)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		people = append(people, person)
+	}
+	if numSpecial != 1 {
+		fmt.Fprintln(os.Stderr, "One field's name must start with *, indicating that it is "+
+			"the field to identify.")
+		os.Exit(1)
 	}
 
-	dataSet := make(idtrees.DataSet, len(people))
-	for i, person := range people {
-		dataSet[i] = person
-	}
-
-	idtrees.CreateBoolField(dataSet, func(p idtrees.Entry) bool {
-		return p.(*Person).active
-	}, "Is this person still active?")
-	idtrees.CreateBoolField(dataSet, func(p idtrees.Entry) bool {
-		return p.(*Person).acts
-	}, "Does this person act?")
-	idtrees.CreateBoolField(dataSet, func(p idtrees.Entry) bool {
-		return p.(*Person).sings
-	}, "Does this person sing?")
-	idtrees.CreateBoolField(dataSet, func(p idtrees.Entry) bool {
-		return p.(*Person).female
-	}, "Is this person female?")
-
-	idtrees.CreateBisectingIntFields(dataSet, func(p idtrees.Entry) int {
-		return p.(*Person).age
-	}, "Is the person over %d years old? (Dead people are 0)")
-	idtrees.CreateBisectingIntFields(dataSet, func(p idtrees.Entry) int {
-		return p.(*Person).children
-	}, "Does the person have more than %d child(ren)?")
+	dataSet := generateFieldlessDataSet(csv)
+	generateFields(csv, dataSet)
 
 	treeRoot := idtrees.GenerateTree(dataSet)
 	if treeRoot == nil {
@@ -72,4 +48,69 @@ func main() {
 
 	fmt.Println("Got a tree:")
 	fmt.Println(treeRoot)
+}
+
+func generateFieldlessDataSet(csv *CSV) idtrees.DataSet {
+	var specialField *Field
+	for _, field := range csv.Fields {
+		if field.Special {
+			specialField = field
+			break
+		}
+	}
+
+	dataSet := make(idtrees.DataSet, len(csv.Entries))
+	for i, entry := range csv.Entries {
+		var class idtrees.Value
+		v := entry.Values[specialField]
+		if specialField.Type == Integer {
+			class = idtrees.StringValue(specialField.Name + " = " + strconv.Itoa(v.(int)))
+		} else {
+			class = idtrees.StringValue(specialField.Name + " = " + v.(string))
+		}
+		dataSet[i] = &TreeEntry{
+			csvEntry: entry,
+			valueMap: map[idtrees.Field]idtrees.Value{},
+			class:    class,
+		}
+	}
+	return dataSet
+}
+
+func generateFields(csv *CSV, dataSet idtrees.DataSet) {
+	for _, field := range csv.Fields {
+		if field.Ignore || field.Special {
+			continue
+		}
+		addField(dataSet, field)
+	}
+}
+
+func addField(dataSet idtrees.DataSet, field *Field) {
+	switch field.Type {
+	case Integer:
+		idtrees.CreateBisectingIntFields(dataSet, func(e idtrees.Entry) int {
+			csvEntry := e.(*TreeEntry).csvEntry
+			return csvEntry.Values[field].(int)
+		}, field.Name+" > %d")
+	case String:
+		idtrees.CreateListField(dataSet, func(e idtrees.Entry) idtrees.Value {
+			csvEntry := e.(*TreeEntry).csvEntry
+			return idtrees.StringValue(csvEntry.Values[field].(string))
+		}, field.Name)
+	}
+}
+
+type TreeEntry struct {
+	csvEntry *Entry
+	valueMap map[idtrees.Field]idtrees.Value
+	class    idtrees.Value
+}
+
+func (t *TreeEntry) Class() idtrees.Value {
+	return t.class
+}
+
+func (t *TreeEntry) FieldValues() map[idtrees.Field]idtrees.Value {
+	return t.valueMap
 }

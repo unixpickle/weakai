@@ -7,19 +7,14 @@ import (
 
 type BoolFieldGetter func(e Entry) bool
 type IntFieldGetter func(e Entry) int
+type GeneralFieldGetter func(e Entry) Value
 
-// A BoolField is a field which reports BoolValue(true) and
-// BoolValue(false) as its potential values.
-type BoolField string
+// A StringValue is an fmt.Stringer that returns itself.
+type StringValue string
 
-// String returns string(b)
-func (b BoolField) String() string {
-	return string(b)
-}
-
-// Values returns BoolValue(true) and BoolValue(false).
-func (b BoolField) Values() []Value {
-	return []Value{BoolValue(true), BoolValue(false)}
+// String returns string(s).
+func (s StringValue) String() string {
+	return string(s)
 }
 
 // A BoolValue is an fmt.Stringer that returns "true" or "false"
@@ -35,18 +30,14 @@ func (b BoolValue) String() string {
 	}
 }
 
-// A StringValue is an fmt.Stringer that returns itself.
-type StringValue string
-
-// String returns string(s).
-func (s StringValue) String() string {
-	return string(s)
-}
+// A BoolField is a field which reports BoolValue(true) and
+// BoolValue(false) as its potential values.
+type BoolField string
 
 // CreateBoolField generates a field with two possibile answers.
 // It adds the field to each Entry in the DataSet, specifying the
-// answer returned by g.
-// It returns the generated Field.
+// boolean value returned by g.
+// It returns the generated BoolField.
 func CreateBoolField(d DataSet, g BoolFieldGetter, label string) BoolField {
 	f := BoolField(label)
 	for _, entry := range d {
@@ -55,9 +46,54 @@ func CreateBoolField(d DataSet, g BoolFieldGetter, label string) BoolField {
 	return f
 }
 
+// String returns string(b)
+func (b BoolField) String() string {
+	return string(b)
+}
+
+// Values returns BoolValue(true) and BoolValue(false).
+func (b BoolField) Values() []Value {
+	return []Value{BoolValue(true), BoolValue(false)}
+}
+
+// A ListField is a Field which has a pre-defined
+// list of Values.
+type ListField struct {
+	Label     string
+	ValueList []Value
+}
+
+// CreateListField generates a field with any number of possible Values.
+// It adds the field to each Entry in the DataSet, specifying the
+// Value returned by g.
+// It returns the generated ListField.
+func CreateListField(d DataSet, g GeneralFieldGetter, label string) *ListField {
+	f := &ListField{Label: label, ValueList: []Value{}}
+	seenValues := map[Value]bool{}
+	for _, entry := range d {
+		val := g(entry)
+		entry.FieldValues()[f] = val
+		if !seenValues[val] {
+			seenValues[val] = true
+			f.ValueList = append(f.ValueList, val)
+		}
+	}
+	return f
+}
+
+// String returns l.Label.
+func (l *ListField) String() string {
+	return l.Label
+}
+
+// Values returns l.ValueList.
+func (l *ListField) Values() []Value {
+	return l.ValueList
+}
+
 // CreateBisectingIntFields generates zero or more fields which
 // divide up integer values associated with each Entry.
-// It returns the generated Fields, of which there may be none.
+// It returns the generated BoolFields, of which there may be none.
 //
 // The labelFmt argument should be a format string with a "%d" in it.
 // This will be used to generate labels for each of the fields.

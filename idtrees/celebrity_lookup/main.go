@@ -24,7 +24,7 @@ func main() {
 	}
 
 	lines := strings.Split(string(contents), "\n")
-	fmt.Println("Name,Age,Children,Sings,Acts,Active,HasBeenMarried,Female")
+	fmt.Println("_Name,Age,Children,Sings,Acts,Active,*HasBeenMarried,Female")
 	for _, u := range lines {
 		trimmed := strings.TrimSpace(u)
 		if len(trimmed) == 0 {
@@ -83,7 +83,7 @@ func fetchCelebrityInfo(wikipediaURL string) (*CelebrityInfo, error) {
 	}
 	res.Age, _ = strconv.Atoi(born[4])
 
-	occupationsExp := regexp.MustCompile(">Occupation(\\(s\\)|s)?((.|\n)*?)</tr>")
+	occupationsExp := regexp.MustCompile(">Occupation(\\(s\\)|s)<?((.|\n)*?)</tr>")
 	occupations := occupationsExp.FindStringSubmatch(source)
 	if occupations != nil {
 		if ok, _ := regexp.MatchString("[sS]inger", occupations[2]); ok {
@@ -94,7 +94,7 @@ func fetchCelebrityInfo(wikipediaURL string) (*CelebrityInfo, error) {
 		}
 	}
 
-	childrenExp := regexp.MustCompile(">Children(.|\n)*?<td>\\s*([0-9]*)")
+	childrenExp := regexp.MustCompile(">Children<(.|\n)*?<td>\\s*([0-9]*)")
 	children := childrenExp.FindStringSubmatch(source)
 	if children != nil {
 		res.Children, _ = strconv.Atoi(children[2])

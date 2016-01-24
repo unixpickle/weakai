@@ -7,6 +7,10 @@ https://en.wikipedia.org/wiki/Christian_Bale
 https://en.wikipedia.org/wiki/Will_Smith
 https://en.wikipedia.org/wiki/Denzel_Washington
 https://en.wikipedia.org/wiki/Robert_Downey_Jr.
+https://en.wikipedia.org/wiki/Justin_Bieber
+https://en.wikipedia.org/wiki/Kanye_West
+https://en.wikipedia.org/wiki/Eminem
+https://en.wikipedia.org/wiki/Chris_Martin
 https://en.wikipedia.org/wiki/Angelina_Jolie
 https://en.wikipedia.org/wiki/Jennifer_Lawrence
 https://en.wikipedia.org/wiki/Natalie_Portman
@@ -16,3 +20,7 @@ https://en.wikipedia.org/wiki/Emma_Stone
 https://en.wikipedia.org/wiki/Mila_Kunis
 https://en.wikipedia.org/wiki/Sandra_Bullock
 https://en.wikipedia.org/wiki/Kristen_Stewart
+https://en.wikipedia.org/wiki/Kendall_Jenner
+https://en.wikipedia.org/wiki/Chloë_Grace_Moretz
+https://en.wikipedia.org/wiki/Snooki
+https://en.wikipedia.org/wiki/Selena_Gomez

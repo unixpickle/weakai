@@ -7,19 +7,19 @@ type Question struct {
 	Answers []string
 }
 
-type DataEntry struct {
-	QuestionAnswers map[*Question]string
-	Class           int
+type DataEntry interface {
+	QuestionAnswers() map[*Question]string
+	Class() int
 }
 
-type DataSet []*DataEntry
+type DataSet []DataEntry
 
 func (d DataSet) Questions() []*Question {
 	if len(d) == 0 {
 		return []*Question{}
 	}
-	res := make([]*Question, 0, len(d[0].QuestionAnswers))
-	for q := range d[0].QuestionAnswers {
+	res := make([]*Question, 0, len(d[0].QuestionAnswers()))
+	for q := range d[0].QuestionAnswers() {
 		res = append(res, q)
 	}
 	return res
@@ -29,9 +29,9 @@ func (d DataSet) Classes() []int {
 	res := []int{}
 	seen := map[int]bool{}
 	for _, e := range d {
-		if !seen[e.Class] {
-			seen[e.Class] = true
-			res = append(res, e.Class)
+		if !seen[e.Class()] {
+			seen[e.Class()] = true
+			res = append(res, e.Class())
 		}
 	}
 	return res
@@ -40,7 +40,7 @@ func (d DataSet) Classes() []int {
 func (d DataSet) filter(q *Question, answer string) DataSet {
 	res := DataSet{}
 	for _, x := range d {
-		if x.QuestionAnswers[q] == answer {
+		if x.QuestionAnswers()[q] == answer {
 			res = append(res, x)
 		}
 	}
@@ -50,7 +50,7 @@ func (d DataSet) filter(q *Question, answer string) DataSet {
 func (d DataSet) disorder(allClasses []int) float64 {
 	classCount := map[int]int{}
 	for _, x := range d {
-		classCount[x.Class]++
+		classCount[x.Class()]++
 	}
 
 	// Thank you, information theorists.
@@ -68,9 +68,9 @@ func (d DataSet) homogeneous() (homogeneous bool, class int) {
 	if len(d) == 0 {
 		return true, -1
 	}
-	firstClass := d[0].Class
+	firstClass := d[0].Class()
 	for i := 1; i < len(d); i++ {
-		if d[i].Class != firstClass {
+		if d[i].Class() != firstClass {
 			return false, 0
 		}
 	}

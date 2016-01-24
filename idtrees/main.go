@@ -1,11 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
+	"sort"
 	"strings"
 )
 
@@ -39,43 +38,96 @@ func main() {
 		people = append(people, person)
 	}
 
-	// TODO: generate a bunch of questions here.
+	dataSet := make(DataSet, len(people))
+	for i, person := range people {
+		dataSet[i] = &PersonEntry{person, map[*Question]string{}}
+	}
+
+	addBoolQuestion(dataSet, func(p *Person) bool {
+		return p.Active
+	}).Prompt = "Is this person still active?"
+	addBoolQuestion(dataSet, func(p *Person) bool {
+		return p.Acts
+	}).Prompt = "Does this person act?"
+	addBoolQuestion(dataSet, func(p *Person) bool {
+		return p.Sings
+	}).Prompt = "Does this person sing?"
+	addBoolQuestion(dataSet, func(p *Person) bool {
+		return p.HasBeenMarried
+	}).Prompt = "Has this person been married?"
+
+	addIntQuestion(dataSet, func(p *Person) int {
+		return p.Age
+	}, "Is the person over %d years old? (Dead people are 0)")
+	addIntQuestion(dataSet, func(p *Person) int {
+		return p.Children
+	}, "Does the person have more than %d child(ren)?")
+
+	treeRoot := GenerateIDTree(dataSet)
+	if treeRoot == nil {
+		fmt.Fprintln(os.Stderr, "The data is inconclusive.")
+		os.Exit(1)
+	}
+
+	fmt.Println("Got a useful tree:")
+	fmt.Println(treeRoot)
 }
 
-type Person struct {
-	Name           string
-	Age            int
-	Children       int
-	Sings          bool
-	Acts           bool
-	Active         bool
-	HasBeenMarried bool
-	Female         bool
+type PersonEntry struct {
+	person      *Person
+	questionMap map[*Question]string
 }
 
-func ParsePerson(s string) (p *Person, err error) {
-	var res Person
-	comps := strings.Split(s, ",")
-	if len(comps) != 8 {
-		return nil, errors.New("invalid number of columns")
+func (p *PersonEntry) Class() int {
+	if p.person.Female {
+		return 1
+	} else {
+		return 0
 	}
-	res.Name = comps[0]
-	res.Age, err = strconv.Atoi(comps[1])
-	if err != nil {
-		return
+}
+
+func (p *PersonEntry) QuestionAnswers() map[*Question]string {
+	return p.questionMap
+}
+
+func addBoolQuestion(entries DataSet, getter func(p *Person) bool) *Question {
+	q := &Question{Answers: []string{"yes", "no"}}
+	for _, entry := range entries {
+		personEntry := entry.(*PersonEntry)
+		answer := "no"
+		if getter(personEntry.person) {
+			answer = "yes"
+		}
+		personEntry.questionMap[q] = answer
 	}
-	res.Children, err = strconv.Atoi(comps[2])
-	if err != nil {
-		return
-	}
-	boolFields := []*bool{&res.Sings, &res.Acts, &res.Active, &res.HasBeenMarried,
-		&res.Female}
-	for i := 3; i < len(comps); i++ {
-		if comps[i] == "true" {
-			*(boolFields[i-3]) = true
-		} else if comps[i] != "false" {
-			return nil, errors.New("invalid boolean field: " + comps[i])
+	return q
+}
+
+func addIntQuestion(entries DataSet, getter func(p *Person) int, prompt string) {
+	possibilities := []int{}
+	seenPossibilities := map[int]bool{}
+	for _, entry := range entries {
+		val := getter(entry.(*PersonEntry).person)
+		if !seenPossibilities[val] {
+			seenPossibilities[val] = true
+			possibilities = append(possibilities, val)
 		}
 	}
-	return &res, nil
+	sort.Ints(possibilities)
+
+	for i := 0; i < len(possibilities)-1; i++ {
+		middle := (possibilities[i] + possibilities[i+1]) / 2
+		question := &Question{
+			Prompt:  fmt.Sprintf(prompt, middle),
+			Answers: []string{"yes", "no"},
+		}
+		for _, entry := range entries {
+			personEntry := entry.(*PersonEntry)
+			if getter(personEntry.person) > middle {
+				personEntry.questionMap[question] = "yes"
+			} else {
+				personEntry.questionMap[question] = "no"
+			}
+		}
+	}
 }

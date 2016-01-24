@@ -1,5 +1,10 @@
 package main
 
+import (
+	"strconv"
+	"strings"
+)
+
 type Node struct {
 	IsLeaf    bool
 	LeafClass int
@@ -10,6 +15,25 @@ type Node struct {
 
 func GenerateIDTree(d DataSet) *Node {
 	return generateNode(d, d.Classes(), map[*Question]bool{})
+}
+
+func (n *Node) String() string {
+	if n.IsLeaf {
+		return "Class " + strconv.Itoa(n.LeafClass)
+	}
+
+	res := n.Question.Prompt + "\n"
+	isFirst := true
+	for answer, branch := range n.Branches {
+		if !isFirst {
+			res += "\n"
+		}
+		isFirst = false
+		branchStr := " " + answer + " -> " + branch.String()
+		res += strings.Replace(branchStr, "\n", "\n  ", -1)
+	}
+
+	return res
 }
 
 func generateNode(d DataSet, allClasses []int, usedQuestions map[*Question]bool) *Node {
@@ -32,6 +56,7 @@ func generateNode(d DataSet, allClasses []int, usedQuestions map[*Question]bool)
 		}
 		res.Branches[answer] = subnode
 	}
+	usedQuestions[question] = false
 
 	return res
 }
@@ -39,7 +64,7 @@ func generateNode(d DataSet, allClasses []int, usedQuestions map[*Question]bool)
 func bestQuestion(d DataSet, allClasses []int, usedQuestions map[*Question]bool) *Question {
 	var leastDisorder float64
 	var bestQuestion *Question
-	for i, question := range d.Questions() {
+	for _, question := range d.Questions() {
 		if usedQuestions[question] {
 			continue
 		}
@@ -49,7 +74,7 @@ func bestQuestion(d DataSet, allClasses []int, usedQuestions map[*Question]bool)
 			fractionOfWhole := float64(len(subset)) / float64(len(d))
 			disorder += fractionOfWhole * subset.disorder(allClasses)
 		}
-		if disorder < leastDisorder || i == 0 {
+		if disorder < leastDisorder || bestQuestion == nil {
 			leastDisorder = disorder
 			bestQuestion = question
 		}

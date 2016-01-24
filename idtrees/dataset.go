@@ -48,6 +48,10 @@ func (d DataSet) filter(q *Question, answer string) DataSet {
 }
 
 func (d DataSet) disorder(allClasses []int) float64 {
+	if len(d) == 0 {
+		return 0
+	}
+
 	classCount := map[int]int{}
 	for _, x := range d {
 		classCount[x.Class()]++
@@ -55,12 +59,14 @@ func (d DataSet) disorder(allClasses []int) float64 {
 
 	// Thank you, information theorists.
 	var res float64
+	logBaseConversion := math.Log(float64(len(allClasses)))
 	for _, class := range allClasses {
 		fraction := float64(classCount[class]) / float64(len(d))
 		if fraction != 0 {
-			res -= fraction * math.Log(fraction)
+			res -= fraction * math.Log(fraction) / logBaseConversion
 		}
 	}
+
 	return res
 }
 

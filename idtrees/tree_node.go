@@ -29,7 +29,11 @@ type TreeNode struct {
 // using indentation to signify depth in the tree.
 func (t *TreeNode) String() string {
 	if t.Leaf() {
-		return t.LeafValue.String()
+		if t.LeafValue != nil {
+			return t.LeafValue.String()
+		} else {
+			return "(Unreachable)"
+		}
 	}
 
 	var buf bytes.Buffer

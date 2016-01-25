@@ -9,6 +9,9 @@ type BoolFieldGetter func(e Entry) bool
 type IntFieldGetter func(e Entry) int
 type GeneralFieldGetter func(e Entry) Value
 
+// A ValueAdder adds a Value to an Entry's FieldValues slice.
+type ValueAdder func(e Entry, v Value)
+
 // A StringValue is an fmt.Stringer that returns itself.
 type StringValue string
 
@@ -35,13 +38,14 @@ func (b BoolValue) String() string {
 type BoolField string
 
 // CreateBoolField generates a field with two possibile answers.
-// It adds the field to each Entry in the DataSet, specifying the
-// boolean value returned by g.
+// It adds the field to each Entry in the DataSet using v, specifying
+// the boolean value returned by g.
 // It returns the generated BoolField.
-func CreateBoolField(d DataSet, g BoolFieldGetter, label string) BoolField {
+func CreateBoolField(d *DataSet, g BoolFieldGetter, v ValueAdder, label string) BoolField {
 	f := BoolField(label)
-	for _, entry := range d {
-		entry.FieldValues()[f] = BoolValue(g(entry))
+	d.Fields = append(d.Fields, f)
+	for _, entry := range d.Entries {
+		v(entry, BoolValue(g(entry)))
 	}
 	return f
 }
@@ -64,15 +68,16 @@ type ListField struct {
 }
 
 // CreateListField generates a field with any number of possible Values.
-// It adds the field to each Entry in the DataSet, specifying the
+// It adds the field to each Entry in the DataSet using v, specifying the
 // Value returned by g.
 // It returns the generated ListField.
-func CreateListField(d DataSet, g GeneralFieldGetter, label string) *ListField {
+func CreateListField(d *DataSet, g GeneralFieldGetter, v ValueAdder, label string) *ListField {
 	f := &ListField{Label: label, ValueList: []Value{}}
+	d.Fields = append(d.Fields, f)
 	seenValues := map[Value]bool{}
-	for _, entry := range d {
+	for _, entry := range d.Entries {
 		val := g(entry)
-		entry.FieldValues()[f] = val
+		v(entry, val)
 		if !seenValues[val] {
 			seenValues[val] = true
 			f.ValueList = append(f.ValueList, val)
@@ -98,10 +103,11 @@ func (l *ListField) Values() []Value {
 // The labelFmt argument should be a format string with a "%d" in it.
 // This will be used to generate labels for each of the fields.
 // It should look something like "X is greater than %d.".
-func CreateBisectingIntFields(d DataSet, g IntFieldGetter, labelFmt string) []BoolField {
+func CreateBisectingIntFields(d *DataSet, g IntFieldGetter, v ValueAdder,
+	labelFmt string) []BoolField {
 	possibilities := []int{}
 	seenPossibilities := map[int]bool{}
-	for _, entry := range d {
+	for _, entry := range d.Entries {
 		val := g(entry)
 		if !seenPossibilities[val] {
 			seenPossibilities[val] = true
@@ -119,9 +125,10 @@ func CreateBisectingIntFields(d DataSet, g IntFieldGetter, labelFmt string) []Bo
 		middle := (possibilities[i] + possibilities[i+1]) / 2
 		field := BoolField(fmt.Sprintf(labelFmt, middle))
 		res = append(res, field)
-		for _, entry := range d {
-			entry.FieldValues()[field] = BoolValue(g(entry) > middle)
+		for _, entry := range d.Entries {
+			v(entry, BoolValue(g(entry) > middle))
 		}
+		d.Fields = append(d.Fields, field)
 	}
 
 	return res

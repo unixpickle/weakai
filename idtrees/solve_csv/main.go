@@ -57,7 +57,7 @@ func main() {
 	fmt.Println(treeRoot)
 }
 
-func generateFieldlessDataSet(csv *CSV) idtrees.DataSet {
+func generateFieldlessDataSet(csv *CSV) *idtrees.DataSet {
 	var specialField *Field
 	for _, field := range csv.Fields {
 		if field.Special {
@@ -66,7 +66,11 @@ func generateFieldlessDataSet(csv *CSV) idtrees.DataSet {
 		}
 	}
 
-	dataSet := make(idtrees.DataSet, len(csv.Entries))
+	dataSet := &idtrees.DataSet{
+		Entries: make([]idtrees.Entry, len(csv.Entries)),
+		Fields:  []idtrees.Field{},
+	}
+
 	for i, entry := range csv.Entries {
 		var class idtrees.Value
 		v := entry.Values[specialField]
@@ -75,16 +79,17 @@ func generateFieldlessDataSet(csv *CSV) idtrees.DataSet {
 		} else {
 			class = idtrees.StringValue(specialField.Name + " = " + v.(string))
 		}
-		dataSet[i] = &TreeEntry{
+		dataSet.Entries[i] = &TreeEntry{
 			csvEntry: entry,
-			valueMap: map[idtrees.Field]idtrees.Value{},
+			values:   []idtrees.Value{},
 			class:    class,
 		}
 	}
+
 	return dataSet
 }
 
-func generateFields(csv *CSV, dataSet idtrees.DataSet) {
+func generateFields(csv *CSV, dataSet *idtrees.DataSet) {
 	for _, field := range csv.Fields {
 		if field.Ignore || field.Special {
 			continue
@@ -93,24 +98,28 @@ func generateFields(csv *CSV, dataSet idtrees.DataSet) {
 	}
 }
 
-func addField(dataSet idtrees.DataSet, field *Field) {
+func addField(dataSet *idtrees.DataSet, field *Field) {
+	adder := func(e idtrees.Entry, v idtrees.Value) {
+		treeEntry := e.(*TreeEntry)
+		treeEntry.values = append(treeEntry.values, v)
+	}
 	switch field.Type {
 	case Integer:
 		idtrees.CreateBisectingIntFields(dataSet, func(e idtrees.Entry) int {
 			csvEntry := e.(*TreeEntry).csvEntry
 			return csvEntry.Values[field].(int)
-		}, field.Name+" > %d")
+		}, adder, field.Name+" > %d")
 	case String:
 		idtrees.CreateListField(dataSet, func(e idtrees.Entry) idtrees.Value {
 			csvEntry := e.(*TreeEntry).csvEntry
 			return idtrees.StringValue(csvEntry.Values[field].(string))
-		}, field.Name)
+		}, adder, field.Name)
 	}
 }
 
 type TreeEntry struct {
 	csvEntry *Entry
-	valueMap map[idtrees.Field]idtrees.Value
+	values   []idtrees.Value
 	class    idtrees.Value
 }
 
@@ -118,6 +127,6 @@ func (t *TreeEntry) Class() idtrees.Value {
 	return t.class
 }
 
-func (t *TreeEntry) FieldValues() map[idtrees.Field]idtrees.Value {
-	return t.valueMap
+func (t *TreeEntry) FieldValues() []idtrees.Value {
+	return t.values
 }

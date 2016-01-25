@@ -16,6 +16,6 @@ type Field interface {
 // An Entry represents an entity that has exactly one Value for each Field.
 // Each Entry is a member of exactly one class, which is represented as a Value.
 type Entry interface {
-	FieldValues() map[Field]Value
+	FieldValues() []Value
 	Class() Value
 }

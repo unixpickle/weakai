@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -18,6 +19,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "")
 		os.Exit(1)
 	}
+
+	log.Println("Reading CSV file...")
 
 	csv, err := ReadCSVFile(os.Args[1])
 	if err != nil {
@@ -37,16 +40,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Println("Generating data set entries...")
 	dataSet := generateFieldlessDataSet(csv)
+	log.Println("Generating fields...")
 	generateFields(csv, dataSet)
 
+	log.Println("Generating tree...")
 	treeRoot := idtrees.GenerateTree(dataSet)
 	if treeRoot == nil {
 		fmt.Fprintln(os.Stderr, "The data is inconclusive.")
 		os.Exit(1)
 	}
 
-	fmt.Println("Got a tree:")
+	log.Println("Printing out the tree...")
+
 	fmt.Println(treeRoot)
 }
 

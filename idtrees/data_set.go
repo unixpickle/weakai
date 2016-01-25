@@ -29,28 +29,27 @@ func (d *DataSet) filter(fieldIndex int, v Value) *DataSet {
 	return res
 }
 
-func (d *DataSet) disorder() float64 {
-	if len(d.Entries) == 0 {
-		return 0
-	}
-
+func (d *DataSet) statsForFilter(fieldIndex int, v Value) (disorder float64, count int) {
 	classDistribution := map[Value]int{}
 	for _, entry := range d.Entries {
-		classDistribution[entry.Class()]++
-	}
-
-	if len(classDistribution) == 1 {
-		return 0
-	}
-
-	// See https://en.wikipedia.org/wiki/Entropy_%28information_theory%29#Characterization
-	var res float64
-	for _, amount := range classDistribution {
-		fraction := float64(amount) / float64(len(d.Entries))
-		if fraction != 0 {
-			res -= fraction * math.Log(fraction)
+		if entry.FieldValues()[fieldIndex] == v {
+			class := entry.Class()
+			classDistribution[class]++
+			count++
 		}
 	}
 
-	return res
+	if len(classDistribution) <= 1 {
+		return 0, count
+	}
+
+	// See https://en.wikipedia.org/wiki/Entropy_%28information_theory%29#Characterization
+	for _, amount := range classDistribution {
+		fraction := float64(amount) / float64(count)
+		if fraction != 0 {
+			disorder -= fraction * math.Log(fraction)
+		}
+	}
+
+	return
 }

@@ -45,9 +45,9 @@ func bestField(d *DataSet, usedFields map[Field]bool) (Field, int) {
 		}
 		var disorder float64
 		for _, value := range field.Values() {
-			subset := d.filter(idx, value)
-			fractionOfWhole := float64(len(subset.Entries)) / float64(len(d.Entries))
-			disorder += fractionOfWhole * subset.disorder()
+			partDisorder, count := d.statsForFilter(idx, value)
+			fractionOfWhole := float64(count) / float64(len(d.Entries))
+			disorder += fractionOfWhole * partDisorder
 		}
 		if disorder < leastDisorder || bestField == nil {
 			leastDisorder = disorder

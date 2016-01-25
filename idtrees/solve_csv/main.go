@@ -110,9 +110,17 @@ func addField(dataSet *idtrees.DataSet, field *Field) {
 			return csvEntry.Values[field].(int)
 		}, adder, field.Name+" > %d")
 	case String:
+		vals := map[string]*StringPointerValue{}
 		idtrees.CreateListField(dataSet, func(e idtrees.Entry) idtrees.Value {
 			csvEntry := e.(*TreeEntry).csvEntry
-			return idtrees.StringValue(csvEntry.Values[field].(string))
+			s := csvEntry.Values[field].(string)
+			if ptr, ok := vals[s]; ok {
+				return ptr
+			} else {
+				x := StringPointerValue(s)
+				vals[s] = &x
+				return vals[s]
+			}
 		}, adder, field.Name)
 	}
 }
@@ -129,4 +137,14 @@ func (t *TreeEntry) Class() idtrees.Value {
 
 func (t *TreeEntry) FieldValues() []idtrees.Value {
 	return t.values
+}
+
+// A StringPointerValue is a Value that encapsulates a string,
+// but unlike idtrees.StringValue, it does not force idtrees
+// to use string comparisons each time it compares Value interfaces.
+// Using this is beneficial for performance.
+type StringPointerValue string
+
+func (s *StringPointerValue) String() string {
+	return string(*s)
 }

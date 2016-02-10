@@ -32,5 +32,14 @@ func main() {
 	}
 
 	solution := svm.RandomlySolve(problem, 100000, 20)
-	fmt.Println("Solution is", solution)
+	fmt.Println("Solution from random solver:", solution)
+
+	subgradientSolver := &svm.SubgradientSolver{
+		Tradeoff: 0.001,
+		Steps:    100000,
+		StepSize: 0.001,
+	}
+	solution = subgradientSolver.Solve(problem)
+
+	fmt.Println("Solution from subgradient solver:", solution)
 }

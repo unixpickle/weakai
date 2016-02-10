@@ -1,5 +1,7 @@
 package svm
 
+import "math"
+
 // A SubgradientSolver solves Problems using sub-gradient descent.
 type SubgradientSolver struct {
 	// Tradeoff specifies how important it is to minimize the magnitude of the normal vector versus
@@ -40,9 +42,9 @@ func (s *SubgradientSolver) descend(p *Problem, args softMarginArgs) softMarginA
 	res.normal = make(Sample, len(args.normal))
 	copy(res.normal, args.normal)
 
-	res.threshold += s.thresholdPartial(p, args) * s.StepSize
+	res.threshold -= s.thresholdPartial(p, args) * s.StepSize
 	for i := range res.normal {
-		res.normal[i] += s.normalPartial(p, args, i) * s.StepSize
+		res.normal[i] -= s.normalPartial(p, args, i) * s.StepSize
 	}
 
 	return res
@@ -75,7 +77,12 @@ func (s *SubgradientSolver) normalPartial(p *Problem, args softMarginArgs, comp 
 func (s *SubgradientSolver) softMarginFunction(p *Problem, args softMarginArgs) float64 {
 	var matchSum float64
 	for _, positive := range p.Positives {
-		matchSum += 1 - (p.Kernel(args.normal, positive) + args.threshold)
+		errorMargin := math.Max(0, 1-(p.Kernel(args.normal, positive)+args.threshold))
+		matchSum += errorMargin
+	}
+	for _, negative := range p.Negatives {
+		errorMargin := math.Max(0, 1+(p.Kernel(args.normal, negative)+args.threshold))
+		matchSum += errorMargin
 	}
 	return matchSum + s.Tradeoff*p.Kernel(args.normal, args.normal)
 }

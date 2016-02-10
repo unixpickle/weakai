@@ -18,13 +18,13 @@ func RandomlySolve(p *Problem, numGuesses int, maxWeight float64) *Classifier {
 		for i, positive := range p.Positives {
 			coefficient := guess[i]
 			for j, x := range normalVector {
-				normalVector[j] = x + positive[j]
+				normalVector[j] = x + coefficient*positive[j]
 			}
 		}
 		for i, negative := range p.Negatives {
 			coefficient := guess[i+len(p.Positives)]
 			for j, x := range normalVector {
-				normalVector[j] = x + negative[j]
+				normalVector[j] = x + coefficient*negative[j]
 			}
 		}
 
@@ -56,7 +56,7 @@ func RandomlySolve(p *Problem, numGuesses int, maxWeight float64) *Classifier {
 			bestSeparation = separation
 			bestClassifier = &Classifier{
 				HyperplaneNormal: normalVector,
-				Threshold:        -(minPositiveDot + minNegativeDot) / 2,
+				Threshold:        -(minPositiveDot + maxNegativeDot) / 2,
 				Kernel:           p.Kernel,
 			}
 		}

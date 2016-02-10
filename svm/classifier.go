@@ -1,4 +1,4 @@
-package svg
+package svm
 
 // A Classifier uses inner products to determine if novel samples are likely to be positive or not.
 type Classifier struct {

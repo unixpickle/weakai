@@ -7,8 +7,8 @@ import (
 
 // RandomlySolve generates many random guesses for solutions and returns the "best" guess,
 // judging based on which guess yields the maximum separation between any two samples.
-func RandomlySolve(p *Problem, numGuesses int, maxWeight float64) *Classifier {
-	var bestClassifier *Classifier
+func RandomlySolve(p *Problem, numGuesses int, maxWeight float64) *LinearClassifier {
+	var bestClassifier *LinearClassifier
 	var bestSeparation float64
 
 	sampleCount := len(p.Negatives) + len(p.Positives)
@@ -54,7 +54,7 @@ func RandomlySolve(p *Problem, numGuesses int, maxWeight float64) *Classifier {
 
 		if separation > bestSeparation || i == 0 {
 			bestSeparation = separation
-			bestClassifier = &Classifier{
+			bestClassifier = &LinearClassifier{
 				HyperplaneNormal: normalVector,
 				Threshold:        -(minPositiveDot + maxNegativeDot) / 2,
 				Kernel:           p.Kernel,

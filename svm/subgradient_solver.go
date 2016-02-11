@@ -3,6 +3,9 @@ package svm
 import "math"
 
 // A SubgradientSolver solves Problems using sub-gradient descent.
+//
+// This is only guaranteed to be effective for linear kernels, since such kernels yield a convex
+// function to optimize.
 type SubgradientSolver struct {
 	// Tradeoff specifies how important it is to minimize the magnitude of the normal vector versus
 	// finding a good separation of samples.
@@ -21,7 +24,7 @@ type SubgradientSolver struct {
 	StepSize float64
 }
 
-func (s *SubgradientSolver) Solve(p *Problem) *Classifier {
+func (s *SubgradientSolver) Solve(p *Problem) *LinearClassifier {
 	args := softMarginArgs{
 		normal: make(Sample, len(p.Positives[0])),
 	}
@@ -30,7 +33,7 @@ func (s *SubgradientSolver) Solve(p *Problem) *Classifier {
 		args = s.descend(p, args)
 	}
 
-	return &Classifier{
+	return &LinearClassifier{
 		HyperplaneNormal: args.normal,
 		Threshold:        args.threshold,
 		Kernel:           p.Kernel,

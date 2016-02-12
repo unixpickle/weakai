@@ -31,7 +31,7 @@ func main() {
 		Kernel:    svm.LinearKernel,
 	}
 
-	solution := svm.RandomlySolve(problem, 100000, 20)
+	solution := svm.RandomlySolveLinear(problem, 100000, 5)
 	fmt.Println("Solution from random solver:", solution)
 
 	subgradientSolver := &svm.SubgradientSolver{

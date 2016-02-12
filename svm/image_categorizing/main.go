@@ -41,7 +41,7 @@ func main() {
 	}
 
 	fmt.Println("Solving...")
-	solver := svm.CoordDescentSolver{
+	solver := svm.GradientDescentSolver{
 		Tradeoff: 0.001,
 		Steps:    1000,
 		StepSize: 0.001,

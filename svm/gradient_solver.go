@@ -2,8 +2,13 @@ package svm
 
 import "math"
 
-// A CoordDescentSolver solves Problems using coordinate descent.
-type CoordDescentSolver struct {
+// A GradientDescentSolver solves Problems using gradient descent.
+//
+// The algorithm that this uses has the following attributes:
+// - This uses the Lagrangian dual problem, rather than the primal problem.
+// - The gradients are computed using a closed-form mathematical function, not an approximation.
+// - After each descent step, the coefficients are "projected" onto the constraints.
+type GradientDescentSolver struct {
 	// Steps indicates how many iterations the solver should perform.
 	Steps int
 
@@ -19,7 +24,7 @@ type CoordDescentSolver struct {
 	Tradeoff float64
 }
 
-func (c *CoordDescentSolver) Solve(p *Problem) *CombinationClassifier {
+func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 	solution := make([]float64, len(p.Positives)+len(p.Negatives))
 	temp := make([]float64, len(solution))
 
@@ -52,7 +57,7 @@ func (c *CoordDescentSolver) Solve(p *Problem) *CombinationClassifier {
 
 // partial computes the partial derivative of the dual optimization problem with respect to one of
 // the coefficients, given by the coefficient index.
-func (c *CoordDescentSolver) partial(p *Problem, coefficients []float64, idx int) float64 {
+func (c *GradientDescentSolver) partial(p *Problem, coefficients []float64, idx int) float64 {
 	var coefficientSample Sample
 	sampleCoefficient := 1.0
 	if idx >= len(p.Positives) {
@@ -78,7 +83,7 @@ func (c *CoordDescentSolver) partial(p *Problem, coefficients []float64, idx int
 // constraintProjection projects the current solution onto two constraints:
 // - sum(ci+yi)=0, where yi is the sign of a given sample, and ci is its coefficient.
 // - 0 <= ci <= 1/k where ci is a coefficient and k is the width-separation tradeoff.
-func (c *CoordDescentSolver) constraintProjection(p *Problem, coefficients []float64) {
+func (c *GradientDescentSolver) constraintProjection(p *Problem, coefficients []float64) {
 	// Let the vector y = (y1, y2, ..., yn) where yi is -1 for negatives and 1 for positives.
 	// Let the vector c = (c1, c2, ..., cn) where ci is the i-th coefficient.
 	yDotY := float64(len(p.Positives) + len(p.Negatives))

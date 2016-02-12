@@ -43,12 +43,12 @@ func main() {
 
 	fmt.Println("Solution from subgradient solver:", solution)
 
-	coordSolver := &svm.CoordDescentSolver{
+	gradientSolver := &svm.GradientDescentSolver{
 		Tradeoff: 0.001,
 		StepSize: 0.001,
 		Steps:    100000,
 	}
-	solution = coordSolver.Solve(problem).Linearize()
+	solution = gradientSolver.Solve(problem).Linearize()
 
-	fmt.Println("Solution from coordinate descent solver:", solution)
+	fmt.Println("Solution from gradient descent solver:", solution)
 }

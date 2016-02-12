@@ -30,10 +30,32 @@ type CombinationClassifier struct {
 	Kernel    Kernel
 }
 
-func (c CombinationClassifier) Classify(sample Sample) bool {
+func (c *CombinationClassifier) Classify(sample Sample) bool {
+	return c.sampleProduct(sample)+c.Threshold > 0
+}
+
+func (c *CombinationClassifier) computeThreshold(p *Problem) {
+	var lowestPositive float64
+	var highestNegative float64
+	for i, pos := range p.Positives {
+		product := c.sampleProduct(pos)
+		if product < lowestPositive || i == 0 {
+			lowestPositive = product
+		}
+	}
+	for i, neg := range p.Negatives {
+		product := c.sampleProduct(neg)
+		if product > highestNegative || i == 0 {
+			highestNegative = product
+		}
+	}
+	c.Threshold = (lowestPositive + highestNegative) / 2
+}
+
+func (c *CombinationClassifier) sampleProduct(sample Sample) float64 {
 	var innerProduct float64
 	for i, coeff := range c.Coefficients {
 		innerProduct += coeff * c.Kernel(c.SupportVectors[i], sample)
 	}
-	return innerProduct+c.Threshold > 0
+	return innerProduct
 }

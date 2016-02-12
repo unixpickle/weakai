@@ -1,5 +1,7 @@
 package svm
 
+import "math"
+
 // A CoordDescentSolver solves Problems using coordinate descent.
 type CoordDescentSolver struct {
 	// Steps indicates how many iterations the solver should perform.
@@ -9,6 +11,12 @@ type CoordDescentSolver struct {
 	// added to the current solution at each step.
 	// There is a tradeoff between a small step size and a small number of steps.
 	StepSize float64
+
+	// Tradeoff specifies how important it is to minimize the magnitude of the normal vector versus
+	// finding a good separation of samples.
+	// In other words, it determines how important a wide margin is.
+	// For linearly separable data, you should use a small (but non-zero) Tradeoff value.
+	Tradeoff float64
 }
 
 func (c *CoordDescentSolver) Solve(p *Problem) *CombinationClassifier {
@@ -23,9 +31,6 @@ func (c *CoordDescentSolver) Solve(p *Problem) *CombinationClassifier {
 			solution[j] += partial * c.StepSize
 		}
 		c.constraintProjection(p, solution)
-
-		// TODO: use the constraint 0 <= ci <= 1/(2n*k) where k is a tradeoff between margin width
-		// and separation correctness.
 	}
 
 	// TODO: figure out the support vectors by weeding out samples which have ~0 coefficients.
@@ -50,7 +55,7 @@ func (c *CoordDescentSolver) Solve(p *Problem) *CombinationClassifier {
 func (c *CoordDescentSolver) partial(p *Problem, coefficients []float64, idx int) float64 {
 	var coefficientSample Sample
 	sampleCoefficient := coefficients[idx]
-	if idx > len(p.Positives) {
+	if idx >= len(p.Positives) {
 		coefficientSample = p.Negatives[idx-len(p.Positives)]
 		sampleCoefficient *= -1
 	} else {
@@ -70,8 +75,9 @@ func (c *CoordDescentSolver) partial(p *Problem, coefficients []float64, idx int
 	return partial
 }
 
-// constraintProjection projects the current solution onto the constraint sum(ci+yi)=0, where yi is
-// the sign of a given sample, and ci is its coefficient.
+// constraintProjection projects the current solution onto two constraints:
+// - sum(ci+yi)=0, where yi is the sign of a given sample, and ci is its coefficient.
+// - 0 <= ci <= 1/k where ci is a coefficient and k is the width-separation tradeoff.
 func (c *CoordDescentSolver) constraintProjection(p *Problem, coefficients []float64) {
 	// Let the vector y = (y1, y2, ..., yn) where yi is -1 for negatives and 1 for positives.
 	// Let the vector c = (c1, c2, ..., cn) where ci is the i-th coefficient.
@@ -94,5 +100,10 @@ func (c *CoordDescentSolver) constraintProjection(p *Problem, coefficients []flo
 		} else {
 			coefficients[i] += scaler
 		}
+	}
+
+	coefficientMax := 1 / c.Tradeoff
+	for i, coeff := range coefficients {
+		coefficients[i] = math.Min(coefficientMax, math.Max(0, coeff))
 	}
 }

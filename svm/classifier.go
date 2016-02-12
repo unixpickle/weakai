@@ -49,7 +49,7 @@ func (c *CombinationClassifier) computeThreshold(p *Problem) {
 			highestNegative = product
 		}
 	}
-	c.Threshold = (lowestPositive + highestNegative) / 2
+	c.Threshold = -(lowestPositive + highestNegative) / 2
 }
 
 func (c *CombinationClassifier) sampleProduct(sample Sample) float64 {

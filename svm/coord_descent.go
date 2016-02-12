@@ -54,23 +54,23 @@ func (c *CoordDescentSolver) Solve(p *Problem) *CombinationClassifier {
 // the coefficients, given by the coefficient index.
 func (c *CoordDescentSolver) partial(p *Problem, coefficients []float64, idx int) float64 {
 	var coefficientSample Sample
-	sampleCoefficient := coefficients[idx]
+	sampleCoefficient := 1.0
 	if idx >= len(p.Positives) {
 		coefficientSample = p.Negatives[idx-len(p.Positives)]
-		sampleCoefficient *= -1
+		sampleCoefficient = -1
 	} else {
 		coefficientSample = p.Positives[idx]
 	}
 
-	// I got this by differentiating sum(ci) + sum(sum(yi*ci*yj*cj*(xi*xj))) with respect to ci.
+	// I got this by differentiating sum(ci) - 1/2*sum(sum(yi*ci*yj*cj*(xi*xj))) with respect to ci.
 	partial := 1.0
 	for i, positive := range p.Positives {
 		product := p.Kernel(coefficientSample, positive)
-		partial += 0.5 * sampleCoefficient * coefficients[i] * product
+		partial -= 0.5 * sampleCoefficient * coefficients[i] * product
 	}
 	for i, negative := range p.Negatives {
 		product := p.Kernel(coefficientSample, negative)
-		partial -= 0.5 * sampleCoefficient * coefficients[i+len(p.Positives)] * product
+		partial += 0.5 * sampleCoefficient * coefficients[i+len(p.Positives)] * product
 	}
 	return partial
 }

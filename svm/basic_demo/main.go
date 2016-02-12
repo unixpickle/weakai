@@ -48,23 +48,7 @@ func main() {
 		StepSize: 0.001,
 		Steps:    100000,
 	}
-	nonlinearSolution := coordSolver.Solve(problem)
-	solution = linearizeCombinationClassifier(nonlinearSolution)
+	solution = coordSolver.Solve(problem).Linearize()
 
 	fmt.Println("Solution from coordinate descent solver:", solution)
-}
-
-func linearizeCombinationClassifier(c *svm.CombinationClassifier) *svm.LinearClassifier {
-	sampleSum := make(svm.Sample, len(c.SupportVectors[0]))
-	for i, vec := range c.SupportVectors {
-		coeff := c.Coefficients[i]
-		for j := range sampleSum {
-			sampleSum[j] += coeff * vec[j]
-		}
-	}
-	return &svm.LinearClassifier{
-		Kernel:           c.Kernel,
-		HyperplaneNormal: sampleSum,
-		Threshold:        c.Threshold,
-	}
 }

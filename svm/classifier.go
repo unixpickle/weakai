@@ -34,6 +34,24 @@ func (c *CombinationClassifier) Classify(sample Sample) bool {
 	return c.sampleProduct(sample)+c.Threshold > 0
 }
 
+// Linearize converts a CombinationClassifier into a LinearClassifier, assuming that the underlying
+// kernel is LinearKernel.
+// This will not work for non-linear kernels.
+func (c *CombinationClassifier) Linearize() *LinearClassifier {
+	sampleSum := make(Sample, len(c.SupportVectors[0]))
+	for i, vec := range c.SupportVectors {
+		coeff := c.Coefficients[i]
+		for j := range sampleSum {
+			sampleSum[j] += coeff * vec[j]
+		}
+	}
+	return &LinearClassifier{
+		Kernel:           c.Kernel,
+		HyperplaneNormal: sampleSum,
+		Threshold:        c.Threshold,
+	}
+}
+
 func (c *CombinationClassifier) computeThreshold(p *Problem) {
 	var lowestPositive float64
 	var highestNegative float64

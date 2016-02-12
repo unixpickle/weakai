@@ -36,7 +36,7 @@ func main() {
 
 	subgradientSolver := &svm.SubgradientSolver{
 		Tradeoff: 0.001,
-		Steps:    100000,
+		Steps:    10000,
 		StepSize: 0.001,
 	}
 	solution = subgradientSolver.Solve(problem)
@@ -45,8 +45,8 @@ func main() {
 
 	coordSolver := &svm.CoordDescentSolver{
 		Tradeoff: 0.001,
-		StepSize: 0.01,
-		Steps:    1000,
+		StepSize: 0.001,
+		Steps:    100000,
 	}
 	nonlinearSolution := coordSolver.Solve(problem)
 	solution = linearizeCombinationClassifier(nonlinearSolution)

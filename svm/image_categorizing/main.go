@@ -41,12 +41,12 @@ func main() {
 	}
 
 	fmt.Println("Solving...")
-	solver := svm.SubgradientSolver{
-		Tradeoff: 0.01,
-		Steps:    900,
-		StepSize: 0.01,
+	solver := svm.CoordDescentSolver{
+		Tradeoff: 0.001,
+		Steps:    1000,
+		StepSize: 0.001,
 	}
-	classifier := solver.Solve(problem)
+	classifier := solver.Solve(problem).Linearize()
 
 	image := imageForSolution(width, height, classifier.HyperplaneNormal)
 	if err := image.WriteFile(os.Args[3]); err != nil {

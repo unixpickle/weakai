@@ -71,11 +71,11 @@ func (c *GradientDescentSolver) partial(p *Problem, coefficients []float64, idx 
 	partial := 1.0
 	for i, positive := range p.Positives {
 		product := p.Kernel(coefficientSample, positive)
-		partial -= 0.5 * sampleCoefficient * coefficients[i] * product
+		partial -= sampleCoefficient * coefficients[i] * product
 	}
 	for i, negative := range p.Negatives {
 		product := p.Kernel(coefficientSample, negative)
-		partial += 0.5 * sampleCoefficient * coefficients[i+len(p.Positives)] * product
+		partial += sampleCoefficient * coefficients[i+len(p.Positives)] * product
 	}
 	return partial
 }

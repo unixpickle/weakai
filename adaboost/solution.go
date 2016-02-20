@@ -5,6 +5,14 @@ type Solution struct {
 	Weights     []float64
 }
 
+// PartialSolution returns a Solution that uses the first n classifiers of this solution.
+func (s *Solution) PartialSolution(n int) *Solution {
+	return &Solution{
+		Classifiers: s.Classifiers[:n],
+		Weights:     s.Weights[:n],
+	}
+}
+
 func (s *Solution) Classify(sam Sample) bool {
 	return s.Evaluate(sam) >= 0
 }

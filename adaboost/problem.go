@@ -11,7 +11,7 @@ type Problem struct {
 func (p *Problem) Solve() *Solution {
 	sol := &Solution{
 		Classifiers: make([]Classifier, 0, len(p.Classifiers)),
-		Weights:     make([]float64, len(p.Classifiers)),
+		Weights:     make([]float64, 0, len(p.Classifiers)),
 	}
 
 	usedClassifiers := map[Classifier]bool{}

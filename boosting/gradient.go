@@ -1,6 +1,9 @@
 package boosting
 
-import "math/rand"
+import (
+	"math"
+	"math/rand"
+)
 
 type GradientSolver struct {
 	Attempts   int
@@ -18,17 +21,20 @@ func (g *GradientSolver) Solve(p *Problem) *Solution {
 			Weights:     make([]float64, len(p.Classifiers)),
 		}
 		for i := range p.Classifiers {
-			sol.Weights[i] = rand.Float64()*float64(attempt) - float64(attempt)/2
+			sol.Weights[i] = rand.Float64() - 0.5
 		}
 
 		partials := make([]float64, len(p.Classifiers))
 		for i := 0; i < g.Iterations; i++ {
 			errs := AdaboostSolver{}.errorsForSamples(p, sol)
+			var gradientMag float64
 			for i := range partials {
 				partials[i] = g.partial(errs, sol, p, i)
+				gradientMag += math.Pow(partials[i], 2)
 			}
+			gradientMag = math.Sqrt(gradientMag)
 			for i, x := range partials {
-				sol.Weights[i] -= x * g.StepSize
+				sol.Weights[i] -= x * g.StepSize / gradientMag
 			}
 			normalizeWeights(sol.Weights)
 		}
@@ -56,7 +62,11 @@ func (g *GradientSolver) partial(errs []float64, s *Solution, p *Problem, index 
 }
 
 func normalizeWeights(f []float64) {
-	sum := sumAll(f)
+	var sum float64
+	for _, x := range f {
+		sum += math.Pow(x, 2)
+	}
+	sum = math.Sqrt(sum)
 	for i, x := range f {
 		f[i] = x / sum
 	}

@@ -2,7 +2,9 @@ package boosting
 
 import "math"
 
-type AdaboostSolver struct{}
+type AdaboostSolver struct {
+	MaxReuse int
+}
 
 func (a AdaboostSolver) Solve(p *Problem) *Solution {
 	sol := &Solution{
@@ -10,32 +12,41 @@ func (a AdaboostSolver) Solve(p *Problem) *Solution {
 		Weights:     make([]float64, 0, len(p.Classifiers)),
 	}
 
-	usedClassifiers := map[Classifier]bool{}
-
-	for i := 0; i < len(p.Classifiers) && p.numCorrect(sol) < len(p.Samples); i++ {
-		errors := a.errorsForSamples(p, sol)
-		var bestErrorWeightSum float64
-		var bestClassifier Classifier
-		for _, c := range p.Classifiers {
-			if usedClassifiers[c] {
-				continue
-			}
-			var errorWeightSum float64
-			for i, sample := range p.Samples {
-				if c.Classify(sample) != p.Classifications[i] {
-					errorWeightSum += errors[i]
+	for iteration := 0; iteration < a.MaxReuse || iteration < 1; iteration++ {
+		usedClassifiers := map[Classifier]bool{}
+		for i := 0; i < len(p.Classifiers) && p.numCorrect(sol) < len(p.Samples); i++ {
+			errors := a.errorsForSamples(p, sol)
+			var bestErrorWeightSum float64
+			var bestClassifier Classifier
+			for _, c := range p.Classifiers {
+				if usedClassifiers[c] {
+					continue
+				}
+				var errorWeightSum float64
+				for i, sample := range p.Samples {
+					if c.Classify(sample) != p.Classifications[i] {
+						errorWeightSum += errors[i]
+					}
+				}
+				if errorWeightSum < bestErrorWeightSum || bestClassifier == nil {
+					bestErrorWeightSum = errorWeightSum
+					bestClassifier = c
 				}
 			}
-			if errorWeightSum < bestErrorWeightSum || bestClassifier == nil {
-				bestErrorWeightSum = errorWeightSum
-				bestClassifier = c
+			errorRate := bestErrorWeightSum / sumAll(errors)
+			weight := 0.5 * math.Log((1-errorRate)/errorRate)
+			usedClassifiers[bestClassifier] = true
+			if iteration > 0 {
+				for i, c := range sol.Classifiers {
+					if c == bestClassifier {
+						sol.Weights[i] += weight
+					}
+				}
+			} else {
+				sol.Weights = append(sol.Weights, weight)
+				sol.Classifiers = append(sol.Classifiers, bestClassifier)
 			}
 		}
-		errorRate := bestErrorWeightSum / sumAll(errors)
-		weight := 0.5 * math.Log((1-errorRate)/errorRate)
-		usedClassifiers[bestClassifier] = true
-		sol.Weights = append(sol.Weights, weight)
-		sol.Classifiers = append(sol.Classifiers, bestClassifier)
 	}
 
 	return sol

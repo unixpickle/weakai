@@ -8,8 +8,8 @@ import (
 	"github.com/unixpickle/weakai/boosting"
 )
 
-const Dimensions = 4
-const Samples = 30
+const Dimensions = 5
+const Samples = 80
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -29,11 +29,11 @@ func main() {
 		problem.Classifiers = append(problem.Classifiers, s)
 	}
 
-	solve("AdaBoost", boosting.AdaboostSolver{}, problem)
+	solve("AdaBoost", boosting.AdaboostSolver{MaxReuse: 10}, problem)
 	solve("Gradient", &boosting.GradientSolver{
 		Iterations: 1000,
-		StepSize:   0.0001,
-		Attempts:   10,
+		StepSize:   0.01,
+		Attempts:   5,
 	}, problem)
 }
 

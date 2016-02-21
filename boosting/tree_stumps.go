@@ -1,4 +1,4 @@
-package adaboost
+package boosting
 
 import "sort"
 

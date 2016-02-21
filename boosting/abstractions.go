@@ -1,4 +1,4 @@
-package adaboost
+package boosting
 
 type Sample interface{}
 

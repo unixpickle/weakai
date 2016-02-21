@@ -1,4 +1,8 @@
-package adaboost
+package boosting
+
+type Solver interface {
+	Solve(p *Problem) *Solution
+}
 
 type Solution struct {
 	Classifiers []Classifier

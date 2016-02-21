@@ -3,15 +3,19 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
-	"github.com/unixpickle/weakai/adaboost"
+	"github.com/unixpickle/weakai/boosting"
 )
 
-const Dimensions = 2
+const Dimensions = 4
+const Samples = 30
 
 func main() {
-	problem := &adaboost.Problem{}
-	for i := 0; i < 20; i++ {
+	rand.Seed(time.Now().UnixNano())
+
+	problem := &boosting.Problem{}
+	for i := 0; i < Samples; i++ {
 		positive := (rand.Intn(2) == 1)
 		sample := make([]float64, Dimensions)
 		for d := 0; d < Dimensions; d++ {
@@ -20,19 +24,25 @@ func main() {
 		problem.Samples = append(problem.Samples, sample)
 		problem.Classifications = append(problem.Classifications, positive)
 	}
-	stumps := adaboost.AllTreeStumps(problem.Samples, Dimensions)
+	stumps := boosting.AllTreeStumps(problem.Samples, Dimensions)
 	for _, s := range stumps {
 		problem.Classifiers = append(problem.Classifiers, s)
 	}
 
-	solution := problem.Solve()
-	for n := 1; n <= len(solution.Classifiers); n++ {
-		partial := solution.PartialSolution(n)
-		fmt.Println("After", n, "iterations, we get", errorCount(partial, problem), "wrong.")
-	}
+	solve("AdaBoost", boosting.AdaboostSolver{}, problem)
+	solve("Gradient", &boosting.GradientSolver{
+		Iterations: 1000,
+		StepSize:   0.0001,
+		Attempts:   10,
+	}, problem)
 }
 
-func errorCount(s *adaboost.Solution, p *adaboost.Problem) int {
+func solve(name string, solver boosting.Solver, p *boosting.Problem) {
+	solution := solver.Solve(p)
+	fmt.Println("Using", name, "we get", errorCount(solution, p), "wrong.")
+}
+
+func errorCount(s *boosting.Solution, p *boosting.Problem) int {
 	var count int
 	for i, sam := range p.Samples {
 		if s.Classify(sam) != p.Classifications[i] {

@@ -1,5 +1,10 @@
 package svm
 
+import (
+	"math"
+	"sort"
+)
+
 // A Classifier classifies samples as positive or negative using some criterion.
 type Classifier interface {
 	Classify(sample Sample) bool
@@ -53,21 +58,39 @@ func (c *CombinationClassifier) Linearize() *LinearClassifier {
 }
 
 func (c *CombinationClassifier) computeThreshold(p *Problem) {
-	var lowestPositive float64
-	var highestNegative float64
-	for i, pos := range p.Positives {
+	sampleProducts := make([]float64, 0, len(p.Positives)+len(p.Negatives))
+	for _, pos := range p.Positives {
 		product := c.sampleProduct(pos)
-		if product < lowestPositive || i == 0 {
-			lowestPositive = product
-		}
+		sampleProducts = append(sampleProducts, product)
 	}
-	for i, neg := range p.Negatives {
+	for _, neg := range p.Negatives {
 		product := c.sampleProduct(neg)
-		if product > highestNegative || i == 0 {
-			highestNegative = product
+		sampleProducts = append(sampleProducts, product)
+	}
+
+	sortedProducts := make([]float64, len(sampleProducts))
+	copy(sortedProducts, sampleProducts)
+	sort.Float64s(sortedProducts)
+
+	var minError float64
+	var minErrorThreshold float64
+
+	for i := 0; i < len(sortedProducts)-1; i++ {
+		thresh := (sortedProducts[i] + sortedProducts[i+1]) / 2
+		var err float64
+		for j := range p.Positives {
+			err += math.Max(0, 1-(sampleProducts[j]-thresh))
+		}
+		for j := range p.Negatives {
+			err += math.Max(0, 1+(sampleProducts[j+len(p.Positives)]-thresh))
+		}
+		if err < minError || i == 0 {
+			minError = err
+			minErrorThreshold = thresh
 		}
 	}
-	c.Threshold = -(lowestPositive + highestNegative) / 2
+
+	c.Threshold = -minErrorThreshold
 }
 
 func (c *CombinationClassifier) sampleProduct(sample Sample) float64 {

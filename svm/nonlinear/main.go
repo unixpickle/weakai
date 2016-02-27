@@ -48,8 +48,8 @@ func main() {
 
 	gradientSolver := &svm.GradientDescentSolver{
 		Tradeoff: 0.001,
-		StepSize: 0.001,
-		Steps:    100000,
+		StepSize: 0.0001,
+		Steps:    500000,
 	}
 	printSolution("gradient descent", gradientSolver.Solve(problem), problem)
 }

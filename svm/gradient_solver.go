@@ -12,8 +12,7 @@ type GradientDescentSolver struct {
 	// Steps indicates how many iterations the solver should perform.
 	Steps int
 
-	// StepSize is a number between 0 and 1 which determines how much of the gradient should be
-	// added to the current solution at each step.
+	// StepSize is a floating point that scales the normalized gradient vector at each step.
 	// There is a tradeoff between a small step size and a small number of steps.
 	StepSize float64
 
@@ -29,11 +28,14 @@ func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 	temp := make([]float64, len(solution))
 
 	for i := 0; i < c.Steps; i++ {
+		var magSquared float64
 		for j := range solution {
 			temp[j] = c.partial(p, solution, j)
+			magSquared += temp[j] * temp[j]
 		}
+		scaler := c.StepSize / math.Sqrt(magSquared)
 		for j, partial := range temp {
-			solution[j] += partial * c.StepSize
+			solution[j] += partial * scaler
 		}
 		c.constraintProjection(p, solution)
 	}

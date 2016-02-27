@@ -12,21 +12,21 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	positives := []svm.Sample{
-		{0.5, 0},
-		{0.4, 0.1},
-		{0.3, 0.2},
-		{0.5, 0.9},
-		{0.6, 1},
-		{0.4, 0.85},
-		{0.5, 0.5},
+		{V: []float64{0.5, 0}},
+		{V: []float64{0.4, 0.1}},
+		{V: []float64{0.3, 0.2}},
+		{V: []float64{0.5, 0.9}},
+		{V: []float64{0.6, 1}},
+		{V: []float64{0.4, 0.85}},
+		{V: []float64{0.5, 0.5}},
 	}
 
 	negatives := []svm.Sample{
-		{0, 0.5},
-		{0.1, 0.4},
-		{0.9, 0.5},
-		{1, 0.6},
-		{0, 0.46},
+		{V: []float64{0, 0.5}},
+		{V: []float64{0.1, 0.4}},
+		{V: []float64{0.9, 0.5}},
+		{V: []float64{1, 0.6}},
+		{V: []float64{0, 0.46}},
 	}
 
 	problem := &svm.Problem{
@@ -58,7 +58,7 @@ func printProblem(p *svm.Problem) {
 	grid := make([]rune, 10*20)
 	x := func(samples []svm.Sample, char rune) {
 		for _, s := range samples {
-			x, y := int(s[0]*20), int(s[1]*10)
+			x, y := int(s.V[0]*20), int(s.V[1]*10)
 			if x >= 20 {
 				x = 19
 			}
@@ -108,7 +108,7 @@ func printSolution(solverType string, solution svm.Classifier, p *svm.Problem) {
 	for y := 0.0; y <= 1.0; y += 0.1 {
 		fmt.Print(" ")
 		for x := 0.0; x < 1.0; x += 0.05 {
-			classification := solution.Classify(svm.Sample{x, y})
+			classification := solution.Classify(svm.Sample{V: []float64{x, y}})
 			if classification {
 				fmt.Print("+")
 			} else {

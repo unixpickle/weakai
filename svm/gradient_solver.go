@@ -28,10 +28,9 @@ func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 	solution := make([]float64, len(p.Positives)+len(p.Negatives))
 	temp := make([]float64, len(solution))
 
-	cache := newKernelCache(p)
 	for i := 0; i < c.Steps; i++ {
 		for j := range solution {
-			temp[j] = c.partial(p, solution, j, cache)
+			temp[j] = c.partial(p, solution, j)
 		}
 		for j, partial := range temp {
 			solution[j] += partial * c.StepSize
@@ -58,23 +57,25 @@ func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 
 // partial computes the partial derivative of the dual optimization problem with respect to one of
 // the coefficients, given by the coefficient index.
-func (c *GradientDescentSolver) partial(p *Problem, coefficients []float64, idx int,
-	cache *kernelCache) float64 {
+func (c *GradientDescentSolver) partial(p *Problem, coefficients []float64, idx int) float64 {
+	var coefficientSample Sample
 	sampleCoefficient := 1.0
 	if idx >= len(p.Positives) {
+		coefficientSample = p.Negatives[idx-len(p.Positives)]
 		sampleCoefficient = -1
+	} else {
+		coefficientSample = p.Positives[idx]
 	}
 
 	// I got this by differentiating sum(ci) - 1/2*sum(sum(yi*ci*yj*cj*(xi*xj))) with respect to ci.
 	partial := 1.0
-	for i := 0; i < len(p.Positives)+len(p.Negatives); i++ {
-		product := cache.product(idx, i)
-		term := sampleCoefficient * coefficients[i] * product
-		if i < len(p.Positives) {
-			partial -= term
-		} else {
-			partial += term
-		}
+	for i, positive := range p.Positives {
+		product := p.Kernel(coefficientSample, positive)
+		partial -= sampleCoefficient * coefficients[i] * product
+	}
+	for i, negative := range p.Negatives {
+		product := p.Kernel(coefficientSample, negative)
+		partial += sampleCoefficient * coefficients[i+len(p.Positives)] * product
 	}
 	return partial
 }
@@ -110,28 +111,4 @@ func (c *GradientDescentSolver) constraintProjection(p *Problem, coefficients []
 	for i, coeff := range coefficients {
 		coefficients[i] = math.Min(coefficientMax, math.Max(0, coeff))
 	}
-}
-
-type kernelCache struct {
-	products [][]float64
-}
-
-func newKernelCache(p *Problem) *kernelCache {
-	res := &kernelCache{
-		products: make([][]float64, len(p.Positives)+len(p.Negatives)),
-	}
-	samples := make([]Sample, len(p.Positives)+len(p.Negatives))
-	copy(samples, p.Positives)
-	copy(samples[len(p.Positives):], p.Negatives)
-	for i, sample1 := range samples {
-		res.products[i] = make([]float64, len(samples))
-		for j, sample2 := range samples {
-			res.products[i][j] = p.Kernel(sample1, sample2)
-		}
-	}
-	return res
-}
-
-func (k *kernelCache) product(idx1, idx2 int) float64 {
-	return k.products[idx1][idx2]
 }

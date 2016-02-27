@@ -18,7 +18,7 @@ func RandomlySolveLinear(p *Problem, numGuesses int, maxEntry float64) *LinearCl
 	var bestMagnitude float64
 
 	for i := 0; i < numGuesses; i++ {
-		guess := randomSample(len(p.Positives[0]), maxEntry)
+		guess := randomSample(len(p.Positives[0].V), maxEntry)
 		mag := p.Kernel(guess, guess)
 		threshold := idealThresholdForGuess(guess, p)
 
@@ -45,11 +45,11 @@ func RandomlySolveLinear(p *Problem, numGuesses int, maxEntry float64) *LinearCl
 }
 
 func randomSample(dimension int, componentMax float64) Sample {
-	res := make(Sample, dimension)
-	for i := range res {
-		res[i] = (rand.Float64() - 0.5) * componentMax * 2
+	vec := make([]float64, dimension)
+	for i := range vec {
+		vec[i] = (rand.Float64() - 0.5) * componentMax * 2
 	}
-	return res
+	return Sample{V: vec}
 }
 
 func idealThresholdForGuess(guess Sample, p *Problem) float64 {

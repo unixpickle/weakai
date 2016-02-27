@@ -26,7 +26,7 @@ type SubgradientSolver struct {
 
 func (s *SubgradientSolver) Solve(p *Problem) *LinearClassifier {
 	args := softMarginArgs{
-		normal: make(Sample, len(p.Positives[0])),
+		normal: make([]float64, len(p.Positives[0].V)),
 	}
 
 	for i := 0; i < s.Steps; i++ {
@@ -34,7 +34,7 @@ func (s *SubgradientSolver) Solve(p *Problem) *LinearClassifier {
 	}
 
 	return &LinearClassifier{
-		HyperplaneNormal: args.normal,
+		HyperplaneNormal: Sample{V: args.normal},
 		Threshold:        args.threshold,
 		Kernel:           p.Kernel,
 	}
@@ -42,7 +42,7 @@ func (s *SubgradientSolver) Solve(p *Problem) *LinearClassifier {
 
 func (s *SubgradientSolver) descend(p *Problem, args softMarginArgs) softMarginArgs {
 	res := args
-	res.normal = make(Sample, len(args.normal))
+	res.normal = make([]float64, len(args.normal))
 	copy(res.normal, args.normal)
 
 	res.threshold -= s.thresholdPartial(p, args) * s.StepSize
@@ -71,26 +71,28 @@ func (s *SubgradientSolver) normalPartial(p *Problem, args softMarginArgs, comp 
 	differential := 1.0 / 10000.0
 
 	tempArgs := args
-	tempArgs.normal = make(Sample, len(args.normal))
+	tempArgs.normal = make([]float64, len(args.normal))
 	copy(tempArgs.normal, args.normal)
 	tempArgs.normal[comp] += differential
 	return (s.softMarginFunction(p, tempArgs) - s.softMarginFunction(p, args)) / differential
 }
 
 func (s *SubgradientSolver) softMarginFunction(p *Problem, args softMarginArgs) float64 {
+	normalSample := Sample{V: args.normal}
+
 	var matchSum float64
 	for _, positive := range p.Positives {
-		errorMargin := math.Max(0, 1-(p.Kernel(args.normal, positive)+args.threshold))
+		errorMargin := math.Max(0, 1-(p.Kernel(normalSample, positive)+args.threshold))
 		matchSum += errorMargin
 	}
 	for _, negative := range p.Negatives {
-		errorMargin := math.Max(0, 1+(p.Kernel(args.normal, negative)+args.threshold))
+		errorMargin := math.Max(0, 1+(p.Kernel(normalSample, negative)+args.threshold))
 		matchSum += errorMargin
 	}
-	return matchSum + s.Tradeoff*p.Kernel(args.normal, args.normal)
+	return matchSum + s.Tradeoff*p.Kernel(normalSample, normalSample)
 }
 
 type softMarginArgs struct {
-	normal    Sample
+	normal    []float64
 	threshold float64
 }

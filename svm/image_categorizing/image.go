@@ -6,13 +6,11 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"os"
-
-	"github.com/unixpickle/weakai/svm"
 )
 
 // Image is a black and white bitmap of pixels.
 type Image struct {
-	Vector svm.Sample
+	Vector []float64
 	Width  int
 	Height int
 }
@@ -29,7 +27,7 @@ func ReadImage(path string) (*Image, error) {
 		return nil, err
 	}
 	res := &Image{
-		Vector: make(svm.Sample, image.Bounds().Dx()*image.Bounds().Dy()),
+		Vector: make([]float64, image.Bounds().Dx()*image.Bounds().Dy()),
 		Width:  image.Bounds().Dx(),
 		Height: image.Bounds().Dy(),
 	}
@@ -52,7 +50,7 @@ func (i *Image) Crop(rect image.Rectangle) *Image {
 		panic("invalid crop rectangle")
 	}
 	res := &Image{
-		Vector: make(svm.Sample, rect.Dx()*rect.Dy()),
+		Vector: make([]float64, rect.Dx()*rect.Dy()),
 		Width:  rect.Dx(),
 		Height: rect.Dy(),
 	}

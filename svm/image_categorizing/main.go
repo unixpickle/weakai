@@ -26,7 +26,7 @@ func main() {
 	width, height := minimumSize(allImages)
 
 	problem := &svm.Problem{
-		Kernel:    svm.LinearKernel,
+		Kernel:    svm.CachedKernel(svm.LinearKernel),
 		Positives: make([]svm.Sample, len(positives)),
 		Negatives: make([]svm.Sample, len(negatives)),
 	}
@@ -34,21 +34,23 @@ func main() {
 	fmt.Println("Cropping samples...")
 	// TODO: perhaps normalize the image vectors.
 	for i, x := range negatives {
-		problem.Negatives[i] = cutOutMiddle(x, width, height).Vector
+		vec := cutOutMiddle(x, width, height).Vector
+		problem.Negatives[i] = svm.Sample{V: vec, UserInfo: i + 1}
 	}
 	for i, x := range positives {
-		problem.Positives[i] = cutOutMiddle(x, width, height).Vector
+		vec := cutOutMiddle(x, width, height).Vector
+		problem.Positives[i] = svm.Sample{V: vec, UserInfo: len(negatives) + 1 + i}
 	}
 
 	fmt.Println("Solving...")
 	solver := svm.GradientDescentSolver{
-		Tradeoff: 0.001,
-		Steps:    1000,
-		StepSize: 0.001,
+		Tradeoff: 0.0001,
+		Steps:    100000,
+		StepSize: 0.00001,
 	}
 	classifier := solver.Solve(problem).Linearize()
 
-	image := imageForSolution(width, height, classifier.HyperplaneNormal)
+	image := imageForSolution(width, height, classifier.HyperplaneNormal.V)
 	if err := image.WriteFile(os.Args[3]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -101,7 +103,7 @@ func cutOutMiddle(img *Image, width, height int) *Image {
 	return img.Crop(image.Rect(cutLeft, cutTop, cutLeft+width, cutTop+height))
 }
 
-func imageForSolution(width, height int, solution svm.Sample) *Image {
+func imageForSolution(width, height int, solution []float64) *Image {
 	var minPixel float64
 	var maxPixel float64
 	for i, sample := range solution {

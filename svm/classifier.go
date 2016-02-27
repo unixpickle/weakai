@@ -38,16 +38,16 @@ func (c *CombinationClassifier) Classify(sample Sample) bool {
 // kernel is LinearKernel.
 // This will not work for non-linear kernels.
 func (c *CombinationClassifier) Linearize() *LinearClassifier {
-	sampleSum := make(Sample, len(c.SupportVectors[0]))
+	sampleSum := make([]float64, len(c.SupportVectors[0].V))
 	for i, vec := range c.SupportVectors {
 		coeff := c.Coefficients[i]
 		for j := range sampleSum {
-			sampleSum[j] += coeff * vec[j]
+			sampleSum[j] += coeff * vec.V[j]
 		}
 	}
 	return &LinearClassifier{
 		Kernel:           c.Kernel,
-		HyperplaneNormal: sampleSum,
+		HyperplaneNormal: Sample{V: sampleSum},
 		Threshold:        c.Threshold,
 	}
 }

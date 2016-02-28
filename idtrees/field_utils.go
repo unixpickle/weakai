@@ -7,6 +7,7 @@ import (
 
 type BoolFieldGetter func(e Entry) bool
 type IntFieldGetter func(e Entry) int
+type FloatFieldGetter func(e Entry) float64
 type GeneralFieldGetter func(e Entry) Value
 
 // A ValueAdder adds a Value to an Entry's FieldValues slice.
@@ -115,6 +116,38 @@ func CreateBisectingIntFields(d *DataSet, g IntFieldGetter, v ValueAdder,
 		}
 	}
 	sort.Ints(possibilities)
+
+	if len(possibilities) <= 1 {
+		return []BoolField{}
+	}
+
+	res := make([]BoolField, 0, len(possibilities)-1)
+	for i := 0; i < len(possibilities)-1; i++ {
+		middle := (possibilities[i] + possibilities[i+1]) / 2
+		field := BoolField(fmt.Sprintf(labelFmt, middle))
+		res = append(res, field)
+		for _, entry := range d.Entries {
+			v(entry, BoolValue(g(entry) > middle))
+		}
+		d.Fields = append(d.Fields, field)
+	}
+
+	return res
+}
+
+// CreateBisectingFloatFields works like CreateBisectingIntFields, but for float64s.
+func CreateBisectingFloatFields(d *DataSet, g FloatFieldGetter, v ValueAdder,
+	labelFmt string) []BoolField {
+	possibilities := []float64{}
+	seenPossibilities := map[float64]bool{}
+	for _, entry := range d.Entries {
+		val := g(entry)
+		if !seenPossibilities[val] {
+			seenPossibilities[val] = true
+			possibilities = append(possibilities, val)
+		}
+	}
+	sort.Float64s(possibilities)
 
 	if len(possibilities) <= 1 {
 		return []BoolField{}

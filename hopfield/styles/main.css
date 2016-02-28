@@ -1,0 +1,17 @@
+body {
+  text-align: center;
+  margin: 0;
+}
+
+.drawing {
+  border: 1px solid black;
+  margin: 0 10px;
+}
+
+#controls {
+  margin: 10px 0;
+}
+
+#drawings {
+  margin-top: 20px;
+}

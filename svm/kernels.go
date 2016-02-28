@@ -21,6 +21,17 @@ func PolynomialKernel(b, n float64) Kernel {
 	}
 }
 
+// RadialBasisKernel generates a Kernel that plugs the vectors into exp(-c*||x-y||^2).
+func RadialBasisKernel(coeff float64) Kernel {
+	return func(x, y Sample) float64 {
+		var diffSquared float64
+		for i, v := range x.V {
+			diffSquared += math.Pow(v-y.V[i], 2)
+		}
+		return math.Exp(-coeff * diffSquared)
+	}
+}
+
 // CachedKernel generates a Kernel which caches results from a different kernel.
 // This requires that each Sample has a unique UserInfo, excepting ones with UserInfo == 0.
 // The caching Kernel will not use the cache for any samples that have UserInfo values of 0.

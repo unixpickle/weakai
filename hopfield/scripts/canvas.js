@@ -66,13 +66,43 @@
 
   Canvas.prototype._registerMouseEvents = function() {
     var tileSize = CANVAS_SIZE / PICTURE_SIZE;
+
+    var mouseMoved = false;
+
     this._element.addEventListener('click', function(e) {
+      if (mouseMoved) {
+        return;
+      }
       var clientRect = this._element.getBoundingClientRect();
       var x = Math.floor((e.clientX - clientRect.left) / tileSize);
       var y = Math.floor((e.clientY - clientRect.top) / tileSize);
+      x = Math.max(0, Math.min(PICTURE_SIZE-1, x));
+      y = Math.max(0, Math.min(PICTURE_SIZE-1, y));
       var idx = x + y*PICTURE_SIZE;
       this._cells[idx] = !this._cells[idx];
       this._draw();
+    }.bind(this));
+
+    this._element.addEventListener('mousedown', function(e) {
+      mouseMoved = false;
+      var boundMovement = function(e) {
+        var clientRect = this._element.getBoundingClientRect();
+        var x = Math.floor((e.clientX - clientRect.left) / tileSize);
+        var y = Math.floor((e.clientY - clientRect.top) / tileSize);
+        x = Math.max(0, Math.min(PICTURE_SIZE-1, x));
+        y = Math.max(0, Math.min(PICTURE_SIZE-1, y));
+        var idx = x + y*PICTURE_SIZE;
+        this._cells[idx] = true;
+        this._draw();
+        mouseMoved = true;
+      }.bind(this);
+      window.addEventListener('mousemove', boundMovement);
+      var boundMouseUp;
+      boundMouseUp = function() {
+        window.removeEventListener('mousemove', boundMovement);
+        window.removeEventListener('mouseup', boundMouseUp);
+      }.bind(this);
+      window.addEventListener('mouseup', boundMouseUp);
     }.bind(this));
   };
 

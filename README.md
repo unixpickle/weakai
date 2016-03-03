@@ -15,3 +15,7 @@ Here are the weak AI demos I've implemented:
  * [minimax](minimax) - checkers AI that uses the minimax algorithm. This is an HTML+CSS+SVG+JavaScript application.
  * [mapcolor](mapcolor) - four-color a map of the USA using a constraint search. This is a Go program that modifies an SVG of the USA and outputs the result.
  * [nearestneighbors](nearestneighbors) - a simple search engine that uses Nearest Neighbors. The search engine itself is far from useful, but at least it demonstrates a technique of Nearest Neighbors learning.
+
+# TODO
+
+ * For idtrees implementation, add a way to prefer the floating point split that is as neutral as possible, instead of picking an arbitrary split which happens to maximize entropy. This way, if multiple splits have the same effect, the middle one is chosen.

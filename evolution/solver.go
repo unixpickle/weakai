@@ -32,6 +32,7 @@ func (s *Solver) Solve(start []Entity) []Entity {
 		newPool := s.nextOffspring(population, fracDone)
 		population = s.applySelection(newPool)
 	}
+	sortEntities(population, nil, nil)
 	return population
 }
 
@@ -56,7 +57,7 @@ func (s *Solver) nextOffspring(population []Entity, fracDone float64) []Entity {
 }
 
 func (s *Solver) applySelection(population []Entity) []Entity {
-	selected := make([]Entity, 0, len(population))
+	selected := make([]Entity, 0, s.MaxPopulation)
 	remaining := make([]Entity, len(population))
 	copy(remaining, population)
 
@@ -122,6 +123,7 @@ type entitySorter struct {
 	tradeoff      DFTradeoff
 
 	findDiversityRank bool
+	donkCount         int
 }
 
 func (e *entitySorter) Len() int {
@@ -140,6 +142,7 @@ func (e *entitySorter) Less(i, j int) bool {
 	if len(e.selected) == 0 {
 		return e1.Fitness() > e2.Fitness()
 	} else if e.findDiversityRank {
+		e.donkCount++
 		return e1.Similarity(e.remaining) < e2.Similarity(e.remaining)
 	}
 	f1 := e.floatingFitnessRank(i)

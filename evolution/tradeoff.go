@@ -6,7 +6,9 @@ package evolution
 // diversity.
 type DFTradeoff func(diversity, fitness float64) float64
 
-// LinearDFTradeoff returns the sum of the diversity rank and the fitness rank values.
-func LinearDFTradeoff(diversity, fitness float64) float64 {
-	return diversity + fitness
+// LinearDFTradeoff makes a DFTradeoff which returns linear combinations of diversity and fitness.
+func LinearDFTradeoff(diversityWeight, fitnessWeight float64) DFTradeoff {
+	return func(div, fit float64) float64 {
+		return div*diversityWeight + fit*fitnessWeight
+	}
 }

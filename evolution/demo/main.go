@@ -12,14 +12,14 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	solver := evolution.Solver{
-		StepCount:            100,
-		StepSizeInitial:      10,
+		StepCount:            1000,
+		StepSizeInitial:      0.1,
 		StepSizeFinal:        0,
-		MaxPopulation:        20,
+		MaxPopulation:        30,
 		MutateProbability:    0.3,
 		CrossOverProbability: 0.3,
 		SelectionProbability: 0.5,
-		DFTradeoff:           evolution.LinearDFTradeoff,
+		DFTradeoff:           evolution.LinearDFTradeoff(0.1, 0.9),
 	}
 	solutions := solver.Solve([]evolution.Entity{Point{0, 0}})
 	fmt.Println("Solution:", solutions[0])

@@ -106,6 +106,10 @@ func sortEntities(entities, selected []Entity, tradeoff DFTradeoff) {
 	if len(selected) > 0 {
 		sorter.selected = selected
 		sorter.findDiversityRank = true
+		sorter.similarityCache = make([]float64, len(entities))
+		for i, ent := range sorter.remaining {
+			sorter.similarityCache[i] = ent.Similarity(selected)
+		}
 		sort.Sort(sorter)
 		for i := range entities {
 			sorter.diversityRank[i] = i
@@ -123,7 +127,7 @@ type entitySorter struct {
 	tradeoff      DFTradeoff
 
 	findDiversityRank bool
-	donkCount         int
+	similarityCache   []float64
 }
 
 func (e *entitySorter) Len() int {
@@ -134,6 +138,9 @@ func (e *entitySorter) Swap(i, j int) {
 	e.remaining[i], e.remaining[j] = e.remaining[j], e.remaining[i]
 	e.fitnessRank[i], e.fitnessRank[j] = e.fitnessRank[j], e.fitnessRank[i]
 	e.diversityRank[i], e.diversityRank[j] = e.diversityRank[j], e.diversityRank[i]
+	if e.similarityCache != nil {
+		e.similarityCache[i], e.similarityCache[j] = e.similarityCache[j], e.similarityCache[i]
+	}
 }
 
 func (e *entitySorter) Less(i, j int) bool {
@@ -142,8 +149,7 @@ func (e *entitySorter) Less(i, j int) bool {
 	if len(e.selected) == 0 {
 		return e1.Fitness() > e2.Fitness()
 	} else if e.findDiversityRank {
-		e.donkCount++
-		return e1.Similarity(e.remaining) < e2.Similarity(e.remaining)
+		return e.similarityCache[i] < e.similarityCache[j]
 	}
 	f1 := e.floatingFitnessRank(i)
 	d1 := e.floatingDiversityRank(i)

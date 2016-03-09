@@ -21,7 +21,10 @@ func generateNode(d *DataSet, usedFields map[Field]bool) *TreeNode {
 
 	field, fieldIdx := bestField(d, usedFields)
 	if field == nil {
-		return nil
+		return &TreeNode{
+			LeafValue:     d.dominantClass(),
+			Indeterminate: true,
+		}
 	}
 
 	res := &TreeNode{BranchField: field, Branches: map[Value]*TreeNode{}}
@@ -78,6 +81,7 @@ func bestFieldInList(d *DataSet, fields []Field, startIndex int,
 	var leastDisorder float64
 	var bestField Field
 	var bestFieldIdx int
+FieldLoop:
 	for idx, field := range fields {
 		if usedFields[field] {
 			continue
@@ -85,6 +89,9 @@ func bestFieldInList(d *DataSet, fields []Field, startIndex int,
 		var disorder float64
 		for _, value := range field.Values() {
 			partDisorder, count := d.statsForFilter(idx+startIndex, value)
+			if count == len(d.Entries) {
+				continue FieldLoop
+			}
 			fractionOfWhole := float64(count) / float64(len(d.Entries))
 			disorder += fractionOfWhole * partDisorder
 		}

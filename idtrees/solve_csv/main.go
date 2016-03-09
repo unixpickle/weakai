@@ -47,11 +47,6 @@ func main() {
 
 	log.Println("Generating tree...")
 	treeRoot := idtrees.GenerateTree(dataSet)
-	if treeRoot == nil {
-		fmt.Fprintln(os.Stderr, "The data is inconclusive.")
-		os.Exit(1)
-	}
-
 	log.Println("Printing out the tree...")
 
 	fmt.Println(treeRoot)

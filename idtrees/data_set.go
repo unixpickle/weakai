@@ -19,6 +19,22 @@ func (d *DataSet) classes() []Value {
 	return res
 }
 
+func (d *DataSet) dominantClass() Value {
+	counts := map[Value]int{}
+	for _, e := range d.Entries {
+		counts[e.Class()]++
+	}
+	var bestValue Value
+	var bestCount int
+	for val, count := range counts {
+		if count > bestCount {
+			bestValue = val
+			bestCount = count
+		}
+	}
+	return bestValue
+}
+
 func (d *DataSet) filter(fieldIndex int, v Value) *DataSet {
 	res := &DataSet{Fields: d.Fields, Entries: []Entry{}}
 	for _, entry := range d.Entries {

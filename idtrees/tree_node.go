@@ -7,9 +7,13 @@ import (
 
 // A TreeNode is one node in an identification tree.
 //
-// If a TreeNode is completely narrowed down to one class,
-// then its LeafValue will be non-nil and its BranchField
+// If a TreeNode is completely narrowed down to one or zero classes,
+// or if no more distinctions could be made, then its BranchField
 // will be nil.
+//
+// If a TreeNode could not be narrowed down further but was
+// not all one class, then LeafValue is the majority class and
+// Indeterminate is true.
 //
 // If a TreeNode is narrowed down to zero classes, i.e. it is
 // impossible to reach, then all its fields will be nil.
@@ -19,7 +23,8 @@ import (
 // indicate children TreeNodes for each possible Value for the
 // BranchField.
 type TreeNode struct {
-	LeafValue Value
+	LeafValue     Value
+	Indeterminate bool
 
 	BranchField Field
 	Branches    map[Value]*TreeNode
@@ -30,7 +35,11 @@ type TreeNode struct {
 func (t *TreeNode) String() string {
 	if t.Leaf() {
 		if t.LeafValue != nil {
-			return t.LeafValue.String()
+			if t.Indeterminate {
+				return t.LeafValue.String() + " (Indeterminate)"
+			} else {
+				return t.LeafValue.String()
+			}
 		} else {
 			return "(Unreachable)"
 		}

@@ -8,6 +8,13 @@ import (
 // A Classifier classifies samples as positive or negative using some criterion.
 type Classifier interface {
 	Classify(sample Sample) bool
+
+	// Rating returns a positive number for positive
+	// samples and a negative number for negatives.
+	// Unlike classify, the results from Rating() are
+	// ordered, so it is possible to tell which sample
+	// is "more" positive.
+	Rating(sample Sample) float64
 }
 
 // A LinearClassifier classifies samples using a hyperplane normal whose pre-image is known.
@@ -20,8 +27,12 @@ type LinearClassifier struct {
 }
 
 func (c *LinearClassifier) Classify(sample Sample) bool {
+	return c.Rating(sample) > 0
+}
+
+func (c *LinearClassifier) Rating(sample Sample) float64 {
 	dot := c.Kernel(sample, c.HyperplaneNormal)
-	return dot+c.Threshold > 0
+	return dot + c.Threshold
 }
 
 // A CombinationClassifier classifies novel samples by taking their inner product with a hyperplane
@@ -36,7 +47,11 @@ type CombinationClassifier struct {
 }
 
 func (c *CombinationClassifier) Classify(sample Sample) bool {
-	return c.sampleProduct(sample)+c.Threshold > 0
+	return c.Rating(sample) > 0
+}
+
+func (c *CombinationClassifier) Rating(sample Sample) float64 {
+	return c.sampleProduct(sample) + c.Threshold
 }
 
 // Linearize converts a CombinationClassifier into a LinearClassifier, assuming that the underlying

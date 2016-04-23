@@ -45,8 +45,7 @@ func main() {
 	fmt.Println("Solving...")
 	solver := svm.GradientDescentSolver{
 		Tradeoff: 0.0001,
-		Steps:    100000,
-		StepSize: 0.001,
+		Steps:    2000,
 	}
 	classifier := solver.Solve(problem).Linearize()
 

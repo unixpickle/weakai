@@ -8,6 +8,7 @@ import (
 )
 
 const reprojectIterationCount = 100
+const stationaryPointScale = 1e-11
 
 // activeSetSolver uses an active set method
 // to solve an SVM-style quadratic
@@ -88,23 +89,8 @@ func newActiveSetSolver(p *Problem, maxCoeff float64) *activeSetSolver {
 // gradient descent.
 func (s *activeSetSolver) StepGradient() {
 	stepDirection := s.gradient().Scale(-1)
-
-	projectedSignVec := s.signVec.Copy()
-	for i, x := range stepDirection {
-		if x > 0 && s.c[i] >= s.maxCoeff {
-			stepDirection[i] = 0
-			projectedSignVec[i] = 0
-		} else if x < 0 && s.c[i] <= 0 {
-			stepDirection[i] = 0
-			projectedSignVec[i] = 0
-		}
-	}
-
-	projAmount := projectedSignVec.Dot(stepDirection) /
-		projectedSignVec.Dot(projectedSignVec)
-	stepDirection.Add(projectedSignVec.Scale(-projAmount))
-
-	s.step(stepDirection)
+	zeroed := s.constrainActiveSet(stepDirection)
+	s.step(stepDirection, zeroed)
 }
 
 // Solution returns the current approximation of
@@ -143,14 +129,14 @@ func (s *activeSetSolver) gradient() linalg.Vector {
 	return linalg.Vector(residual.Data)
 }
 
-func (s *activeSetSolver) step(d linalg.Vector) {
+func (s *activeSetSolver) step(d linalg.Vector, zeroed map[int]bool) {
 	// Avoid stepping so much that we break
 	// inactive inequality constraints.
 	var maxStep, minStep float64
 	var maxIdx, minIdx int
 	isFirst := true
 	for i, x := range d {
-		if x == 0 {
+		if zeroed[i] || x == 0 {
 			continue
 		}
 		guessVal := s.c[i]
@@ -173,6 +159,10 @@ func (s *activeSetSolver) step(d linalg.Vector) {
 				maxIdx = i
 			}
 		}
+	}
+
+	if isFirst {
+		return
 	}
 
 	constrainedIdx := -1
@@ -232,4 +222,58 @@ func (s *activeSetSolver) reprojectConstraints() {
 	}
 	projAmount := s.signVec.Dot(s.c) / s.signVec.Dot(s.signVec)
 	s.c.Add(s.signVec.Copy().Scale(-projAmount))
+}
+
+func (s *activeSetSolver) constrainActiveSet(d linalg.Vector) map[int]bool {
+	initialMax := maxElement(d)
+
+	// Must always project out the equality constraint.
+	projAmount := s.signVec.Dot(d) / s.signVec.Dot(s.signVec)
+	d.Add(s.signVec.Copy().Scale(-projAmount))
+
+	normalizedSignVec := s.signVec.Copy().Scale(1 / math.Sqrt(s.signVec.Dot(s.signVec)))
+	projectedOutVecs := []linalg.Vector{normalizedSignVec}
+	zeroedComponents := map[int]bool{}
+
+	changed := true
+	for changed {
+		changed = false
+		for i, x := range d {
+			if zeroedComponents[i] {
+				continue
+			}
+			if (x > 0 && s.c[i] >= s.maxCoeff) || (x < 0 && s.c[i] <= 0) {
+				zeroedComponents[i] = true
+				changed = true
+				deleteVec := make(linalg.Vector, len(s.signVec))
+				deleteVec[i] = 1
+				for _, v := range projectedOutVecs {
+					deleteVec.Add(v.Copy().Scale(-v.Dot(deleteVec)))
+				}
+				mag := math.Sqrt(deleteVec.Dot(deleteVec))
+				if mag == 0 {
+					continue
+				}
+				deleteVec.Scale(1 / mag)
+				projectedOutVecs = append(projectedOutVecs, deleteVec)
+				d.Add(deleteVec.Copy().Scale(-deleteVec.Dot(d)))
+			}
+		}
+	}
+
+	if maxElement(d) <= stationaryPointScale*initialMax {
+		for i := range d {
+			d[i] = 0
+		}
+	}
+
+	return zeroedComponents
+}
+
+func maxElement(v linalg.Vector) float64 {
+	var m float64
+	for _, x := range v {
+		m = math.Max(m, math.Abs(x))
+	}
+	return m
 }

@@ -7,6 +7,8 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
+const reprojectIterationCount = 100
+
 // activeSetSolver uses an active set method
 // to solve an SVM-style quadratic
 // optimization problem.
@@ -15,7 +17,7 @@ type activeSetSolver struct {
 	// 1/2*c'*A*c - b'*c.
 	a *linalg.Matrix
 
-	// signVec is a vector of 1's or 1's
+	// signVec is a vector of 1's or -1's
 	// indicating whether each sample is
 	// positive or negative.
 	signVec linalg.Vector
@@ -26,6 +28,8 @@ type activeSetSolver struct {
 
 	// c is the current approximate solution.
 	c linalg.Vector
+
+	stepCount int
 }
 
 func newActiveSetSolver(p *Problem, maxCoeff float64) *activeSetSolver {
@@ -96,7 +100,8 @@ func (s *activeSetSolver) StepGradient() {
 		}
 	}
 
-	projAmount := projectedSignVec.Dot(stepDirection) / stepDirection.Dot(stepDirection)
+	projAmount := projectedSignVec.Dot(stepDirection) /
+		projectedSignVec.Dot(projectedSignVec)
 	stepDirection.Add(projectedSignVec.Scale(-projAmount))
 
 	s.step(stepDirection)
@@ -191,10 +196,15 @@ func (s *activeSetSolver) step(d linalg.Vector) {
 			s.c[constrainedIdx] = 0
 		}
 	}
+
+	s.stepCount++
+	if s.stepCount%reprojectIterationCount == 0 {
+		s.reprojectConstraints()
+	}
 }
 
 func (s *activeSetSolver) optimalStep(d linalg.Vector) float64 {
-	// The optimal step size is (d'*b - d'*A*x)/(d'*A*d)
+	// The optimal step size is (d'*b - c'*A*d)/(d'*A*d)
 	// where d is the direction, A is the matrix, x is
 	// the current approximate solution, and b is all 1's.
 
@@ -214,4 +224,12 @@ func (s *activeSetSolver) optimalStep(d linalg.Vector) float64 {
 	denominator := d.Dot(ad)
 
 	return numerator / denominator
+}
+
+func (s *activeSetSolver) reprojectConstraints() {
+	for i, x := range s.c {
+		s.c[i] = math.Max(0, math.Min(s.maxCoeff, x))
+	}
+	projAmount := s.signVec.Dot(s.c) / s.signVec.Dot(s.signVec)
+	s.c.Add(s.signVec.Copy().Scale(-projAmount))
 }

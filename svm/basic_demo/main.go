@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("Solution from subgradient solver:", solution)
 
 	gradientSolver := &svm.GradientDescentSolver{
-		Tradeoff: 0.001,
+		Tradeoff: 0.0001,
 		Steps:    100,
 	}
 	solution = gradientSolver.Solve(problem).Linearize()

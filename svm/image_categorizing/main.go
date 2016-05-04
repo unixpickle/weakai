@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/unixpickle/weakai/svm"
 )
@@ -45,7 +46,7 @@ func main() {
 	fmt.Println("Solving...")
 	solver := svm.GradientDescentSolver{
 		Tradeoff: 0.0001,
-		Steps:    2000,
+		Timeout:  time.Minute,
 	}
 	classifier := solver.Solve(problem).Linearize()
 

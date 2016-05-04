@@ -1,27 +1,45 @@
 package svm
 
-// A GradientDescentSolver solves Problems using gradient descent.
-//
-// The algorithm that this uses has the following attributes:
-// - This uses the Lagrangian dual problem, rather than the primal problem.
-// - The gradients are computed using a closed-form mathematical function, not an approximation.
-// - After each descent step, the coefficients are "projected" onto the constraints.
-type GradientDescentSolver struct {
-	// Steps indicates how many iterations the solver should perform.
-	Steps int
+import "time"
 
-	// Tradeoff specifies how important it is to minimize the magnitude of the normal vector versus
-	// finding a good separation of samples.
-	// In other words, it determines how important a wide margin is.
-	// For linearly separable data, you should use a small (but non-zero) Tradeoff value.
+// A GradientDescentSolver solves Problems using
+// active set gradient descent.
+type GradientDescentSolver struct {
+	// Timeout specifies how long the algorithm
+	// should run before returning the best
+	// solution it's found.
+	Timeout time.Duration
+
+	// Tradeoff determines how important a wide
+	// separation margin is. The greater the
+	// tradeoff, the more the separation is
+	// prioritized over the accuracy.
+	//
+	// For linearly separable data, a small
+	// Tradeoff value will do.
 	Tradeoff float64
 }
 
 func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 	s := newActiveSetSolver(p, 1/(2*c.Tradeoff))
+	timeout := time.After(c.Timeout)
 
-	for i := 0; i < c.Steps; i++ {
+	lastValue := s.QuadraticValue()
+
+StepLoop:
+	for {
 		s.StepGradient()
+		newVal := s.QuadraticValue()
+		if newVal >= lastValue && !s.ConstraintsChanged() {
+			break
+		}
+		lastValue = newVal
+
+		select {
+		case <-timeout:
+			break StepLoop
+		default:
+		}
 	}
 
 	return s.Solution(p)

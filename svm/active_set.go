@@ -30,7 +30,8 @@ type activeSetSolver struct {
 	// c is the current approximate solution.
 	c linalg.Vector
 
-	stepCount int
+	stepCount          int
+	constraintsChanged bool
 }
 
 func newActiveSetSolver(p *Problem, maxCoeff float64) *activeSetSolver {
@@ -88,9 +89,33 @@ func newActiveSetSolver(p *Problem, maxCoeff float64) *activeSetSolver {
 // StepGradient performs a step of constrained
 // gradient descent.
 func (s *activeSetSolver) StepGradient() {
+	s.constraintsChanged = false
 	stepDirection := s.gradient().Scale(-1)
-	zeroed := s.constrainActiveSet(stepDirection)
-	s.step(stepDirection, zeroed)
+	s.constrainActiveSet(stepDirection)
+	s.step(stepDirection)
+}
+
+// QuadraticValue returns the current value of
+// the minimizing quadratic form.
+func (s *activeSetSolver) QuadraticValue() float64 {
+	columnMat := &linalg.Matrix{
+		Rows: s.a.Cols,
+		Cols: 1,
+		Data: s.c,
+	}
+	result := kahan.NewSummer64()
+	quadTerm := columnMat.Transpose().Mul(s.a).Mul(columnMat).Data[0]
+	result.Add(quadTerm * 0.5)
+	for _, x := range s.c {
+		result.Add(-x)
+	}
+	return result.Sum()
+}
+
+// ConstraintsChanged returns whether or not
+// the last step changed any constraints.
+func (s *activeSetSolver) ConstraintsChanged() bool {
+	return s.constraintsChanged
 }
 
 // Solution returns the current approximation of
@@ -129,14 +154,14 @@ func (s *activeSetSolver) gradient() linalg.Vector {
 	return linalg.Vector(residual.Data)
 }
 
-func (s *activeSetSolver) step(d linalg.Vector, zeroed map[int]bool) {
+func (s *activeSetSolver) step(d linalg.Vector) {
 	// Avoid stepping so much that we break
 	// inactive inequality constraints.
 	var maxStep, minStep float64
 	var maxIdx, minIdx int
 	isFirst := true
 	for i, x := range d {
-		if zeroed[i] || x == 0 {
+		if x == 0 {
 			continue
 		}
 		guessVal := s.c[i]
@@ -179,6 +204,7 @@ func (s *activeSetSolver) step(d linalg.Vector, zeroed map[int]bool) {
 	}
 
 	if constrainedIdx >= 0 {
+		s.constraintsChanged = true
 		val := s.c[constrainedIdx]
 		if math.Abs(val) > math.Abs(val-s.maxCoeff) {
 			s.c[constrainedIdx] = s.maxCoeff
@@ -224,7 +250,7 @@ func (s *activeSetSolver) reprojectConstraints() {
 	s.c.Add(s.signVec.Copy().Scale(-projAmount))
 }
 
-func (s *activeSetSolver) constrainActiveSet(d linalg.Vector) map[int]bool {
+func (s *activeSetSolver) constrainActiveSet(d linalg.Vector) {
 	initialMax := maxElement(d)
 
 	// Must always project out the equality constraint.
@@ -257,17 +283,27 @@ func (s *activeSetSolver) constrainActiveSet(d linalg.Vector) map[int]bool {
 				deleteVec.Scale(1 / mag)
 				projectedOutVecs = append(projectedOutVecs, deleteVec)
 				d.Add(deleteVec.Copy().Scale(-deleteVec.Dot(d)))
+				break
 			}
 		}
 	}
 
+	for i, x := range s.c {
+		if !zeroedComponents[i] && (x >= s.maxCoeff || s.c[i] <= 0) {
+			s.constraintsChanged = true
+		}
+	}
+
+	// If we aren't moving very much, don't move at all.
 	if maxElement(d) <= stationaryPointScale*initialMax {
 		for i := range d {
 			d[i] = 0
 		}
 	}
 
-	return zeroedComponents
+	for i := range zeroedComponents {
+		d[i] = 0
+	}
 }
 
 func maxElement(v linalg.Vector) float64 {

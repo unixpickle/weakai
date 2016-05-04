@@ -3,6 +3,7 @@ package svm
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestGradientSolverPolyKernel(t *testing.T) {
@@ -32,7 +33,7 @@ func TestGradientSolverPolyKernel(t *testing.T) {
 
 	gradientSolver := &GradientDescentSolver{
 		Tradeoff: 0.0001,
-		Steps:    10000,
+		Timeout:  time.Minute,
 	}
 	solution := gradientSolver.Solve(problem)
 

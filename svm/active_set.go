@@ -3,160 +3,76 @@ package svm
 import (
 	"math"
 
-	"github.com/unixpickle/num-analysis/kahan"
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
 const reprojectIterationCount = 100
 const stationaryPointScale = 1e-11
 
-// activeSetSolver uses an active set method
-// to solve an SVM-style quadratic
-// optimization problem.
-type activeSetSolver struct {
-	// This is A from the quadratic form
-	// 1/2*c'*A*c - b'*c.
-	a *linalg.Matrix
+// A constraintValue is 1 if a component
+// is not allowed to get any larger, -1
+// if it is not allowed to get any smaller,
+// or 0 if it is fine to move.
+type constraintValue int
 
-	// signVec is a vector of 1's or -1's
+// activeSet maintains a list of active
+// optimization constraints for the SVM
+// dual problem.
+type activeSet struct {
+	// SignVec is a vector of 1's or -1's
 	// indicating whether each sample is
 	// positive or negative.
-	signVec linalg.Vector
+	SignVec linalg.Vector
 
-	// maxCoeff is the maximum value any
-	// component of c can have.
-	maxCoeff float64
+	MaxCoeff float64
 
-	// c is the current approximate solution.
-	c linalg.Vector
-
-	stepCount          int
-	constraintsChanged bool
+	Constraints []constraintValue
+	ActiveCount int
 }
 
-func newActiveSetSolver(p *Problem, maxCoeff float64) *activeSetSolver {
-	varCount := len(p.Positives) + len(p.Negatives)
-	res := &activeSetSolver{
-		a:        linalg.NewMatrix(varCount, varCount),
-		signVec:  make(linalg.Vector, varCount),
-		maxCoeff: maxCoeff,
-		c:        make(linalg.Vector, varCount),
+func newActiveSet(sign linalg.Vector, max float64) *activeSet {
+	return &activeSet{
+		SignVec:     sign,
+		MaxCoeff:    max,
+		Constraints: make([]constraintValue, len(sign)),
 	}
-
-	posCount := len(p.Positives)
-
-	for i := 0; i < varCount; i++ {
-		if i >= posCount {
-			res.signVec[i] = -1
-		} else {
-			res.signVec[i] = 1
-		}
-	}
-
-	for i := 0; i < varCount; i++ {
-		var iSample Sample
-		if i >= posCount {
-			iSample = p.Negatives[i-posCount]
-		} else {
-			iSample = p.Positives[i]
-		}
-		res.a.Set(i, i, p.Kernel(iSample, iSample))
-		for j := 0; j < i; j++ {
-			var jSample Sample
-			if j >= posCount {
-				jSample = p.Negatives[j-posCount]
-			} else {
-				jSample = p.Positives[j]
-			}
-			product := p.Kernel(iSample, jSample)
-			res.a.Set(i, j, product)
-			res.a.Set(j, i, product)
-		}
-	}
-
-	for i := 0; i < varCount; i++ {
-		for j := 0; j < varCount; j++ {
-			oldVal := res.a.Get(i, j)
-			oldVal *= res.signVec[i]
-			oldVal *= res.signVec[j]
-			res.a.Set(i, j, oldVal)
-		}
-	}
-
-	return res
 }
 
-// StepGradient performs a step of constrained
-// gradient descent.
-func (s *activeSetSolver) StepGradient() {
-	s.constraintsChanged = false
-	stepDirection := s.gradient().Scale(-1)
-	s.constrainActiveSet(stepDirection)
-	s.step(stepDirection)
+// Prune removes constraints which can be
+// satisfied whilst going in the direction
+// of the given gradient.
+// This returns true if any vectors were
+// removed from the active set.
+func (a *activeSet) Prune(gradient linalg.Vector) bool {
+	// TODO: if the active constraints (including
+	// the equality constraint) are independent,
+	// then simply loop through each active constraint
+	// looking for one that can be removed.
+	// If the active constraints are dependent, then
+	// loop through pairs of active constraints and
+	// remove the first pair which, together, can be
+	// removed.
+	// This can all be done using ProjectOut() and
+	// some dot products. The dependent case is even
+	// simpler, and may not even require ProjectOut().
+	return false
 }
 
-// QuadraticValue returns the current value of
-// the minimizing quadratic form.
-func (s *activeSetSolver) QuadraticValue() float64 {
-	columnMat := &linalg.Matrix{
-		Rows: s.a.Cols,
-		Cols: 1,
-		Data: s.c,
-	}
-	result := kahan.NewSummer64()
-	quadTerm := columnMat.Transpose().Mul(s.a).Mul(columnMat).Data[0]
-	result.Add(quadTerm * 0.5)
-	for _, x := range s.c {
-		result.Add(-x)
-	}
-	return result.Sum()
+// ProjectOut projects the active constraints
+// out of a gradient vector (in place).
+func (a *activeSet) ProjectOut(d linalg.Vector) {
+	// TODO: this, using some clever math to make it
+	// O(len(d)).
 }
 
-// ConstraintsChanged returns whether or not
-// the last step changed any constraints.
-func (s *activeSetSolver) ConstraintsChanged() bool {
-	return s.constraintsChanged
-}
-
-// Solution returns the current approximation of
-// the solution.
-func (s *activeSetSolver) Solution(p *Problem) *CombinationClassifier {
-	solution := s.c.Copy()
-
-	// TODO: delete support vectors with 0 coefficients.
-	supportVectors := make([]Sample, len(p.Positives)+len(p.Negatives))
-	copy(supportVectors, p.Positives)
-	copy(supportVectors[len(p.Positives):], p.Negatives)
-	for i := len(p.Positives); i < len(p.Positives)+len(p.Negatives); i++ {
-		solution[i] *= -1
-	}
-
-	res := &CombinationClassifier{
-		SupportVectors: supportVectors,
-		Coefficients:   solution,
-		Kernel:         p.Kernel,
-	}
-	res.computeThreshold(p)
-
-	return res
-}
-
-func (s *activeSetSolver) gradient() linalg.Vector {
-	columnMat := &linalg.Matrix{
-		Rows: s.a.Cols,
-		Cols: 1,
-		Data: s.c,
-	}
-	residual := s.a.Mul(columnMat)
-	for i, x := range residual.Data {
-		residual.Data[i] = x - 1
-	}
-	return linalg.Vector(residual.Data)
-}
-
-func (s *activeSetSolver) step(d linalg.Vector) {
-	// Avoid stepping so much that we break
-	// inactive inequality constraints.
+// Step adds d.Scale(amount) to coeffs.
+// If any of the entries in coeffs hits a
+// constraint, then the step is stopped
+// short and true is returned to indicate
+// that a new constraint has been added.
+//
+// This may modify d in any way it pleases.
+func (a *activeSet) Step(coeffs, d linalg.Vector, amount float64) bool {
 	var maxStep, minStep float64
 	var maxIdx, minIdx int
 	isFirst := true
@@ -164,9 +80,9 @@ func (s *activeSetSolver) step(d linalg.Vector) {
 		if x == 0 {
 			continue
 		}
-		guessVal := s.c[i]
-		maxValue := (s.maxCoeff - guessVal) / x
-		minValue := -guessVal / x
+		coeff := coeffs[i]
+		maxValue := (a.MaxCoeff - coeff) / x
+		minValue := -coeff / x
 		if x < 0 {
 			maxValue, minValue = minValue, maxValue
 		}
@@ -187,129 +103,27 @@ func (s *activeSetSolver) step(d linalg.Vector) {
 	}
 
 	if isFirst {
-		return
+		return false
 	}
 
-	constrainedIdx := -1
-
-	unconstrainedStep := s.optimalStep(d)
-	if unconstrainedStep < minStep {
-		s.c = d.Scale(minStep).Add(s.c)
-		constrainedIdx = minIdx
-	} else if unconstrainedStep > maxStep {
-		s.c = d.Scale(maxStep).Add(s.c)
-		constrainedIdx = maxIdx
+	if amount < minStep {
+		coeffs.Add(d.Scale(minStep))
+		a.addConstraint(coeffs, minIdx)
+	} else if amount > maxStep {
+		coeffs.Add(d.Scale(maxStep))
+		a.addConstraint(coeffs, maxIdx)
 	} else {
-		s.c = d.Scale(unconstrainedStep).Add(s.c)
+		coeffs.Add(d.Scale(amount))
+		return false
 	}
-
-	if constrainedIdx >= 0 {
-		s.constraintsChanged = true
-		val := s.c[constrainedIdx]
-		if math.Abs(val) > math.Abs(val-s.maxCoeff) {
-			s.c[constrainedIdx] = s.maxCoeff
-		} else {
-			s.c[constrainedIdx] = 0
-		}
-	}
-
-	s.stepCount++
-	if s.stepCount%reprojectIterationCount == 0 {
-		s.reprojectConstraints()
-	}
+	return true
 }
 
-func (s *activeSetSolver) optimalStep(d linalg.Vector) float64 {
-	// The optimal step size is (d'*b - c'*A*d)/(d'*A*d)
-	// where d is the direction, A is the matrix, x is
-	// the current approximate solution, and b is all 1's.
-
-	dMat := &linalg.Matrix{
-		Rows: len(d),
-		Cols: 1,
-		Data: d,
+func (a *activeSet) addConstraint(coeffs linalg.Vector, idx int) {
+	val := coeffs[idx]
+	if math.Abs(val) > math.Abs(val-a.MaxCoeff) {
+		coeffs[idx] = a.MaxCoeff
+	} else {
+		coeffs[idx] = 0
 	}
-	ad := linalg.Vector(s.a.Mul(dMat).Data)
-
-	summer := kahan.NewSummer64()
-	for _, x := range d {
-		summer.Add(x)
-	}
-
-	numerator := summer.Sum() - s.c.Dot(ad)
-	denominator := d.Dot(ad)
-
-	return numerator / denominator
-}
-
-func (s *activeSetSolver) reprojectConstraints() {
-	for i, x := range s.c {
-		s.c[i] = math.Max(0, math.Min(s.maxCoeff, x))
-	}
-	projAmount := s.signVec.Dot(s.c) / s.signVec.Dot(s.signVec)
-	s.c.Add(s.signVec.Copy().Scale(-projAmount))
-}
-
-func (s *activeSetSolver) constrainActiveSet(d linalg.Vector) {
-	initialMax := maxElement(d)
-
-	// Must always project out the equality constraint.
-	projAmount := s.signVec.Dot(d) / s.signVec.Dot(s.signVec)
-	d.Add(s.signVec.Copy().Scale(-projAmount))
-
-	normalizedSignVec := s.signVec.Copy().Scale(1 / math.Sqrt(s.signVec.Dot(s.signVec)))
-	projectedOutVecs := []linalg.Vector{normalizedSignVec}
-	zeroedComponents := map[int]bool{}
-
-	changed := true
-	for changed {
-		changed = false
-		for i, x := range d {
-			if zeroedComponents[i] {
-				continue
-			}
-			if (x > 0 && s.c[i] >= s.maxCoeff) || (x < 0 && s.c[i] <= 0) {
-				zeroedComponents[i] = true
-				changed = true
-				deleteVec := make(linalg.Vector, len(s.signVec))
-				deleteVec[i] = 1
-				for _, v := range projectedOutVecs {
-					deleteVec.Add(v.Copy().Scale(-v.Dot(deleteVec)))
-				}
-				mag := math.Sqrt(deleteVec.Dot(deleteVec))
-				if mag == 0 {
-					continue
-				}
-				deleteVec.Scale(1 / mag)
-				projectedOutVecs = append(projectedOutVecs, deleteVec)
-				d.Add(deleteVec.Copy().Scale(-deleteVec.Dot(d)))
-				break
-			}
-		}
-	}
-
-	for i, x := range s.c {
-		if !zeroedComponents[i] && (x >= s.maxCoeff || s.c[i] <= 0) {
-			s.constraintsChanged = true
-		}
-	}
-
-	// If we aren't moving very much, don't move at all.
-	if maxElement(d) <= stationaryPointScale*initialMax {
-		for i := range d {
-			d[i] = 0
-		}
-	}
-
-	for i := range zeroedComponents {
-		d[i] = 0
-	}
-}
-
-func maxElement(v linalg.Vector) float64 {
-	var m float64
-	for _, x := range v {
-		m = math.Max(m, math.Abs(x))
-	}
-	return m
 }

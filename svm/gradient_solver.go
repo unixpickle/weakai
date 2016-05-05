@@ -1,8 +1,10 @@
 package svm
 
 import (
+	"math"
 	"time"
 
+	"github.com/unixpickle/num-analysis/kahan"
 	"github.com/unixpickle/num-analysis/linalg"
 )
 

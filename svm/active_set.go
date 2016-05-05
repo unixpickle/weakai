@@ -44,17 +44,29 @@ func newActiveSet(sign linalg.Vector, max float64) *activeSet {
 // This returns true if any vectors were
 // removed from the active set.
 func (a *activeSet) Prune(gradient linalg.Vector) bool {
-	// TODO: if the active constraints (including
-	// the equality constraint) are independent,
-	// then simply loop through each active constraint
-	// looking for one that can be removed.
-	// If the active constraints are dependent, then
-	// loop through pairs of active constraints and
-	// remove the first pair which, together, can be
-	// removed.
-	// This can all be done using ProjectOut() and
-	// some dot products. The dependent case is even
-	// simpler, and may not even require ProjectOut().
+	if a.ActiveCount == len(a.Constraints) {
+		if !a.pruneLinearlyDependent(gradient) {
+			return false
+		}
+	}
+
+	var maxViolation float64
+	violationIndex := -1
+	for i, x := range a.Constraints {
+		if x == 0 {
+			continue
+		}
+		violation := a.kktViolationAmount(gradient, i)
+		if violation > maxViolation {
+			maxViolation = violation
+			violationIndex = i
+		}
+	}
+
+	if violationIndex >= 0 {
+		return true
+	}
+
 	return false
 }
 
@@ -125,5 +137,26 @@ func (a *activeSet) addConstraint(coeffs linalg.Vector, idx int) {
 		coeffs[idx] = a.MaxCoeff
 	} else {
 		coeffs[idx] = 0
+	}
+}
+
+func (a *activeSet) pruneLinearlyDependent(grad linalg.Vector) bool {
+	// TODO: loop through pairs of constraints and see
+	// if they can both be removed.
+	return false
+}
+
+func (a *activeSet) kktViolationAmount(grad linalg.Vector, i int) float64 {
+	constraintType := a.Constraints[i]
+	a.Constraints[i] = 0
+	gradient := grad.Copy()
+	a.ProjectOut(gradient)
+	a.Constraints[i] = constraintType
+
+	dot := gradient[i]
+	if constraintType == -1 {
+		return dot
+	} else {
+		return -dot
 	}
 }

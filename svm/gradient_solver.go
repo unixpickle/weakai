@@ -211,14 +211,14 @@ func (g *gradientIterator) optimalStep(d linalg.Vector) float64 {
 
 func (g *gradientIterator) step(d linalg.Vector) {
 	optimalAmount := g.optimalStep(d)
-	if g.activeSet.step(g.solution, d, optimalAmount) {
-		c.constraintsChanged = true
+	if g.activeSet.Step(g.solution, d, optimalAmount) {
+		g.constraintsChanged = true
 	}
 
 	g.stepCount++
 	if g.stepCount%reprojectIterationCount == 0 {
 		g.reprojectConstraints()
-		c.constraintsChanged = true
+		g.constraintsChanged = true
 	}
 }
 

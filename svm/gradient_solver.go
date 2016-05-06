@@ -17,6 +17,7 @@ type GradientDescentSolver struct {
 	// Timeout specifies how long the algorithm
 	// should run before returning the best
 	// solution it's found.
+	// If this is zero, no timeout is used.
 	Timeout time.Duration
 
 	// Tradeoff determines how important a wide
@@ -34,7 +35,11 @@ func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 	maxCoefficient := 1 / (2 * c.Tradeoff * sampleCount)
 	iter := newGradientIterator(p, maxCoefficient)
 
-	timeout := time.After(c.Timeout)
+	var timeout <-chan time.Time
+	if c.Timeout != 0 {
+		timeout = time.After(c.Timeout)
+	}
+
 	lastValue := iter.QuadraticValue()
 
 StepLoop:
@@ -46,10 +51,12 @@ StepLoop:
 		}
 		lastValue = newVal
 
-		select {
-		case <-timeout:
-			break StepLoop
-		default:
+		if timeout != nil {
+			select {
+			case <-timeout:
+				break StepLoop
+			default:
+			}
 		}
 	}
 

@@ -8,6 +8,8 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
+const reprojectIterationCount = 100
+
 // A GradientDescentSolver solves Problems using
 // active set gradient descent.
 type GradientDescentSolver struct {
@@ -173,6 +175,19 @@ func (g *gradientIterator) Solution(p *Problem) *CombinationClassifier {
 	return res
 }
 
+func (g *gradientIterator) step(d linalg.Vector) {
+	optimalAmount := g.optimalStep(d)
+	if g.activeSet.Step(g.solution, d, optimalAmount) {
+		g.constraintsChanged = true
+	}
+
+	g.stepCount++
+	if g.stepCount%reprojectIterationCount == 0 {
+		g.reprojectConstraints()
+		g.constraintsChanged = true
+	}
+}
+
 func (g *gradientIterator) gradient() linalg.Vector {
 	columnMat := &linalg.Matrix{
 		Rows: g.matrix.Cols,
@@ -207,19 +222,6 @@ func (g *gradientIterator) optimalStep(d linalg.Vector) float64 {
 	denominator := d.Dot(ad)
 
 	return numerator / denominator
-}
-
-func (g *gradientIterator) step(d linalg.Vector) {
-	optimalAmount := g.optimalStep(d)
-	if g.activeSet.Step(g.solution, d, optimalAmount) {
-		g.constraintsChanged = true
-	}
-
-	g.stepCount++
-	if g.stepCount%reprojectIterationCount == 0 {
-		g.reprojectConstraints()
-		g.constraintsChanged = true
-	}
 }
 
 func (g *gradientIterator) reprojectConstraints() {

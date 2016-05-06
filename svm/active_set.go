@@ -6,9 +6,6 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
-const reprojectIterationCount = 100
-const stationaryPointScale = 1e-11
-
 // A constraintValue is 1 if a component
 // is not allowed to get any larger, -1
 // if it is not allowed to get any smaller,
@@ -141,8 +138,10 @@ func (a *activeSet) addConstraint(coeffs linalg.Vector, idx int) {
 	val := coeffs[idx]
 	if math.Abs(val) > math.Abs(val-a.MaxCoeff) {
 		coeffs[idx] = a.MaxCoeff
+		a.Constraints[idx] = 1
 	} else {
 		coeffs[idx] = 0
+		a.Constraints[idx] = -1
 	}
 }
 

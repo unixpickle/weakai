@@ -45,9 +45,7 @@ func newActiveSet(sign linalg.Vector, max float64) *activeSet {
 // removed from the active set.
 func (a *activeSet) Prune(gradient linalg.Vector) bool {
 	if a.ActiveCount == len(a.Constraints) {
-		if !a.pruneLinearlyDependent(gradient) {
-			return false
-		}
+		return a.pruneLinearlyDependent(gradient)
 	}
 
 	var maxViolation float64
@@ -64,6 +62,7 @@ func (a *activeSet) Prune(gradient linalg.Vector) bool {
 	}
 
 	if violationIndex >= 0 {
+		a.Constraints[violationIndex] = 0
 		return true
 	}
 
@@ -73,8 +72,15 @@ func (a *activeSet) Prune(gradient linalg.Vector) bool {
 // ProjectOut projects the active constraints
 // out of a gradient vector (in place).
 func (a *activeSet) ProjectOut(d linalg.Vector) {
-	// TODO: this, using some clever math to make it
-	// O(len(d)).
+	signVec := a.SignVec.Copy()
+	for i, x := range a.Constraints {
+		if x != 0 {
+			d[i] = 0
+			signVec[i] = 0
+		}
+	}
+	projAmount := signVec.Dot(d) / signVec.Dot(signVec)
+	d.Add(signVec.Copy().Scale(-projAmount))
 }
 
 // Step adds d.Scale(amount) to coeffs.
@@ -141,8 +147,36 @@ func (a *activeSet) addConstraint(coeffs linalg.Vector, idx int) {
 }
 
 func (a *activeSet) pruneLinearlyDependent(grad linalg.Vector) bool {
-	// TODO: loop through pairs of constraints and see
-	// if they can both be removed.
+	var biggestViolation float64
+	var violationI, violationJ int
+
+	for i := 0; i < len(a.Constraints)-1; i++ {
+		iConstraint := float64(a.Constraints[i])
+		for j := i + 1; j < len(a.Constraints); j++ {
+			jConstraint := float64(a.Constraints[j])
+
+			signVec := [2]float64{a.SignVec[i], a.SignVec[j]}
+			gradVec := [2]float64{grad[i], grad[j]}
+
+			gradDot := gradVec[0]*signVec[0] + gradVec[1]*signVec[1]
+			k := -gradDot / 2.0
+			gradProj := [2]float64{gradVec[0] + k*signVec[0], gradVec[1] + k*signVec[1]}
+
+			if gradProj[0]*iConstraint < 0 && gradProj[1]*jConstraint < 0 {
+				gradProjMag := math.Pow(gradProj[0], 2) + math.Pow(gradProj[1], 2)
+				if gradProjMag >= biggestViolation || violationJ == 0 {
+					biggestViolation = gradProjMag
+					violationI = i
+					violationJ = j
+				}
+			}
+		}
+	}
+	if violationJ > 0 {
+		a.Constraints[violationI] = 0
+		a.Constraints[violationJ] = 0
+		return true
+	}
 	return false
 }
 

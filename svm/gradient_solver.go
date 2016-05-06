@@ -244,10 +244,40 @@ func (g *gradientIterator) optimalStep(d linalg.Vector) float64 {
 }
 
 func (g *gradientIterator) reprojectConstraints() {
+	// This is a crude way to ensure that the current
+	// solution is a feasible point. It would give
+	// horrible results if the solution were not already
+	// close to being feasible, but since it is only used
+	// to fix small rounding errors, it should work fine.
+
 	for i, x := range g.solution {
 		g.solution[i] = math.Max(0, math.Min(g.activeSet.MaxCoeff, x))
 	}
+
 	signVec := g.activeSet.SignVec
-	projAmount := signVec.Dot(g.solution) / signVec.Dot(signVec)
-	g.solution.Add(signVec.Copy().Scale(-projAmount))
+	currentDot := g.solution.Dot(signVec)
+
+	changed := true
+	for changed {
+		changed = false
+		for i, x := range g.solution {
+			desiredChange := -signVec[i] * currentDot
+			if x+desiredChange < 0 {
+				if x > 0 {
+					g.solution[i] = 0
+					currentDot = g.solution.Dot(signVec)
+					changed = true
+				}
+			} else if x+desiredChange > g.activeSet.MaxCoeff {
+				if x < g.activeSet.MaxCoeff {
+					g.solution[i] = g.activeSet.MaxCoeff
+					currentDot = g.solution.Dot(signVec)
+					changed = true
+				}
+			} else {
+				g.solution[i] += desiredChange
+				return
+			}
+		}
+	}
 }

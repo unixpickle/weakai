@@ -30,9 +30,11 @@ type GradientDescentSolver struct {
 }
 
 func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
-	iter := newGradientIterator(p, 1/(2*c.Tradeoff))
-	timeout := time.After(c.Timeout)
+	sampleCount := float64(len(p.Positives) + len(p.Negatives))
+	maxCoefficient := 1 / (2 * c.Tradeoff * sampleCount)
+	iter := newGradientIterator(p, maxCoefficient)
 
+	timeout := time.After(c.Timeout)
 	lastValue := iter.QuadraticValue()
 
 StepLoop:

@@ -9,6 +9,7 @@ import (
 )
 
 const reprojectIterationCount = 100
+const minProjectionMagChange = 1e-11
 
 // A GradientDescentSolver solves Problems using
 // active set gradient descent.
@@ -38,7 +39,7 @@ StepLoop:
 	for {
 		iter.StepGradient()
 		newVal := iter.QuadraticValue()
-		if newVal >= lastValue && !iter.ConstraintsChanged() {
+		if iter.ShouldTerminate() || (newVal >= lastValue && !iter.ConstraintsChanged()) {
 			break
 		}
 		lastValue = newVal
@@ -66,6 +67,7 @@ type gradientIterator struct {
 
 	stepCount          int
 	constraintsChanged bool
+	shouldTerminate    bool
 }
 
 func newGradientIterator(p *Problem, maxCoeff float64) *gradientIterator {
@@ -125,7 +127,13 @@ func (g *gradientIterator) StepGradient() {
 	g.constraintsChanged = false
 	stepDirection := g.gradient().Scale(-1)
 	g.constraintsChanged = g.activeSet.Prune(stepDirection)
+	preAbs := stepDirection.MaxAbs()
 	g.activeSet.ProjectOut(stepDirection)
+	postAbs := stepDirection.MaxAbs()
+	if postAbs < preAbs*minProjectionMagChange {
+		g.shouldTerminate = true
+		return
+	}
 	g.step(stepDirection)
 }
 
@@ -150,6 +158,13 @@ func (g *gradientIterator) QuadraticValue() float64 {
 // the last step changed any constraints.
 func (g *gradientIterator) ConstraintsChanged() bool {
 	return g.constraintsChanged
+}
+
+// ShouldTerminate returns true if some
+// obvious condition (e.g. zero gradient)
+// was met to terminate the iterations.
+func (g *gradientIterator) ShouldTerminate() bool {
+	return g.shouldTerminate
 }
 
 // Solution returns the current approximation of
@@ -177,6 +192,10 @@ func (g *gradientIterator) Solution(p *Problem) *CombinationClassifier {
 
 func (g *gradientIterator) step(d linalg.Vector) {
 	optimalAmount := g.optimalStep(d)
+	if optimalAmount < 0 {
+		g.shouldTerminate = true
+		return
+	}
 	if g.activeSet.Step(g.solution, d, optimalAmount) {
 		g.constraintsChanged = true
 	}

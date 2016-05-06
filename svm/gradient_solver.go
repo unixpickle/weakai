@@ -170,14 +170,19 @@ func (g *gradientIterator) ShouldTerminate() bool {
 // Solution returns the current approximation of
 // the solution.
 func (g *gradientIterator) Solution(p *Problem) *CombinationClassifier {
-	solution := g.solution.Copy()
-
-	// TODO: delete support vectors with 0 coefficients.
-	supportVectors := make([]Sample, len(p.Positives)+len(p.Negatives))
-	copy(supportVectors, p.Positives)
-	copy(supportVectors[len(p.Positives):], p.Negatives)
-	for i := len(p.Positives); i < len(p.Positives)+len(p.Negatives); i++ {
-		solution[i] *= -1
+	supportVectors := make([]Sample, 0, len(p.Positives)+len(p.Negatives))
+	solution := make([]float64, 0, len(p.Positives)+len(p.Negatives))
+	for i, x := range g.solution {
+		if x != 0 {
+			if i < len(p.Positives) {
+				supportVectors = append(supportVectors, p.Positives[i])
+			} else {
+				neg := p.Negatives[i-len(p.Positives)]
+				supportVectors = append(supportVectors, neg)
+				x *= -1
+			}
+			solution = append(solution, x)
+		}
 	}
 
 	res := &CombinationClassifier{

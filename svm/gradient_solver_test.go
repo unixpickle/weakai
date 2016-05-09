@@ -4,7 +4,11 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/unixpickle/num-analysis/linalg"
 )
+
+const benchmarkDimensionality = 100
 
 func TestGradientSolverPolyKernel(t *testing.T) {
 	positives := []Sample{
@@ -50,5 +54,40 @@ func TestGradientSolverPolyKernel(t *testing.T) {
 	}
 	if math.Abs(maxNegative+1) > 1e-6 {
 		t.Error("maxNegative should be -1 but it's", maxNegative)
+	}
+}
+
+func BenchmarkGradientSolver(b *testing.B) {
+	supportVector := make(linalg.Vector, benchmarkDimensionality)
+	for i := range supportVector {
+		supportVector[i] = float64(i%5) - 2.5
+	}
+	negVector := supportVector.Copy().Scale(-1)
+
+	positives := make([]Sample, benchmarkDimensionality-1)
+	negatives := make([]Sample, len(positives))
+
+	for i := range positives {
+		orthoVector := make(linalg.Vector, len(supportVector))
+		orthoVector[i+1] = 1
+		orthoVector[0] = -supportVector[i] / supportVector[0]
+		positives[i] = Sample{V: []float64(orthoVector.Copy().Add(supportVector))}
+		negatives[i] = Sample{V: []float64(orthoVector.Add(negVector))}
+	}
+
+	problem := &Problem{
+		Positives: positives,
+		Negatives: negatives,
+		Kernel:    LinearKernel,
+	}
+
+	solver := &GradientDescentSolver{
+		Tradeoff: 0.0001,
+		Timeout:  time.Hour,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		solver.Solve(problem)
 	}
 }

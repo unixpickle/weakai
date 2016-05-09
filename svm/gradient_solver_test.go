@@ -10,6 +10,31 @@ import (
 
 const benchmarkDimensionality = 100
 
+func TestGradientSolverLinear(t *testing.T) {
+	problem, supportVec := linearSVMProblem(20)
+	solver := &GradientDescentSolver{
+		Tradeoff: 0.0001,
+		Timeout:  time.Minute,
+	}
+	solution := solver.Solve(problem)
+
+	if math.Abs(solution.Threshold) > 1e-5 {
+		t.Error("unexpected threshold:", solution.Threshold)
+	}
+
+	if len(solution.SupportVectors) != 38 {
+		t.Error("unexpected number of support vectors:", solution.SupportVectors)
+	}
+
+	normal := solution.Linearize().HyperplaneNormal.V
+	for i, x := range supportVec {
+		if math.Abs(x-normal[i]) > 1e-5 {
+			t.Fatal("unexpected support vector:", normal)
+			return
+		}
+	}
+}
+
 func TestGradientSolverPolyKernel(t *testing.T) {
 	positives := []Sample{
 		{V: []float64{0.5, 0}},
@@ -58,28 +83,7 @@ func TestGradientSolverPolyKernel(t *testing.T) {
 }
 
 func BenchmarkGradientSolver(b *testing.B) {
-	supportVector := make(linalg.Vector, benchmarkDimensionality)
-	for i := range supportVector {
-		supportVector[i] = float64(i%5) - 2.5
-	}
-	negVector := supportVector.Copy().Scale(-1)
-
-	positives := make([]Sample, benchmarkDimensionality-1)
-	negatives := make([]Sample, len(positives))
-
-	for i := range positives {
-		orthoVector := make(linalg.Vector, len(supportVector))
-		orthoVector[i+1] = 1
-		orthoVector[0] = -supportVector[i] / supportVector[0]
-		positives[i] = Sample{V: []float64(orthoVector.Copy().Add(supportVector))}
-		negatives[i] = Sample{V: []float64(orthoVector.Add(negVector))}
-	}
-
-	problem := &Problem{
-		Positives: positives,
-		Negatives: negatives,
-		Kernel:    LinearKernel,
-	}
+	problem, _ := linearSVMProblem(benchmarkDimensionality)
 
 	solver := &GradientDescentSolver{
 		Tradeoff: 0.0001,
@@ -90,4 +94,37 @@ func BenchmarkGradientSolver(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		solver.Solve(problem)
 	}
+}
+
+func linearSVMProblem(size int) (*Problem, linalg.Vector) {
+	supportVector := make(linalg.Vector, size)
+	for i := range supportVector {
+		supportVector[i] = float64(i%5) - 2.5
+	}
+	supportVector.Scale(1.0 / math.Sqrt(supportVector.Dot(supportVector)))
+	doubleSupport := supportVector.Copy().Scale(2)
+
+	negVector := supportVector.Copy().Scale(-1)
+	doubleNeg := supportVector.Copy().Scale(-2)
+
+	positives := make([]Sample, (size-1)*2)
+	negatives := make([]Sample, len(positives))
+
+	for i := 0; i < size-1; i++ {
+		orthoVector := make(linalg.Vector, len(supportVector))
+		orthoVector[i+1] = 1
+		orthoVector[0] = -supportVector[i+1] / supportVector[0]
+		positives[i*2] = Sample{V: []float64(orthoVector.Copy().Add(supportVector))}
+		positives[i*2+1] = Sample{V: []float64(orthoVector.Copy().Add(doubleSupport))}
+		negatives[i*2] = Sample{V: []float64(orthoVector.Copy().Add(negVector))}
+		negatives[i*2+1] = Sample{V: []float64(orthoVector.Copy().Add(doubleNeg))}
+	}
+
+	problem := &Problem{
+		Positives: positives,
+		Negatives: negatives,
+		Kernel:    LinearKernel,
+	}
+
+	return problem, supportVector
 }

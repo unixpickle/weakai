@@ -23,7 +23,7 @@ func TestGradientSolverLinear(t *testing.T) {
 	}
 
 	if len(solution.SupportVectors) != 38 {
-		t.Error("unexpected number of support vectors:", solution.SupportVectors)
+		t.Error("unexpected number of support vectors:", len(solution.SupportVectors))
 	}
 
 	normal := solution.Linearize().HyperplaneNormal.V

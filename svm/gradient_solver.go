@@ -77,6 +77,9 @@ type gradientIterator struct {
 	stepCount          int
 	constraintsChanged bool
 	shouldTerminate    bool
+
+	gradientCache  linalg.Vector
+	quadraticCache float64
 }
 
 func newGradientIterator(p *Problem, maxCoeff float64) *gradientIterator {
@@ -127,14 +130,17 @@ func newGradientIterator(p *Problem, maxCoeff float64) *gradientIterator {
 		}
 	}
 
+	res.updateCaches()
+
 	return res
 }
 
 // StepGradient performs a step of constrained
 // gradient descent.
 func (g *gradientIterator) StepGradient() {
-	g.constraintsChanged = false
-	stepDirection := g.gradient().Scale(-1)
+	stepDirection := g.gradientCache.Scale(-1)
+	g.gradientCache = nil
+
 	g.constraintsChanged = g.activeSet.Prune(stepDirection)
 	preAbs := stepDirection.MaxAbs()
 	g.activeSet.ProjectOut(stepDirection)
@@ -143,24 +149,15 @@ func (g *gradientIterator) StepGradient() {
 		g.shouldTerminate = true
 		return
 	}
+
 	g.step(stepDirection)
+	g.updateCaches()
 }
 
 // QuadraticValue returns the current value of
 // the minimizing quadratic form.
 func (g *gradientIterator) QuadraticValue() float64 {
-	columnMat := &linalg.Matrix{
-		Rows: g.matrix.Cols,
-		Cols: 1,
-		Data: g.solution,
-	}
-	result := kahan.NewSummer64()
-	quadTerm := columnMat.Transpose().Mul(g.matrix).Mul(columnMat).Data[0]
-	result.Add(quadTerm * 0.5)
-	for _, x := range g.solution {
-		result.Add(-x)
-	}
-	return result.Sum()
+	return g.quadraticCache
 }
 
 // ConstraintsChanged returns whether or not
@@ -221,17 +218,38 @@ func (g *gradientIterator) step(d linalg.Vector) {
 	}
 }
 
-func (g *gradientIterator) gradient() linalg.Vector {
+func (g *gradientIterator) updateCaches() {
+	// This function computes and uses various pieces
+	// of the quadratic form 1/2*c'*A*c - b'*c.
+
 	columnMat := &linalg.Matrix{
 		Rows: g.matrix.Cols,
 		Cols: 1,
 		Data: g.solution,
 	}
-	residual := g.matrix.Mul(columnMat)
-	for i, x := range residual.Data {
-		residual.Data[i] = x - 1
+
+	// Compute A*c.
+	columnProduct := g.matrix.Mul(columnMat)
+
+	// Compute c'*A*c.
+	quadValue := kahan.NewSummer64()
+	for i, x := range g.solution {
+		quadValue.Add(x * columnProduct.Data[i])
 	}
-	return linalg.Vector(residual.Data)
+
+	// Compute b'*c
+	linearValue := kahan.NewSummer64()
+	for _, x := range g.solution {
+		linearValue.Add(x)
+	}
+
+	g.quadraticCache = quadValue.Sum()*0.5 - linearValue.Sum()
+
+	// Compute A*c - b.
+	for i, x := range columnProduct.Data {
+		columnProduct.Data[i] = x - 1
+	}
+	g.gradientCache = columnProduct.Data
 }
 
 func (g *gradientIterator) optimalStep(d linalg.Vector) float64 {

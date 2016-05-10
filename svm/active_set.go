@@ -3,6 +3,7 @@ package svm
 import (
 	"math"
 
+	"github.com/unixpickle/num-analysis/kahan"
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
@@ -69,15 +70,52 @@ func (a *activeSet) Prune(gradient linalg.Vector) bool {
 // ProjectOut projects the active constraints
 // out of a gradient vector (in place).
 func (a *activeSet) ProjectOut(d linalg.Vector) {
-	signVec := a.SignVec.Copy()
+	signVec := a.SignVec
+
+	var signDotSign int
+	signDotD := kahan.NewSummer64()
+
 	for i, x := range a.Constraints {
 		if x != 0 {
 			d[i] = 0
-			signVec[i] = 0
+		} else {
+			signDotSign++
+			signDotD.Add(d[i] * signVec[i])
 		}
 	}
-	projAmount := signVec.Dot(d) / signVec.Dot(signVec)
-	d.Add(signVec.Copy().Scale(-projAmount))
+
+	projAmount := signDotD.Sum() / float64(signDotSign)
+
+	for i, x := range a.Constraints {
+		if x == 0 {
+			d[i] -= projAmount * signVec[i]
+		}
+	}
+}
+
+// ProjectOutComp projects the active constraints
+// out of a vector and returns the i-th component
+// of the result, without modifying the original
+// vector.
+func (a *activeSet) ProjectOutComp(d linalg.Vector, comp int) float64 {
+	if a.Constraints[comp] != 0 {
+		return 0
+	}
+
+	signVec := a.SignVec
+
+	var signDotSign int
+	signDotD := kahan.NewSummer64()
+
+	for i, x := range a.Constraints {
+		if x == 0 {
+			signDotSign++
+			signDotD.Add(d[i] * signVec[i])
+		}
+	}
+
+	projAmount := signDotD.Sum() / float64(signDotSign)
+	return d[comp] - projAmount*signVec[comp]
 }
 
 // Step adds d.Scale(amount) to coeffs.
@@ -182,11 +220,9 @@ func (a *activeSet) pruneLinearlyDependent(grad linalg.Vector) bool {
 func (a *activeSet) kktViolationAmount(grad linalg.Vector, i int) float64 {
 	constraintType := a.Constraints[i]
 	a.Constraints[i] = 0
-	gradient := grad.Copy()
-	a.ProjectOut(gradient)
+	dot := a.ProjectOutComp(grad, i)
 	a.Constraints[i] = constraintType
 
-	dot := gradient[i]
 	if constraintType == -1 {
 		return dot
 	} else {

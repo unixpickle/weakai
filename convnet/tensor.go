@@ -62,7 +62,7 @@ func (t *Tensor3) Convolve(x1, y1 int, t1 *Tensor3) float64 {
 		}
 	}
 
-	return sum
+	return sum.Sum()
 }
 
 // MulAdd adds the tensor t1, shifted

@@ -71,11 +71,15 @@ type ConvLayer struct {
 }
 
 func NewConvLayer(params *ConvParams) *ConvLayer {
-	if params.FilterWidth > params.InputWidth || params.FilterHeight > c.InputHeight {
-		return nil
-	}
 	w := 1 + (params.InputWidth-params.FilterWidth)/params.Stride
 	h := 1 + (params.InputHeight-params.FilterHeight)/params.Stride
+
+	if w < 0 {
+		w = 0
+	}
+	if h < 0 {
+		h = 0
+	}
 
 	res := &ConvLayer{
 		Activation: params.Activation,
@@ -109,7 +113,7 @@ func (c *ConvLayer) PropagateForward() {
 			for z, filter := range c.Filters {
 				convolution := filter.Convolve(inputX, inputY, filter)
 				c.Convolutions.Set(x, y, z, convolution)
-				c.Output.Set(x, y, z, c.Activation(convolution))
+				c.Output.Set(x, y, z, c.Activation.Eval(convolution))
 			}
 		}
 	}

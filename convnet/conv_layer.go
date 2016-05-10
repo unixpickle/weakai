@@ -1,6 +1,8 @@
-package main
+package convnet
 
 type ConvLayer struct {
+	Activation ActivationFunc
+
 	InDepth  int
 	InWidth  int
 	InHeight int
@@ -15,8 +17,11 @@ type ConvLayer struct {
 	InBuffer  []float64
 	OutBuffer []float64
 
-	InGradient  []float64
-	OutGradient []float64
+	OutConvolutions []float64
+
+	WeightGradient [][]float64
+	InGradient     []float64
+	OutGradient    []float64
 }
 
 // MakeSlices allocates the output buffer,
@@ -30,6 +35,7 @@ func (c *ConvLayer) MakeSlices() {
 	}
 	outWidth, outHeight := c.OutputDims()
 	c.OutBuffer = make([]float64, outWidth*outHeight*c.FeatureCount)
+	c.OutConvolutions = make([]float64, len(c.OutBuffer))
 	c.OutGradient = make([]float64, c.InDepth*c.InWidth*c.InHeight)
 }
 
@@ -37,30 +43,63 @@ func (c *ConvLayer) MakeSlices() {
 // layer using the layer's inputs and its
 // weights.
 func (c *ConvLayer) ComputeOut() {
-	featureRowLen := c.FeatureWidth * c.InDepth
 	outputIdx := 0
 	for y := 0; y <= c.InHeight-c.FeatureHeight; y += c.Stride {
 		for x := 0; x <= c.InWidth-c.FeatureWidth; x += c.Stride {
-			for _, featureWeights := range c.FeatureWeights {
-				summer := kahan.Summer64()
-				inRowStart := (c.InWidth*y + x) * c.InDepth
-				weightIdx := 0
-				for j := 0; j < c.FeatureHeight; j++ {
-					for k := 0; k < featureRowLen; k++ {
-						summer.Add(featureWeights[weightIdx] * c.InBuffer[inRowStart+k])
-						weightIdx++
-					}
-					inRowStart += c.InWidth * c.InDepth
-				}
-				c.OutBuffer[outputIdx] = summer.Sum()
+			for featureIdx := range c.FeatureWeights {
+				convolution := c.convolve(x, y, featureIdx)
+				c.OutConvolutions[outputIdx] = convolution
+				c.OutBuffer[outputIdx] = c.Activation(convolution)
 				outputIdx++
 			}
 		}
 	}
 }
 
+// ComputeGradients computes the gradient of
+// the loss function for each of the input
+// values to this layer, and the gradient of
+// the loss function for each of the weights
+// of this layer.
+//
+// This requires that the layer's outputs have
+// been computed and that its output gradients
+// are correctly set.
+func (c *ConvLayer) ComputeGradients() {
+	gradientSums := make([][]*kahan.Summer64, len(c.WeightGradient))
+	for i, x := range c.WeightGradient {
+		gradientSums[i] = make([]*kahan.Summer64, len(x))
+		for j := range x {
+			gradientSums[i][j] = kahan.NewSummer64()
+		}
+	}
+
+	// TODO: create kahan summers for each of the inputs,
+	// since these inputs may contribute to a number of
+	// different filter instances.
+
+	outputIdx := 0
+	for y := 0; y <= c.InHeight-c.FeatureHeight; y += c.Stride {
+		for x := 0; x <= c.InWidth-c.FeatureWidth; x += c.Stride {
+			for featureIdx := range c.FeatureWeights {
+				activDeriv := c.Activation.Deriv(c.OutConvolutions[outputIdx])
+				activDeriv *= c.OutGradient[outputIdx]
+				// TODO: compute the gradient with respect to each
+				// input, and with respect to each weight.
+				outputIdx++
+			}
+		}
+	}
+
+	for i, x := range gradientSums {
+		for j, s := range x {
+			c.WeightGradient[i][j] = s.Sum()
+		}
+	}
+}
+
 // OutputDims returns the width and height
-// (but not depth) of the output.
+// of the output.
 func (c *ConvLayer) OutputDims() (w, h int) {
 	if c.FeatureWidth > c.InWidth || c.FeatureHeight > c.InHeight {
 		return
@@ -68,4 +107,23 @@ func (c *ConvLayer) OutputDims() (w, h int) {
 	w = 1 + (c.InWidth-c.FeatureWidth)/c.Stride
 	h = 1 + (c.InHeight-c.FeatureHeight)/c.Stride
 	return
+}
+
+func (c *ConvLayer) convolve(x, y, featureIdx int) float64 {
+	summer := kahan.Summer64()
+
+	kernel := c.FeatureWeights[featureIdx]
+	floatsPerRow := c.FeatureWidth * c.InDepth
+
+	weightIdx := 0
+	inputRowStart := (c.InWidth*y + x) * c.InDepth
+	for j := 0; j < c.FeatureHeight; j++ {
+		for k := 0; k < floatsPerRow; k++ {
+			summer.Add(kernel[weightIdx] * c.InBuffer[inputRowStart+k])
+			weightIdx++
+		}
+		inputRowStart += c.InWidth * c.InDepth
+	}
+
+	return summer.Sum()
 }

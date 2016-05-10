@@ -1,129 +1,138 @@
 package convnet
 
+// ConvParams are parameters for constructing
+// a ConvLayer.
+type ConvParams struct {
+	FilterCount  int
+	FilterWidth  int
+	FilterHeight int
+	Stride       int
+
+	InputWidth  int
+	InputHeight int
+	InputDepth  int
+
+	Activation ActivationFunc
+}
+
+// ConvLayer is a convolutional layer for a
+// neural network.
+//It implements back- and forward-propagation.
 type ConvLayer struct {
+	// Activation is the activation function used
+	// to turn each convolution into an output for
+	// the next layer (e.g. a sigmoid function).
 	Activation ActivationFunc
 
-	InDepth  int
-	InWidth  int
-	InHeight int
+	// Stride is the amount that the filters should
+	// "move" horizontally and vertically between
+	// convolutions, i.e. the spacing in input space
+	// corresponding to one-pixel difference in output
+	// space.
+	Stride int
 
-	FeatureCount  int
-	FeatureWidth  int
-	FeatureHeight int
-	Stride        int
+	// Filters is an array of convolutional filters
+	// used in the network.
+	// Each filter is a tensor which corresponds to
+	// the weights to be applied to the filter's
+	// input values.
+	Filters []*Tensor3
 
-	FeatureWeights [][]float64
+	// FilterGradients is structed exactly like
+	// Filter, but after back-propagation, every
+	// entry corresponds to the gradient with respect
+	// to the entry in Filters.
+	FilterGradients []*Tensor3
 
-	InBuffer  []float64
-	OutBuffer []float64
+	// Output is the ouput from this convolution layer.
+	Output *Tensor3
 
-	OutConvolutions []float64
+	// Convolutions is the output from this convolution
+	// layer, before applying the activation function.
+	Convolutions *Tensor3
 
-	WeightGradient [][]float64
-	InGradient     []float64
-	OutGradient    []float64
+	// UpstreamGradient is structured like Input.
+	// Back-propagation sets values in UpstreamGradient
+	// to specify the gradient of the loss function with
+	// respect to the inputs to this layer.
+	UpstreamGradient *Tensor3
+
+	// Input is the input data to this layer.
+	// This should be set by some external entity
+	// before forward-propagation.
+	Input *Tensor3
+
+	// DownstreamGradient is the gradient of the
+	// loss function with respect to the outputs
+	// of this layer.
+	// This should be set by some external entity
+	// before back-propagation.
+	DownstreamGradient *Tensor3
 }
 
-// MakeSlices allocates the output buffer,
-// output gradient, and feature weights.
-// It does not allocate input slices, since
-// these will come from other layers.
-func (c *ConvLayer) MakeSlices() {
-	c.FeatureWeights = make([][]float64, c.FeatureCount)
-	for i := range c.FeatureWeights {
-		c.FeatureWeights[i] = make([]float64, c.FeatureWidth*c.FeatureHeight*c.InDepth)
+func NewConvLayer(params *ConvParams) *ConvLayer {
+	if params.FilterWidth > params.InputWidth || params.FilterHeight > c.InputHeight {
+		return nil
 	}
-	outWidth, outHeight := c.OutputDims()
-	c.OutBuffer = make([]float64, outWidth*outHeight*c.FeatureCount)
-	c.OutConvolutions = make([]float64, len(c.OutBuffer))
-	c.OutGradient = make([]float64, c.InDepth*c.InWidth*c.InHeight)
-}
+	w := 1 + (params.InputWidth-params.FilterWidth)/params.Stride
+	h := 1 + (params.InputHeight-params.FilterHeight)/params.Stride
 
-// ComputeOut computes the output of this
-// layer using the layer's inputs and its
-// weights.
-func (c *ConvLayer) ComputeOut() {
-	outputIdx := 0
-	for y := 0; y <= c.InHeight-c.FeatureHeight; y += c.Stride {
-		for x := 0; x <= c.InWidth-c.FeatureWidth; x += c.Stride {
-			for featureIdx := range c.FeatureWeights {
-				convolution := c.convolve(x, y, featureIdx)
-				c.OutConvolutions[outputIdx] = convolution
-				c.OutBuffer[outputIdx] = c.Activation(convolution)
-				outputIdx++
-			}
-		}
+	res := &ConvLayer{
+		Activation: params.Activation,
+		Stride:     params.Stride,
+
+		Filters:         make([]*Tensor3, params.FilterCount),
+		FilterGradients: make([]*Tensor3, params.FilterCount),
+
+		Output:           NewTensor3(w, h, params.FilterCount),
+		Convolutions:     NewTensor3(w, h, params.FilterCount),
+		UpstreamGradient: NewTensor3(params.InputWidth, params.InputHeight, params.InputDepth),
 	}
+
+	for i := 0; i < params.FilterCount; i++ {
+		res.Filters[i] = NewTensor3(params.FilterWidth, params.FilterHeight, params.InputDepth)
+		res.FilterGradients[i] = NewTensor3(params.FilterWidth, params.FilterHeight,
+			params.InputDepth)
+	}
+
+	return res
 }
 
-// ComputeGradients computes the gradient of
-// the loss function for each of the input
-// values to this layer, and the gradient of
-// the loss function for each of the weights
+// PropagateForward performs forward-propagation,
+// computing the output convolutions and activations
 // of this layer.
-//
-// This requires that the layer's outputs have
-// been computed and that its output gradients
-// are correctly set.
-func (c *ConvLayer) ComputeGradients() {
-	gradientSums := make([][]*kahan.Summer64, len(c.WeightGradient))
-	for i, x := range c.WeightGradient {
-		gradientSums[i] = make([]*kahan.Summer64, len(x))
-		for j := range x {
-			gradientSums[i][j] = kahan.NewSummer64()
-		}
-	}
-
-	// TODO: create kahan summers for each of the inputs,
-	// since these inputs may contribute to a number of
-	// different filter instances.
-
-	outputIdx := 0
-	for y := 0; y <= c.InHeight-c.FeatureHeight; y += c.Stride {
-		for x := 0; x <= c.InWidth-c.FeatureWidth; x += c.Stride {
-			for featureIdx := range c.FeatureWeights {
-				activDeriv := c.Activation.Deriv(c.OutConvolutions[outputIdx])
-				activDeriv *= c.OutGradient[outputIdx]
-				// TODO: compute the gradient with respect to each
-				// input, and with respect to each weight.
-				outputIdx++
+func (c *ConvLayer) PropagateForward() {
+	for y := 0; y < c.Output.Height; y++ {
+		inputY := y * c.Stride
+		for x := 0; x < c.Output.Width; x++ {
+			inputX := x * c.Stride
+			for z, filter := range c.Filters {
+				convolution := filter.Convolve(inputX, inputY, filter)
+				c.Convolutions.Set(x, y, z, convolution)
+				c.Output.Set(x, y, z, c.Activation(convolution))
 			}
 		}
 	}
-
-	for i, x := range gradientSums {
-		for j, s := range x {
-			c.WeightGradient[i][j] = s.Sum()
-		}
-	}
 }
 
-// OutputDims returns the width and height
-// of the output.
-func (c *ConvLayer) OutputDims() (w, h int) {
-	if c.FeatureWidth > c.InWidth || c.FeatureHeight > c.InHeight {
-		return
+// PropagateBackward performs backward propagation.
+// This must be called after ForwardPropagate.
+func (c *ConvLayer) PropagateBackward() {
+	for _, x := range c.FilterGradients {
+		x.Reset()
 	}
-	w = 1 + (c.InWidth-c.FeatureWidth)/c.Stride
-	h = 1 + (c.InHeight-c.FeatureHeight)/c.Stride
-	return
-}
+	c.UpstreamGradient.Reset()
 
-func (c *ConvLayer) convolve(x, y, featureIdx int) float64 {
-	summer := kahan.Summer64()
-
-	kernel := c.FeatureWeights[featureIdx]
-	floatsPerRow := c.FeatureWidth * c.InDepth
-
-	weightIdx := 0
-	inputRowStart := (c.InWidth*y + x) * c.InDepth
-	for j := 0; j < c.FeatureHeight; j++ {
-		for k := 0; k < floatsPerRow; k++ {
-			summer.Add(kernel[weightIdx] * c.InBuffer[inputRowStart+k])
-			weightIdx++
+	for y := 0; y < c.Output.Height; y++ {
+		inputY := y * c.Stride
+		for x := 0; x < c.Output.Width; x++ {
+			inputX := x * c.Stride
+			for z, filter := range c.Filters {
+				sumPartial := c.DownstreamGradient.Get(x, y, z) *
+					c.Activation.Deriv(c.Convolutions.Get(x, y, z))
+				c.FilterGradients[z].MulAdd(-inputX, -inputY, c.Input, sumPartial)
+				c.UpstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
+			}
 		}
-		inputRowStart += c.InWidth * c.InDepth
 	}
-
-	return summer.Sum()
 }

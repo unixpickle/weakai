@@ -47,10 +47,6 @@ type ConvLayer struct {
 	// Output is the ouput from this convolution layer.
 	Output *Tensor3
 
-	// Convolutions is the output from this convolution
-	// layer, before applying the activation function.
-	Convolutions *Tensor3
-
 	// UpstreamGradient is structured like Input.
 	// Back-propagation sets values in UpstreamGradient
 	// to specify the gradient of the loss function with
@@ -68,6 +64,10 @@ type ConvLayer struct {
 	// This should be set by some external entity
 	// before back-propagation.
 	DownstreamGradient *Tensor3
+
+	// convolutions is the output from this convolution
+	// layer, before applying the activation function.
+	convolutions *Tensor3
 }
 
 func NewConvLayer(params *ConvParams) *ConvLayer {
@@ -89,7 +89,7 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 		FilterGradients: make([]*Tensor3, params.FilterCount),
 
 		Output:           NewTensor3(w, h, params.FilterCount),
-		Convolutions:     NewTensor3(w, h, params.FilterCount),
+		convolutions:     NewTensor3(w, h, params.FilterCount),
 		UpstreamGradient: NewTensor3(params.InputWidth, params.InputHeight, params.InputDepth),
 	}
 
@@ -112,7 +112,7 @@ func (c *ConvLayer) PropagateForward() {
 			inputX := x * c.Stride
 			for z, filter := range c.Filters {
 				convolution := filter.Convolve(inputX, inputY, filter)
-				c.Convolutions.Set(x, y, z, convolution)
+				c.convolutions.Set(x, y, z, convolution)
 				c.Output.Set(x, y, z, c.Activation.Eval(convolution))
 			}
 		}
@@ -133,7 +133,7 @@ func (c *ConvLayer) PropagateBackward() {
 			inputX := x * c.Stride
 			for z, filter := range c.Filters {
 				sumPartial := c.DownstreamGradient.Get(x, y, z) *
-					c.Activation.Deriv(c.Convolutions.Get(x, y, z))
+					c.Activation.Deriv(c.convolutions.Get(x, y, z))
 				c.FilterGradients[z].MulAdd(-inputX, -inputY, c.Input, sumPartial)
 				c.UpstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
 			}

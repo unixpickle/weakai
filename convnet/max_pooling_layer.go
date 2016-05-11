@@ -85,6 +85,11 @@ func NewMaxPoolingLayer(params *MaxPoolingParams) *MaxPoolingLayer {
 	return res
 }
 
+// Randomize does nothing, since this type of
+// layer has no learnable values.
+func (r *MaxPoolingLayer) Randomize() {
+}
+
 // PropagateForward performs forward-propagation.
 func (r *MaxPoolingLayer) PropagateForward() {
 	for y := 0; y < r.Output.Height; y++ {

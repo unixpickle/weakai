@@ -1,6 +1,10 @@
 package convnet
 
-import "github.com/unixpickle/num-analysis/kahan"
+import (
+	"math/rand"
+
+	"github.com/unixpickle/num-analysis/kahan"
+)
 
 // DenseParams are parameters for a dense
 // or "fully-connected" layer.
@@ -78,6 +82,17 @@ func NewDenseLayer(params *DenseParams) *DenseLayer {
 		res.WeightGradient[i] = make([]float64, params.InputCount)
 	}
 	return res
+}
+
+func (d *DenseLayer) Randomize() {
+	for i := range d.Biases {
+		d.Biases[i] = (rand.Float64() * 2) - 1
+	}
+	for _, weights := range d.Weights {
+		for i := range weights {
+			weights[i] = (rand.Float64() * 2) - 1
+		}
+	}
 }
 
 // PropagateForward performs forward-propagation.

@@ -114,6 +114,13 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 	return res
 }
 
+func (c *ConvLayer) Randomize() {
+	c.Biases.Randomize()
+	for _, filter := range c.Filters {
+		filter.Randomize()
+	}
+}
+
 // PropagateForward performs forward-propagation,
 // computing the output convolutions and activations
 // of this layer.

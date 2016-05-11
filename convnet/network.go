@@ -7,6 +7,7 @@ import "fmt"
 type Layer interface {
 	PropagateForward()
 	PropagateBackward()
+	Randomize()
 }
 
 // A Network is nothing more than a stack
@@ -81,6 +82,14 @@ func NewNetwork(paramList []interface{}) (*Network, error) {
 	}
 	n.connectGradients()
 	return n, nil
+}
+
+// Randomize generates random values for every
+// weight and bias in the network.
+func (n *Network) Randomize() {
+	for _, layer := range n.Layers {
+		layer.Randomize()
+	}
 }
 
 func (n *Network) PropagateForward() {

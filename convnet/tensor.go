@@ -1,6 +1,10 @@
 package convnet
 
-import "github.com/unixpickle/num-analysis/kahan"
+import (
+	"math/rand"
+
+	"github.com/unixpickle/num-analysis/kahan"
+)
 
 // Tensor3 represents a 3D tensor, with
 // values along an x, y, and z axis.
@@ -26,6 +30,14 @@ func NewTensor3(width, height, depth int) *Tensor3 {
 func (t *Tensor3) Reset() {
 	for i := range t.Data {
 		t.Data[i] = 0
+	}
+}
+
+// Randomize sets all the entries of this
+// tensor to a random number in [-1, 1].
+func (t *Tensor3) Randomize() {
+	for i := range t.Data {
+		t.Data[i] = (rand.Float64() * 2) - 1
 	}
 }
 

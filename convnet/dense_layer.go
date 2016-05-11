@@ -29,7 +29,7 @@ type DenseLayer struct {
 
 	// WeightGradients has the same structure as
 	// Weights, and each entry corresponds to the
-	// partial derivative of the loss function with
+	// partial derivative of the cost function with
 	// respect to the given weight.
 	// It will be setup during backward-propagation.
 	WeightGradients [][]float64
@@ -40,7 +40,7 @@ type DenseLayer struct {
 
 	// UpstreamGradients has the same structure as
 	// Inputs, and each entry corresponds to the
-	// partial derivative of the loss function with
+	// partial derivative of the cost function with
 	// respect to the given input.
 	// It will be setup during backward-propagation.
 	UpstreamGradients []float64
@@ -53,7 +53,7 @@ type DenseLayer struct {
 
 	// DownstreamGradients is structured like Output,
 	// and each entry corresponds to the partial of
-	// the loss function with respect to the output
+	// the cost function with respect to the output
 	// from this layer.
 	// This should be setup  by an external entity
 	// before backward-propagation.

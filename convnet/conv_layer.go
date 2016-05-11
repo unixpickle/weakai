@@ -51,7 +51,7 @@ type ConvLayer struct {
 
 	// BiasGradients is structured like Biases, but
 	// after back-propagation, every entry corresponds
-	// to the partial of the loss function with respect
+	// to the partial of the cost function with respect
 	// to the corresponding bias value.
 	BiasGradients *Tensor3
 
@@ -60,7 +60,7 @@ type ConvLayer struct {
 
 	// UpstreamGradient is structured like Input.
 	// Back-propagation sets values in UpstreamGradient
-	// to specify the gradient of the loss function with
+	// to specify the gradient of the cost function with
 	// respect to the inputs to this layer.
 	UpstreamGradient *Tensor3
 
@@ -70,7 +70,7 @@ type ConvLayer struct {
 	Input *Tensor3
 
 	// DownstreamGradient is the gradient of the
-	// loss function with respect to the outputs
+	// cost function with respect to the outputs
 	// of this layer.
 	// This should be set by some external entity
 	// before back-propagation.

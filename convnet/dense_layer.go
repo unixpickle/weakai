@@ -15,72 +15,46 @@ type DenseParams struct {
 	OutputCount int
 }
 
+// Make creates a *DenseLayer based on the
+// parameters specified by p.
+// This is equivalent to NewDenseLayer(p).
+func (p *DenseParams) Make() Layer {
+	return NewDenseLayer(p)
+}
+
 type DenseLayer struct {
-	Activation ActivationFunc
+	activation ActivationFunc
 
-	// Weights is a slice of weight maps, where
-	// each weight map corresponds to a neuron
-	// in the layer.
-	Weights [][]float64
+	// Each weight list or bias value corresponds
+	// to a neuron (and thus to an output).
+	weights [][]float64
+	biases  []float64
 
-	// Biases is a slice of biases, one for each
-	// output neuron.
-	Biases []float64
-
-	// Output is an array of output values
-	// from this layer.
-	// It will be set during forward-propagation.
-	Output []float64
-
-	// WeightGradient has the same structure as
-	// Weights, and each entry corresponds to the
-	// partial derivative of the cost function with
-	// respect to the given weight.
-	// It will be setup during backward-propagation.
-	WeightGradient [][]float64
-
-	// BiasGradient is like WeightGradient, but for
-	// Biases instead of Weights.
-	BiasGradient []float64
-
-	// UpstreamGradient has the same structure as
-	// Inputs, and each entry corresponds to the
-	// partial derivative of the cost function with
-	// respect to the given input.
-	// It will be setup during backward-propagation.
-	UpstreamGradient []float64
-
-	// Input is an array of input values
-	// for this layer.
-	// This should be setup by an external entity
-	// before forward-propagation.
-	Input []float64
-
-	// DownstreamGradient is structured like Output,
-	// and each entry corresponds to the partial of
-	// the cost function with respect to the output
-	// from this layer.
-	// This should be setup  by an external entity
-	// before backward-propagation.
-	DownstreamGradient []float64
-
+	output     []float64
 	outputSums []float64
+
+	downstreamGradient []float64
+	weightGradient     [][]float64
+	biasGradient       []float64
+
+	upstreamGradient []float64
+	input            []float64
 }
 
 func NewDenseLayer(params *DenseParams) *DenseLayer {
 	res := &DenseLayer{
-		Activation:       params.Activation,
-		Weights:          make([][]float64, params.OutputCount),
-		Biases:           make([]float64, params.OutputCount),
-		Output:           make([]float64, params.OutputCount),
-		WeightGradient:   make([][]float64, params.OutputCount),
-		BiasGradient:     make([]float64, params.OutputCount),
-		UpstreamGradient: make([]float64, params.OutputCount),
+		activation:       params.Activation,
+		weights:          make([][]float64, params.OutputCount),
+		biases:           make([]float64, params.OutputCount),
+		output:           make([]float64, params.OutputCount),
+		weightGradient:   make([][]float64, params.OutputCount),
+		biasGradient:     make([]float64, params.OutputCount),
+		upstreamGradient: make([]float64, params.OutputCount),
 		outputSums:       make([]float64, params.OutputCount),
 	}
-	for i := range res.Weights {
-		res.Weights[i] = make([]float64, params.InputCount)
-		res.WeightGradient[i] = make([]float64, params.InputCount)
+	for i := range res.weights {
+		res.weights[i] = make([]float64, params.InputCount)
+		res.weightGradient[i] = make([]float64, params.InputCount)
 	}
 	return res
 }
@@ -93,42 +67,72 @@ func NewDenseLayer(params *DenseParams) *DenseLayer {
 // for a given neuron is 1.
 func (d *DenseLayer) Randomize() {
 	sqrt3 := math.Sqrt(3)
-	for i := range d.Biases {
-		d.Biases[i] = sqrt3 * ((rand.Float64() * 2) - 1)
+	for i := range d.biases {
+		d.biases[i] = sqrt3 * ((rand.Float64() * 2) - 1)
 	}
-	weightCoeff := math.Sqrt(3.0 / float64(len(d.UpstreamGradient)))
-	for _, weights := range d.Weights {
+	weightCoeff := math.Sqrt(3.0 / float64(len(d.upstreamGradient)))
+	for _, weights := range d.weights {
 		for i := range weights {
 			weights[i] = weightCoeff * ((rand.Float64() * 2) - 1)
 		}
 	}
 }
 
-// PropagateForward performs forward-propagation.
 func (d *DenseLayer) PropagateForward() {
-	for i, weights := range d.Weights {
+	for i, weights := range d.weights {
 		sum := kahan.NewSummer64()
 		for j, weight := range weights {
-			sum.Add(weight * d.Input[j])
+			sum.Add(weight * d.input[j])
 		}
-		sum.Add(d.Biases[i])
+		sum.Add(d.biases[i])
 		d.outputSums[i] = sum.Sum()
-		d.Output[i] = d.Activation.Eval(sum.Sum())
+		d.output[i] = d.activation.Eval(sum.Sum())
 	}
 }
 
-// PropagateBackward performs backward-propagation.
 func (d *DenseLayer) PropagateBackward() {
-	for i := range d.UpstreamGradient {
-		d.UpstreamGradient[i] = 0
+	for i := range d.upstreamGradient {
+		d.upstreamGradient[i] = 0
 	}
 
-	for i, weights := range d.Weights {
-		sumPartial := d.DownstreamGradient[i] * d.Activation.Deriv(d.outputSums[i])
-		d.BiasGradient[i] = sumPartial
+	for i, weights := range d.weights {
+		sumPartial := d.downstreamGradient[i] * d.activation.Deriv(d.outputSums[i])
+		d.biasGradient[i] = sumPartial
 		for j, weight := range weights {
-			d.WeightGradient[i][j] = d.Input[j] * sumPartial
-			d.UpstreamGradient[j] += sumPartial * weight
+			d.weightGradient[i][j] = d.input[j] * sumPartial
+			d.upstreamGradient[j] += sumPartial * weight
 		}
 	}
+}
+
+func (d *DenseLayer) Output() []float64 {
+	return d.output
+}
+
+func (d *DenseLayer) UpstreamGradient() []float64 {
+	return d.upstreamGradient
+}
+
+func (d *DenseLayer) Input() []float64 {
+	return d.input
+}
+
+func (d *DenseLayer) SetInput(v []float64) bool {
+	if len(v) != len(d.upstreamGradient) {
+		return false
+	}
+	d.input = v
+	return true
+}
+
+func (d *DenseLayer) DownstreamGradient() []float64 {
+	return d.downstreamGradient
+}
+
+func (d *DenseLayer) SetDownstreamGradient(v []float64) bool {
+	if len(v) != len(d.output) {
+		return false
+	}
+	d.downstreamGradient = v
+	return true
 }

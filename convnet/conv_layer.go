@@ -1,7 +1,9 @@
 package convnet
 
-// ConvParams are parameters for constructing
-// a ConvLayer.
+// ConvParams stores parameters that define
+// a convolutional layer in an ANN.
+// It can be used as a LayerPrototype to make
+// convolutional layers.
 type ConvParams struct {
 	FilterCount  int
 	FilterWidth  int
@@ -15,72 +17,35 @@ type ConvParams struct {
 	Activation ActivationFunc
 }
 
-// ConvLayer is a convolutional layer for a
-// neural network.
-//It implements back- and forward-propagation.
+// Make creates a new *ConvLayer using the
+// options specified in p.
+// This is equivalent to NewConvLayer(p).
+func (p *ConvParams) Make() Layer {
+	return NewConvLayer(p)
+}
+
+// A ConvLayer serves as a convolutional layer
+// in a neural network.
 type ConvLayer struct {
-	// Activation is the activation function used
-	// to turn each convolution into an output for
-	// the next layer (e.g. a sigmoid function).
-	Activation ActivationFunc
+	tensorLayer
 
-	// Stride is the amount that the filters should
-	// "move" horizontally and vertically between
-	// convolutions, i.e. the spacing in input space
-	// corresponding to one-pixel difference in output
-	// space.
-	Stride int
+	activation ActivationFunc
+	stride     int
 
-	// Filters is an array of convolutional filters
-	// used in the network.
-	// Each filter is a tensor which corresponds to
-	// the weights to be applied to the filter's
-	// input values.
-	Filters []*Tensor3
+	filters         []*Tensor3
+	filterGradients []*Tensor3
+	biases          *Tensor3
+	biasGradients   *Tensor3
 
-	// FilterGradients is structed exactly like
-	// Filter, but after back-propagation, every
-	// entry corresponds to the gradient with respect
-	// to the entry in Filters.
-	FilterGradients []*Tensor3
-
-	// Biases is structured like Output, and stores the
-	// bias value for each filter used to generate the
-	// output.
-	Biases *Tensor3
-
-	// BiasGradients is structured like Biases, but
-	// after back-propagation, every entry corresponds
-	// to the partial of the cost function with respect
-	// to the corresponding bias value.
-	BiasGradients *Tensor3
-
-	// Output is the ouput from this convolution layer.
-	Output *Tensor3
-
-	// UpstreamGradient is structured like Input.
-	// Back-propagation sets values in UpstreamGradient
-	// to specify the gradient of the cost function with
-	// respect to the inputs to this layer.
-	UpstreamGradient *Tensor3
-
-	// Input is the input data to this layer.
-	// This should be set by some external entity
-	// before forward-propagation.
-	Input *Tensor3
-
-	// DownstreamGradient is the gradient of the
-	// cost function with respect to the outputs
-	// of this layer.
-	// This should be set by some external entity
-	// before back-propagation.
-	DownstreamGradient *Tensor3
-
-	// convolutions is the output from this convolution
-	// layer, before applying the activation function.
 	convolutions *Tensor3
 }
 
+// NewConvLayer creates a *ConvLayer using the
+// specified parameters.
+//
+// The resulting layer will be filled with zero
+// weights, biases, and outputs.
+// It will have a nil input and downstream gradient.
 func NewConvLayer(params *ConvParams) *ConvLayer {
 	w := 1 + (params.InputWidth-params.FilterWidth)/params.Stride
 	h := 1 + (params.InputHeight-params.FilterHeight)/params.Stride
@@ -93,21 +58,24 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 	}
 
 	res := &ConvLayer{
-		Activation: params.Activation,
-		Stride:     params.Stride,
+		tensorLayer: tensorLayer{
+			output:           NewTensor3(w, h, params.FilterCount),
+			upstreamGradient: NewTensor3(params.InputWidth, params.InputHeight, params.InputDepth),
+		},
 
-		Filters:         make([]*Tensor3, params.FilterCount),
-		FilterGradients: make([]*Tensor3, params.FilterCount),
-		Biases:          NewTensor3(w, h, params.FilterCount),
+		activation: params.Activation,
+		stride:     params.Stride,
 
-		Output:           NewTensor3(w, h, params.FilterCount),
-		convolutions:     NewTensor3(w, h, params.FilterCount),
-		UpstreamGradient: NewTensor3(params.InputWidth, params.InputHeight, params.InputDepth),
+		filters:         make([]*Tensor3, params.FilterCount),
+		filterGradients: make([]*Tensor3, params.FilterCount),
+		biases:          NewTensor3(w, h, params.FilterCount),
+
+		convolutions: NewTensor3(w, h, params.FilterCount),
 	}
 
 	for i := 0; i < params.FilterCount; i++ {
-		res.Filters[i] = NewTensor3(params.FilterWidth, params.FilterHeight, params.InputDepth)
-		res.FilterGradients[i] = NewTensor3(params.FilterWidth, params.FilterHeight,
+		res.filters[i] = NewTensor3(params.FilterWidth, params.FilterHeight, params.InputDepth)
+		res.filterGradients[i] = NewTensor3(params.FilterWidth, params.FilterHeight,
 			params.InputDepth)
 	}
 
@@ -115,48 +83,43 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 }
 
 func (c *ConvLayer) Randomize() {
-	c.Biases.Randomize()
-	for _, filter := range c.Filters {
+	c.biases.Randomize()
+	for _, filter := range c.filters {
 		filter.Randomize()
 	}
 }
 
-// PropagateForward performs forward-propagation,
-// computing the output convolutions and activations
-// of this layer.
 func (c *ConvLayer) PropagateForward() {
-	for y := 0; y < c.Output.Height; y++ {
-		inputY := y * c.Stride
-		for x := 0; x < c.Output.Width; x++ {
-			inputX := x * c.Stride
-			for z, filter := range c.Filters {
+	for y := 0; y < c.output.Height; y++ {
+		inputY := y * c.stride
+		for x := 0; x < c.output.Width; x++ {
+			inputX := x * c.stride
+			for z, filter := range c.filters {
 				convolution := filter.Convolve(inputX, inputY, filter)
-				convolution += c.Biases.Get(x, y, z)
+				convolution += c.biases.Get(x, y, z)
 				c.convolutions.Set(x, y, z, convolution)
-				c.Output.Set(x, y, z, c.Activation.Eval(convolution))
+				c.output.Set(x, y, z, c.activation.Eval(convolution))
 			}
 		}
 	}
 }
 
-// PropagateBackward performs backward propagation.
-// This must be called after ForwardPropagate.
 func (c *ConvLayer) PropagateBackward() {
-	for _, x := range c.FilterGradients {
+	for _, x := range c.filterGradients {
 		x.Reset()
 	}
-	c.UpstreamGradient.Reset()
+	c.upstreamGradient.Reset()
 
-	for y := 0; y < c.Output.Height; y++ {
-		inputY := y * c.Stride
-		for x := 0; x < c.Output.Width; x++ {
-			inputX := x * c.Stride
-			for z, filter := range c.Filters {
-				sumPartial := c.DownstreamGradient.Get(x, y, z) *
-					c.Activation.Deriv(c.convolutions.Get(x, y, z))
-				c.FilterGradients[z].MulAdd(-inputX, -inputY, c.Input, sumPartial)
-				c.UpstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
-				c.BiasGradients.Set(x, y, z, sumPartial)
+	for y := 0; y < c.output.Height; y++ {
+		inputY := y * c.stride
+		for x := 0; x < c.output.Width; x++ {
+			inputX := x * c.stride
+			for z, filter := range c.filters {
+				sumPartial := c.downstreamGradient.Get(x, y, z) *
+					c.activation.Deriv(c.convolutions.Get(x, y, z))
+				c.filterGradients[z].MulAdd(-inputX, -inputY, c.input, sumPartial)
+				c.upstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
+				c.biasGradients.Set(x, y, z, sumPartial)
 			}
 		}
 	}

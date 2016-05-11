@@ -26,30 +26,18 @@ type MaxPoolingParams struct {
 	InputDepth int
 }
 
+// Make creates a new *MaxPoolingLayer using
+// the values in p.
+// This is equivalent to NewMaxPoolingLayer(p).
+func (p *MaxPoolingParams) Make() Layer {
+	return NewMaxPoolingLayer(p)
+}
+
 type MaxPoolingLayer struct {
-	XSpan int
-	YSpan int
+	tensorLayer
 
-	// Output is the output from this layer.
-	// This is updated during forward-propagation.
-	Output *Tensor3
-
-	// UpstreamGradient is the gradient of the loss
-	// function with respect to the input tensor.
-	// This is updated during back-propagation.
-	UpstreamGradient *Tensor3
-
-	// Input is the input to this layer.
-	// This should be set by an external party
-	// before forward-propagation.
-	Input *Tensor3
-
-	// DownstreamGradient is the gradient of the
-	// loss function with respect to the output
-	// of this layer.
-	// This should be set by an external party
-	// before back-propagation.
-	DownstreamGradient *Tensor3
+	xSpan int
+	ySpan int
 
 	// outputChoices[x][y][z] is the pair {x1,y1}
 	// indicating which value in the pool associated
@@ -69,11 +57,13 @@ func NewMaxPoolingLayer(params *MaxPoolingParams) *MaxPoolingLayer {
 		h++
 	}
 	res := &MaxPoolingLayer{
-		XSpan:            params.XSpan,
-		YSpan:            params.YSpan,
-		Output:           NewTensor3(w, h, params.InputDepth),
-		UpstreamGradient: NewTensor3(params.InputWidth, params.InputHeight, params.InputDepth),
-		outputChoices:    make([][][][2]int, w),
+		tensorLayer: tensorLayer{
+			output:           NewTensor3(w, h, params.InputDepth),
+			upstreamGradient: NewTensor3(params.InputWidth, params.InputHeight, params.InputDepth),
+		},
+		xSpan:         params.XSpan,
+		ySpan:         params.YSpan,
+		outputChoices: make([][][][2]int, w),
 	}
 	for i := range res.outputChoices {
 		list := make([][][2]int, h)
@@ -90,38 +80,36 @@ func NewMaxPoolingLayer(params *MaxPoolingParams) *MaxPoolingLayer {
 func (r *MaxPoolingLayer) Randomize() {
 }
 
-// PropagateForward performs forward-propagation.
 func (r *MaxPoolingLayer) PropagateForward() {
-	for y := 0; y < r.Output.Height; y++ {
-		poolY := y * r.YSpan
-		maxY := poolY + r.YSpan - 1
-		if maxY >= r.Input.Height {
-			maxY = r.Input.Height - 1
+	for y := 0; y < r.output.Height; y++ {
+		poolY := y * r.ySpan
+		maxY := poolY + r.ySpan - 1
+		if maxY >= r.input.Height {
+			maxY = r.input.Height - 1
 		}
-		for x := 0; x < r.Output.Width; x++ {
-			poolX := x * r.XSpan
-			maxX := poolX + r.XSpan - 1
-			if maxX >= r.Input.Width {
-				maxX = r.Input.Width - 1
+		for x := 0; x < r.output.Width; x++ {
+			poolX := x * r.xSpan
+			maxX := poolX + r.xSpan - 1
+			if maxX >= r.input.Width {
+				maxX = r.input.Width - 1
 			}
-			for z := 0; z < r.Output.Depth; z++ {
+			for z := 0; z < r.output.Depth; z++ {
 				output, bestX, bestY := r.maxInput(poolX, maxX, poolY, maxY, z)
-				r.Output.Set(x, y, z, output)
+				r.output.Set(x, y, z, output)
 				r.outputChoices[x][y][z] = [2]int{bestX, bestY}
 			}
 		}
 	}
 }
 
-// PropagateBackward performs backward-propagation.
 func (r *MaxPoolingLayer) PropagateBackward() {
-	for y := 0; y < r.Output.Height; y++ {
-		for x := 0; x < r.Output.Width; x++ {
-			for z := 0; z < r.Output.Depth; z++ {
+	for y := 0; y < r.output.Height; y++ {
+		for x := 0; x < r.output.Width; x++ {
+			for z := 0; z < r.output.Depth; z++ {
 				outputPoint := r.outputChoices[x][y][z]
 				sourceX, sourceY := outputPoint[0], outputPoint[1]
-				grad := r.DownstreamGradient.Get(x, y, z)
-				r.UpstreamGradient.Set(sourceX, sourceY, z, grad)
+				grad := r.downstreamGradient.Get(x, y, z)
+				r.upstreamGradient.Set(sourceX, sourceY, z, grad)
 			}
 		}
 	}
@@ -133,7 +121,7 @@ func (r *MaxPoolingLayer) maxInput(x1, x2, y1, y2, z int) (value float64, bestX,
 	value = math.Inf(-1)
 	for x := x1; x <= x2; x++ {
 		for y := y1; y <= y2; y++ {
-			input := r.Input.Get(x, y, z)
+			input := r.input.Get(x, y, z)
 			if input > value {
 				value = input
 				bestX = x

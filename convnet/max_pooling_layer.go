@@ -48,11 +48,11 @@ type MaxPoolingLayer struct {
 }
 
 func NewMaxPoolingLayer(params *MaxPoolingParams) *MaxPoolingLayer {
-	w := params.InputWidth - params.XSpan
+	w := params.InputWidth / params.XSpan
 	if (params.InputWidth % params.XSpan) != 0 {
 		w++
 	}
-	h := params.InputHeight - params.YSpan
+	h := params.InputHeight / params.YSpan
 	if (params.InputHeight % params.YSpan) != 0 {
 		h++
 	}
@@ -103,6 +103,10 @@ func (r *MaxPoolingLayer) PropagateForward() {
 }
 
 func (r *MaxPoolingLayer) PropagateBackward() {
+	for i := range r.upstreamGradient.Data {
+		r.upstreamGradient.Data[i] = 0
+	}
+
 	for y := 0; y < r.output.Height; y++ {
 		for x := 0; x < r.output.Width; x++ {
 			for z := 0; z < r.output.Depth; z++ {

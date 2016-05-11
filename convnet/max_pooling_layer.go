@@ -115,6 +115,13 @@ func (r *MaxPoolingLayer) PropagateBackward() {
 	}
 }
 
+func (r *MaxPoolingLayer) GradientMagSquared() float64 {
+	return 0
+}
+
+func (r *MaxPoolingLayer) StepGradient(f float64) {
+}
+
 // maxInput computes the maxmimum input value
 // in a given rectangular range.
 func (r *MaxPoolingLayer) maxInput(x1, x2, y1, y2, z int) (value float64, bestX, bestY int) {

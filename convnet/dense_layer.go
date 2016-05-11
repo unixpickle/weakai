@@ -105,6 +105,32 @@ func (d *DenseLayer) PropagateBackward() {
 	}
 }
 
+func (d *DenseLayer) GradientMagSquared() float64 {
+	sum := kahan.NewSummer64()
+	for _, x := range d.biasGradient {
+		sum.Add(x * x)
+	}
+
+	for _, weightGrads := range d.weightGradient {
+		for _, grad := range weightGrads {
+			sum.Add(grad * grad)
+		}
+	}
+
+	return sum.Sum()
+}
+
+func (d *DenseLayer) StepGradient(f float64) {
+	for i, x := range d.biasGradient {
+		d.biases[i] += x * f
+	}
+	for i, weightGrads := range d.weightGradient {
+		for j, grad := range weightGrads {
+			d.weights[i][j] += grad * f
+		}
+	}
+}
+
 func (d *DenseLayer) Output() []float64 {
 	return d.output
 }

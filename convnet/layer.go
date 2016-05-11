@@ -61,6 +61,23 @@ type Layer interface {
 	// from the latest PropagateForward() to generate
 	// upstream gradients.
 	PropagateBackward()
+
+	// GradientMagSquared takes the gradient vector of
+	// this layer's parameters with respect to the cost
+	// function, computes its magnitude, and returns
+	// the magnitude's square.
+	//
+	// It uses the gradient computed during the last
+	// back propagation.
+	GradientMagSquared() float64
+
+	// StepGradient adjusts the layer's parameters
+	// by adding f times the parameter gradient to the
+	// parameters.
+	//
+	// It uses the gradient computed during the last
+	// back propagation.
+	StepGradient(f float64)
 }
 
 // LayerPrototype represents a prototype

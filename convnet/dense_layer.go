@@ -1,6 +1,7 @@
 package convnet
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/unixpickle/num-analysis/kahan"
@@ -84,13 +85,21 @@ func NewDenseLayer(params *DenseParams) *DenseLayer {
 	return res
 }
 
+// Randomize randomizes the weights and biases.
+// The biases are chosen uniformly such that
+// their variance is 1.
+// The weights are chosen uniformly such that
+// the variance of the sum of all the weights
+// for a given neuron is 1.
 func (d *DenseLayer) Randomize() {
+	sqrt3 := math.Sqrt(3)
 	for i := range d.Biases {
-		d.Biases[i] = (rand.Float64() * 2) - 1
+		d.Biases[i] = sqrt3 * ((rand.Float64() * 2) - 1)
 	}
+	weightCoeff := math.Sqrt(3.0 / float64(len(d.UpstreamGradient)))
 	for _, weights := range d.Weights {
 		for i := range weights {
-			weights[i] = (rand.Float64() * 2) - 1
+			weights[i] = weightCoeff * ((rand.Float64() * 2) - 1)
 		}
 	}
 }

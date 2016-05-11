@@ -1,6 +1,7 @@
 package convnet
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/unixpickle/num-analysis/kahan"
@@ -34,10 +35,13 @@ func (t *Tensor3) Reset() {
 }
 
 // Randomize sets all the entries of this
-// tensor to a random number in [-1, 1].
+// tensor to random numbers in such a way
+// that the standard deviation of the sum
+// of all the entries is 1.
 func (t *Tensor3) Randomize() {
+	coeff := math.Sqrt(3.0 / float64(len(t.Data)))
 	for i := range t.Data {
-		t.Data[i] = (rand.Float64() * 2) - 1
+		t.Data[i] = coeff * ((rand.Float64() * 2) - 1)
 	}
 }
 

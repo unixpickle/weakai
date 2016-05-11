@@ -84,8 +84,7 @@ func NewNetwork(paramList []interface{}) (*Network, error) {
 	return n, nil
 }
 
-// Randomize generates random values for every
-// weight and bias in the network.
+// Randomize randomizes every layer.
 func (n *Network) Randomize() {
 	for _, layer := range n.Layers {
 		layer.Randomize()

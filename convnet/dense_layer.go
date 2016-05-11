@@ -18,6 +18,10 @@ type DenseLayer struct {
 	// in the layer.
 	Weights [][]float64
 
+	// Biases is a slice of biases, one for each
+	// output neuron.
+	Biases []float64
+
 	// Output is an array of output values
 	// from this layer.
 	// It will be set during forward-propagation.
@@ -29,6 +33,10 @@ type DenseLayer struct {
 	// respect to the given weight.
 	// It will be setup during backward-propagation.
 	WeightGradients [][]float64
+
+	// BiasGradients is like WeightGradients, but for
+	// Biases instead of Weights.
+	BiasGradients []float64
 
 	// UpstreamGradients has the same structure as
 	// Inputs, and each entry corresponds to the
@@ -58,8 +66,10 @@ func NewDenseLayer(params *DenseParams) *DenseLayer {
 	res := &DenseLayer{
 		Activation:        params.Activation,
 		Weights:           make([][]float64, params.OutputCount),
+		Biases:            make([]float64, params.OutputCount),
 		Output:            make([]float64, params.OutputCount),
 		WeightGradients:   make([][]float64, params.OutputCount),
+		BiasGradients:     make([]float64, params.OutputCount),
 		UpstreamGradients: make([]float64, params.OutputCount),
 		outputSums:        make([]float64, params.OutputCount),
 	}
@@ -77,6 +87,7 @@ func (d *DenseLayer) PropagateForward() {
 		for j, weight := range weights {
 			sum.Add(weight * d.Input[j])
 		}
+		sum.Add(d.Biases[i])
 		d.outputSums[i] = sum.Sum()
 		d.Output[i] = d.Activation.Eval(sum.Sum())
 	}
@@ -90,6 +101,7 @@ func (d *DenseLayer) PropagateBackward() {
 
 	for i, weights := range d.Weights {
 		sumPartial := d.DownstreamGradients[i] * d.Activation.Deriv(d.outputSums[i])
+		d.BiasGradients[i] = sumPartial
 		for j, weight := range weights {
 			d.WeightGradients[i][j] = d.Input[j] * sumPartial
 			d.UpstreamGradients[j] += sumPartial * weight

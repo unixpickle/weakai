@@ -44,6 +44,17 @@ type ConvLayer struct {
 	// to the entry in Filters.
 	FilterGradients []*Tensor3
 
+	// Biases is structured like Output, and stores the
+	// bias value for each filter used to generate the
+	// output.
+	Biases *Tensor3
+
+	// BiasGradients is structured like Biases, but
+	// after back-propagation, every entry corresponds
+	// to the partial of the loss function with respect
+	// to the corresponding bias value.
+	BiasGradients *Tensor3
+
 	// Output is the ouput from this convolution layer.
 	Output *Tensor3
 
@@ -87,6 +98,7 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 
 		Filters:         make([]*Tensor3, params.FilterCount),
 		FilterGradients: make([]*Tensor3, params.FilterCount),
+		Biases:          NewTensor3(w, h, params.FilterCount),
 
 		Output:           NewTensor3(w, h, params.FilterCount),
 		convolutions:     NewTensor3(w, h, params.FilterCount),
@@ -112,6 +124,7 @@ func (c *ConvLayer) PropagateForward() {
 			inputX := x * c.Stride
 			for z, filter := range c.Filters {
 				convolution := filter.Convolve(inputX, inputY, filter)
+				convolution += c.Biases.Get(x, y, z)
 				c.convolutions.Set(x, y, z, convolution)
 				c.Output.Set(x, y, z, c.Activation.Eval(convolution))
 			}
@@ -136,6 +149,7 @@ func (c *ConvLayer) PropagateBackward() {
 					c.Activation.Deriv(c.convolutions.Get(x, y, z))
 				c.FilterGradients[z].MulAdd(-inputX, -inputY, c.Input, sumPartial)
 				c.UpstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
+				c.BiasGradients.Set(x, y, z, sumPartial)
 			}
 		}
 	}

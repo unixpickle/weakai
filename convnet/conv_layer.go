@@ -1,5 +1,7 @@
 package convnet
 
+import "math/rand"
+
 // ConvParams stores parameters that define
 // a convolutional layer in an ANN.
 // It can be used as a LayerPrototype to make
@@ -34,8 +36,8 @@ type ConvLayer struct {
 
 	filters         []*Tensor3
 	filterGradients []*Tensor3
-	biases          *Tensor3
-	biasGradients   *Tensor3
+	biases          []float64
+	biasPartials    []float64
 
 	convolutions *Tensor3
 }
@@ -68,7 +70,8 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 
 		filters:         make([]*Tensor3, params.FilterCount),
 		filterGradients: make([]*Tensor3, params.FilterCount),
-		biases:          NewTensor3(w, h, params.FilterCount),
+		biases:          make([]float64, params.FilterCount),
+		biasPartials:    make([]float64, params.FilterCount),
 
 		convolutions: NewTensor3(w, h, params.FilterCount),
 	}
@@ -83,9 +86,9 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 }
 
 func (c *ConvLayer) Randomize() {
-	c.biases.Randomize()
-	for _, filter := range c.filters {
+	for i, filter := range c.filters {
 		filter.Randomize()
+		c.biases[i] = rand.Float64()
 	}
 }
 
@@ -96,7 +99,7 @@ func (c *ConvLayer) PropagateForward() {
 			inputX := x * c.stride
 			for z, filter := range c.filters {
 				convolution := filter.Convolve(inputX, inputY, filter)
-				convolution += c.biases.Get(x, y, z)
+				convolution += c.biases[z]
 				c.convolutions.Set(x, y, z, convolution)
 				c.output.Set(x, y, z, c.activation.Eval(convolution))
 			}
@@ -105,8 +108,9 @@ func (c *ConvLayer) PropagateForward() {
 }
 
 func (c *ConvLayer) PropagateBackward() {
-	for _, x := range c.filterGradients {
+	for i, x := range c.filterGradients {
 		x.Reset()
+		c.biasPartials[i] = 0
 	}
 	c.upstreamGradient.Reset()
 
@@ -119,7 +123,7 @@ func (c *ConvLayer) PropagateBackward() {
 					c.activation.Deriv(c.convolutions.Get(x, y, z))
 				c.filterGradients[z].MulAdd(-inputX, -inputY, c.input, sumPartial)
 				c.upstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
-				c.biasGradients.Set(x, y, z, sumPartial)
+				c.biasPartials[z] += sumPartial
 			}
 		}
 	}

@@ -1,6 +1,11 @@
 package convnet
 
-import "math/rand"
+import (
+	"math"
+	"math/rand"
+
+	"github.com/unixpickle/num-analysis/kahan"
+)
 
 // ConvParams stores parameters that define
 // a convolutional layer in an ANN.
@@ -125,6 +130,28 @@ func (c *ConvLayer) PropagateBackward() {
 				c.upstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
 				c.biasPartials[z] += sumPartial
 			}
+		}
+	}
+}
+
+func (c *ConvLayer) GradientMagSquared() float64 {
+	sum := kahan.NewSummer64()
+
+	for i, filterGrad := range c.filterGradients {
+		sum.Add(math.Pow(c.biasPartials[i], 2))
+		for _, val := range filterGrad.Data {
+			sum.Add(val * val)
+		}
+	}
+
+	return sum.Sum()
+}
+
+func (c *ConvLayer) StepGradient(f float64) {
+	for i, filterGrad := range c.filterGradients {
+		c.biases[i] += c.biasPartials[i] * f
+		for j, val := range filterGrad.Data {
+			c.filters[i].Data[j] += val * f
 		}
 	}
 }

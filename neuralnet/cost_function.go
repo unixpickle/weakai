@@ -1,4 +1,4 @@
-package convnet
+package neuralnet
 
 // A CostFunc computes the amount of
 // discrepancy between the actual and

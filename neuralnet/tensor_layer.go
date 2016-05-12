@@ -1,4 +1,4 @@
-package convnet
+package neuralnet
 
 // tensorLayer is meant to be encapsulated (via
 // an anonymous field) by layers with input and

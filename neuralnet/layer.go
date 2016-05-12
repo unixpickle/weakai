@@ -1,4 +1,4 @@
-package convnet
+package neuralnet
 
 // A Layer represents any kind of "layer"
 // that a deep neural network may contain.

@@ -1,4 +1,4 @@
-package convnet
+package neuralnet
 
 import (
 	"math"

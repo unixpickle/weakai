@@ -1,6 +1,10 @@
 package convnet
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/unixpickle/num-analysis/kahan"
+)
 
 // A Network is a feed-forward neural network
 // composed of a series of layers, each one
@@ -51,8 +55,8 @@ func (n *Network) PropagateForward() {
 }
 
 func (n *Network) PropagateBackward() {
-	for _, l := range n.Layers {
-		l.PropagateBackward()
+	for i := len(n.Layers) - 1; i >= 0; i-- {
+		n.Layers[i].PropagateBackward()
 	}
 }
 
@@ -78,4 +82,18 @@ func (n *Network) DownstreamGradient() []float64 {
 
 func (n *Network) SetDownstreamGradient(v []float64) bool {
 	return n.Layers[len(n.Layers)-1].SetDownstreamGradient(v)
+}
+
+func (n *Network) GradientMagSquared() float64 {
+	sum := kahan.NewSummer64()
+	for _, l := range n.Layers {
+		sum.Add(l.GradientMagSquared())
+	}
+	return sum.Sum()
+}
+
+func (n *Network) StepGradient(f float64) {
+	for _, l := range n.Layers {
+		l.StepGradient(f)
+	}
 }

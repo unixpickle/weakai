@@ -103,7 +103,7 @@ func (c *ConvLayer) PropagateForward() {
 		for x := 0; x < c.output.Width; x++ {
 			inputX := x * c.stride
 			for z, filter := range c.filters {
-				convolution := filter.Convolve(inputX, inputY, filter)
+				convolution := filter.Convolve(inputX, inputY, c.input)
 				convolution += c.biases[z]
 				c.convolutions.Set(x, y, z, convolution)
 				c.output.Set(x, y, z, c.activation.Eval(convolution))

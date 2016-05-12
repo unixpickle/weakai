@@ -25,6 +25,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	firstBitTest()
 	horizontalLineTest()
+	horizontalLineConvTest()
 }
 
 // firstBitTest builds a neural network to:
@@ -87,17 +88,6 @@ func firstBitTest() {
 // horizontalLineTest builds a neural network
 // to accept bitmaps with horizontal lines.
 func horizontalLineTest() {
-	trainingSamples := make([][]float64, GridTrainingSize)
-	trainingOutputs := make([][]float64, GridTrainingSize)
-	for i := range trainingSamples {
-		trainingSamples[i] = randomBitmap()
-		if bitmapHasHorizontal(trainingSamples[i]) {
-			trainingOutputs[i] = []float64{1}
-		} else {
-			trainingOutputs[i] = []float64{0}
-		}
-	}
-
 	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
 		&neuralnet.DenseParams{
 			Activation:  neuralnet.Sigmoid{},
@@ -110,6 +100,49 @@ func horizontalLineTest() {
 			OutputCount: 1,
 		},
 	})
+	runHorizontalLineTest("horizontalLineTest", network)
+}
+
+// horizontalLineConvTest is like
+// horizontalLineTest, but it uses
+// a convolutional layer.
+func horizontalLineConvTest() {
+	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
+		&neuralnet.ConvParams{
+			Activation:   neuralnet.Sigmoid{},
+			FilterCount:  4,
+			FilterWidth:  2,
+			FilterHeight: 2,
+			Stride:       1,
+			InputWidth:   4,
+			InputHeight:  4,
+			InputDepth:   1,
+		},
+		&neuralnet.DenseParams{
+			Activation:  neuralnet.Sigmoid{},
+			InputCount:  3 * 3 * 4,
+			OutputCount: 4,
+		},
+		&neuralnet.DenseParams{
+			Activation:  neuralnet.Sigmoid{},
+			InputCount:  4,
+			OutputCount: 1,
+		},
+	})
+	runHorizontalLineTest("horizontalLineConvTest", network)
+}
+
+func runHorizontalLineTest(name string, network *neuralnet.Network) {
+	trainingSamples := make([][]float64, GridTrainingSize)
+	trainingOutputs := make([][]float64, GridTrainingSize)
+	for i := range trainingSamples {
+		trainingSamples[i] = randomBitmap()
+		if bitmapHasHorizontal(trainingSamples[i]) {
+			trainingOutputs[i] = []float64{1}
+		} else {
+			trainingOutputs[i] = []float64{0}
+		}
+	}
 
 	trainer := neuralnet.SGD{
 		CostFunc:         neuralnet.MeanSquaredCost{},
@@ -150,7 +183,7 @@ func horizontalLineTest() {
 		maxPossibleError += 1.0
 	}
 
-	fmt.Printf("horizontalLineTest() training error: %f; cross error: %f\n",
+	fmt.Printf("%s() training error: %f; cross error: %f\n", name,
 		trainingError/maxTrainingError, totalError/maxPossibleError)
 }
 

@@ -49,7 +49,7 @@ func NewDenseLayer(params *DenseParams) *DenseLayer {
 		output:           make([]float64, params.OutputCount),
 		weightGradient:   make([][]float64, params.OutputCount),
 		biasGradient:     make([]float64, params.OutputCount),
-		upstreamGradient: make([]float64, params.OutputCount),
+		upstreamGradient: make([]float64, params.InputCount),
 		outputSums:       make([]float64, params.OutputCount),
 	}
 	for i := range res.weights {

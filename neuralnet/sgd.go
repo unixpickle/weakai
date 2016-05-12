@@ -42,16 +42,14 @@ func (s *SGD) Train(n *Network) {
 			n.SetInput(input)
 			n.PropagateForward()
 			s.CostFunc.Deriv(downstreamGrad, n.Output(), output)
-			propagateBackwardsAlmost(n)
+
+			n.PropagateBackward()
 
 			grad := math.Sqrt(n.GradientMagSquared())
-			n.StepGradient(stepSize / grad)
+			if grad == 0 {
+				continue
+			}
+			n.StepGradient(-stepSize / grad)
 		}
-	}
-}
-
-func propagateBackwardsAlmost(n *Network) {
-	for i := len(n.Layers) - 1; i > 0; i-- {
-		n.Layers[i].PropagateBackward()
 	}
 }

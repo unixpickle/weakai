@@ -38,6 +38,7 @@ func NewNetwork(prototypes []LayerPrototype) (*Network, error) {
 				return nil, fmt.Errorf("layer %d cannot feed back into layer %d", i, i-1)
 			}
 		}
+		n.Layers[i] = layer
 	}
 	return n, nil
 }

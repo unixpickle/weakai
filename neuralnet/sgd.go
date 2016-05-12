@@ -36,6 +36,7 @@ func (s *SGD) Train(n *Network) {
 		}
 
 		order := rand.Perm(len(s.Inputs))
+		descended := false
 		for _, j := range order {
 			input := s.Inputs[j]
 			output := s.Outputs[j]
@@ -49,7 +50,11 @@ func (s *SGD) Train(n *Network) {
 			if grad == 0 {
 				continue
 			}
+			descended = true
 			n.StepGradient(-stepSize / grad)
+		}
+		if !descended {
+			break
 		}
 	}
 }

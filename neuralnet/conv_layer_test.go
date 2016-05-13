@@ -166,6 +166,58 @@ func TestConvBackward(t *testing.T) {
 	}
 }
 
+func TestConvSerialize(t *testing.T) {
+	layer := testingConvLayer()
+	data := layer.Serialize()
+	dataType := layer.SerializerType()
+
+	l, err := Deserializers[dataType](data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layer, ok := l.(*ConvLayer)
+	if !ok {
+		t.Fatal("deserialized object is not a *ConvLayer")
+	}
+
+	expLists := [][]float64{
+		{
+			0.348, 0.299, 0.946, 0.806,
+			0.101, 0.705, 0.821, 0.819,
+			0.106, 0.348, 0.285, 0.133,
+		},
+		{
+			0.293, 0.494, 0.148, 0.758,
+			0.901, 0.050, 0.415, 0.892,
+			0.736, 0.458, 0.465, 0.167,
+		},
+		{0.333, -0.255},
+	}
+	actualLists := [][]float64{layer.filters[0].Data, layer.filters[1].Data, layer.biases}
+
+	for i, x := range expLists {
+		actual := actualLists[i]
+		equal := true
+		for j, v := range x {
+			if math.Abs(actual[j]-v) > 1e-6 {
+				equal = false
+			}
+		}
+		if !equal {
+			t.Errorf("list %d does not match", i)
+		}
+	}
+
+	// Make sure these don't trigger dimension
+	// mismatches; also needed to test propagation.
+	layer.SetInput(make([]float64, 7*5*2))
+	layer.SetDownstreamGradient(make([]float64, 2*3*2))
+
+	// Make sure these don't trigger any errors.
+	layer.PropagateForward()
+	layer.PropagateBackward()
+}
+
 func testingConvLayer() *ConvLayer {
 	layer := NewConvLayer(&ConvParams{
 		FilterCount:  2,

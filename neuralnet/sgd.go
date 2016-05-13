@@ -42,7 +42,7 @@ func (s *SGD) Train(n *Network) {
 			output := s.Outputs[j]
 			n.SetInput(input)
 			n.PropagateForward()
-			s.CostFunc.Deriv(downstreamGrad, n.Output(), output)
+			s.CostFunc.Deriv(n, output, downstreamGrad)
 
 			n.PropagateBackward()
 

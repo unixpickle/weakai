@@ -43,6 +43,9 @@ func init() {
 		"network": func(d []byte) (Serializer, error) {
 			return DeserializeNetwork(d)
 		},
+		"borderlayer": func(d []byte) (Serializer, error) {
+			return DeserializeBorderLayer(d)
+		},
 	}
 	for key, obj := range des {
 		Deserializers[key] = obj

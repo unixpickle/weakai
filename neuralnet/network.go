@@ -1,10 +1,15 @@
 package neuralnet
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/unixpickle/num-analysis/kahan"
 )
+
+var networkEncodingEndian = binary.LittleEndian
 
 // A Network is a feed-forward neural network
 // composed of a series of layers, each one
@@ -41,6 +46,59 @@ func NewNetwork(prototypes []LayerPrototype) (*Network, error) {
 		n.Layers[i] = layer
 	}
 	return n, nil
+}
+
+func DeserializeNetwork(data []byte) (*Network, error) {
+	buffer := bytes.NewBuffer(data)
+
+	var count uint32
+	if err := binary.Read(buffer, networkEncodingEndian, &count); err != nil {
+		return nil, err
+	}
+
+	res := &Network{make([]Layer, int(count))}
+
+	for i := range res.Layers {
+		var typeLen uint32
+		if err := binary.Read(buffer, networkEncodingEndian, &typeLen); err != nil {
+			return nil, err
+		}
+		typeData := make([]byte, int(typeLen))
+		n, err := buffer.Read(typeData)
+		if err != nil {
+			return nil, err
+		} else if n < len(typeData) {
+			return nil, errors.New("buffer underflow")
+		}
+
+		var dataLen uint64
+		if err := binary.Read(buffer, networkEncodingEndian, &dataLen); err != nil {
+			return nil, err
+		}
+		layerData := make([]byte, int(dataLen))
+		n, err = buffer.Read(layerData)
+		if err != nil {
+			return nil, err
+		} else if n < len(layerData) {
+			return nil, errors.New("buffer underflow")
+		}
+
+		typeStr := string(typeData)
+		decoder, ok := Deserializers[typeStr]
+		if !ok {
+			return nil, fmt.Errorf("unknown serializer type: %s", typeStr)
+		}
+		layerObj, err := decoder(layerData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode layer %d: %s", i, err.Error())
+		} else if _, ok := layerObj.(Layer); !ok {
+			return nil, fmt.Errorf("layer %d is not Layer, it's %T", i, layerObj)
+		}
+
+		res.Layers[i] = layerObj.(Layer)
+	}
+
+	return res, nil
 }
 
 func (n *Network) Randomize() {
@@ -97,4 +155,27 @@ func (n *Network) StepGradient(f float64) {
 	for _, l := range n.Layers {
 		l.StepGradient(f)
 	}
+}
+
+func (n *Network) Serialize() []byte {
+	var buf bytes.Buffer
+
+	binary.Write(&buf, networkEncodingEndian, uint32(len(n.Layers)))
+
+	for _, l := range n.Layers {
+		encoded := l.Serialize()
+		typeName := []byte(l.SerializerType())
+
+		binary.Write(&buf, networkEncodingEndian, uint32(len(typeName)))
+		buf.Write(typeName)
+
+		binary.Write(&buf, networkEncodingEndian, uint64(len(encoded)))
+		buf.Write(encoded)
+	}
+
+	return buf.Bytes()
+}
+
+func (n *Network) SerializerType() string {
+	return "network"
 }

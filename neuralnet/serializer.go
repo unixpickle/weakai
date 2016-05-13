@@ -24,8 +24,27 @@ type Deserializer func(data []byte) (Serializer, error)
 //
 // External packages may set keys in this
 // during their init() routines.
-var Deserializers = map[string]Deserializer{
-	"sigmoid": func(d []byte) (Serializer, error) {
-		return Sigmoid{}, nil
-	},
+var Deserializers = map[string]Deserializer{}
+
+func init() {
+	des := map[string]Deserializer{
+		"sigmoid": func(d []byte) (Serializer, error) {
+			return Sigmoid{}, nil
+		},
+		"convlayer": func(d []byte) (Serializer, error) {
+			return DeserializeConvLayer(d)
+		},
+		"denselayer": func(d []byte) (Serializer, error) {
+			return DeserializeDenseLayer(d)
+		},
+		"maxpoolinglayer": func(d []byte) (Serializer, error) {
+			return DeserializeMaxPoolingLayer(d)
+		},
+		"network": func(d []byte) (Serializer, error) {
+			return DeserializeNetwork(d)
+		},
+	}
+	for key, obj := range des {
+		Deserializers[key] = obj
+	}
 }

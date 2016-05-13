@@ -1,6 +1,7 @@
 package neuralnet
 
 import (
+	"encoding/json"
 	"math"
 	"math/rand"
 
@@ -57,6 +58,35 @@ func NewDenseLayer(params *DenseParams) *DenseLayer {
 		res.weightGradient[i] = make([]float64, params.InputCount)
 	}
 	return res
+}
+
+func DeserializeDenseLayer(data []byte) (*DenseLayer, error) {
+	var s serializedDenseLayer
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+
+	activation, err := deserializeActivation(s.ActivationData, s.ActivationType)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &DenseLayer{
+		activation:       activation,
+		weights:          s.Weights,
+		biases:           s.Biases,
+		output:           make([]float64, s.OutputSize),
+		weightGradient:   make([][]float64, s.OutputSize),
+		biasGradient:     make([]float64, s.OutputSize),
+		upstreamGradient: make([]float64, s.InputSize),
+		outputSums:       make([]float64, s.OutputSize),
+	}
+
+	for i := range res.weights {
+		res.weightGradient[i] = make([]float64, s.InputSize)
+	}
+
+	return res, nil
 }
 
 // Randomize randomizes the weights and biases.
@@ -161,4 +191,33 @@ func (d *DenseLayer) SetDownstreamGradient(v []float64) bool {
 	}
 	d.downstreamGradient = v
 	return true
+}
+
+func (d *DenseLayer) Serialize() []byte {
+	s := serializedDenseLayer{
+		ActivationData: d.activation.Serialize(),
+		ActivationType: d.activation.SerializerType(),
+
+		Weights:    d.weights,
+		Biases:     d.biases,
+		InputSize:  len(d.upstreamGradient),
+		OutputSize: len(d.output),
+	}
+	data, _ := json.Marshal(&s)
+	return data
+}
+
+func (d *DenseLayer) SerializerType() string {
+	return "denselayer"
+}
+
+type serializedDenseLayer struct {
+	ActivationData []byte
+	ActivationType string
+
+	Weights [][]float64
+	Biases  []float64
+
+	InputSize  int
+	OutputSize int
 }

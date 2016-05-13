@@ -11,6 +11,8 @@ package neuralnet
 // the function they perform, doing what is
 // known as back propagation.
 type Layer interface {
+	Serializer
+
 	// Output is the output vector for this layer.
 	// The contents of this slice may change after
 	// forward propagation, but the slice itself

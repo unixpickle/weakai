@@ -1,6 +1,9 @@
 package neuralnet
 
-import "math"
+import (
+	"encoding/json"
+	"math"
+)
 
 // MaxPoolingParams configures a max-pooling
 // layer for a neural network.
@@ -75,6 +78,33 @@ func NewMaxPoolingLayer(params *MaxPoolingParams) *MaxPoolingLayer {
 	return res
 }
 
+func DeserializeMaxPoolingLayer(data []byte) (*MaxPoolingLayer, error) {
+	var s serializedMaxPoolingLayer
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+
+	res := &MaxPoolingLayer{
+		tensorLayer: tensorLayer{
+			output:           NewTensor3(s.OutputWidth, s.OutputHeight, s.OutputDepth),
+			upstreamGradient: NewTensor3(s.InputWidth, s.InputHeight, s.InputDepth),
+		},
+		xSpan:         s.XSpan,
+		ySpan:         s.YSpan,
+		outputChoices: make([][][][2]int, s.OutputWidth),
+	}
+
+	for i := range res.outputChoices {
+		list := make([][][2]int, s.OutputHeight)
+		for j := range list {
+			list[j] = make([][2]int, s.OutputDepth)
+		}
+		res.outputChoices[i] = list
+	}
+
+	return res, nil
+}
+
 // Randomize does nothing, since this type of
 // layer has no learnable values.
 func (r *MaxPoolingLayer) Randomize() {
@@ -126,6 +156,27 @@ func (r *MaxPoolingLayer) GradientMagSquared() float64 {
 func (r *MaxPoolingLayer) StepGradient(f float64) {
 }
 
+func (r *MaxPoolingLayer) Serialize() []byte {
+	s := serializedMaxPoolingLayer{
+		InputWidth:  r.upstreamGradient.Width,
+		InputHeight: r.upstreamGradient.Height,
+		InputDepth:  r.upstreamGradient.Depth,
+
+		OutputWidth:  r.output.Width,
+		OutputHeight: r.output.Height,
+		OutputDepth:  r.output.Depth,
+
+		XSpan: r.xSpan,
+		YSpan: r.ySpan,
+	}
+	data, _ := json.Marshal(&s)
+	return data
+}
+
+func (r *MaxPoolingLayer) SerializerType() string {
+	return "maxpoolinglayer"
+}
+
 // maxInput computes the maxmimum input value
 // in a given rectangular range.
 func (r *MaxPoolingLayer) maxInput(x1, x2, y1, y2, z int) (value float64, bestX, bestY int) {
@@ -141,4 +192,17 @@ func (r *MaxPoolingLayer) maxInput(x1, x2, y1, y2, z int) (value float64, bestX,
 		}
 	}
 	return
+}
+
+type serializedMaxPoolingLayer struct {
+	InputWidth  int
+	InputHeight int
+	InputDepth  int
+
+	OutputWidth  int
+	OutputHeight int
+	OutputDepth  int
+
+	XSpan int
+	YSpan int
 }

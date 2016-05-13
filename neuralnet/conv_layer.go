@@ -1,6 +1,7 @@
 package neuralnet
 
 import (
+	"encoding/json"
 	"math"
 	"math/rand"
 
@@ -90,6 +91,42 @@ func NewConvLayer(params *ConvParams) *ConvLayer {
 	return res
 }
 
+func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
+	var s serializedConvLayer
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+
+	activation, err := deserializeActivation(s.ActivationData, s.ActivationType)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &ConvLayer{
+		tensorLayer: tensorLayer{
+			output:           NewTensor3(s.OutputWidth, s.OutputHeight, s.OutputDepth),
+			upstreamGradient: NewTensor3(s.InputWidth, s.InputHeight, s.InputDepth),
+		},
+
+		activation: activation,
+		stride:     s.Stride,
+
+		filters:         s.Filters,
+		filterGradients: make([]*Tensor3, len(s.Filters)),
+		biases:          s.Biases,
+		biasPartials:    make([]float64, len(s.Biases)),
+
+		convolutions: NewTensor3(s.OutputWidth, s.OutputHeight, s.OutputDepth),
+	}
+
+	for i := range s.Filters {
+		res.filterGradients[i] = NewTensor3(s.Filters[i].Width, s.Filters[i].Height,
+			s.Filters[i].Depth)
+	}
+
+	return res, nil
+}
+
 func (c *ConvLayer) Randomize() {
 	for i, filter := range c.filters {
 		filter.Randomize()
@@ -154,4 +191,52 @@ func (c *ConvLayer) StepGradient(f float64) {
 			c.filters[i].Data[j] += val * f
 		}
 	}
+}
+
+// Serialize encodes all of the parameters for
+// this layer, including its current weights
+// and biases.
+// It does not encode the current input/output,
+// upstream/downstream gradient, or parameter
+// gradient.
+func (c *ConvLayer) Serialize() []byte {
+	s := serializedConvLayer{
+		ActivationData: c.activation.Serialize(),
+		ActivationType: c.activation.SerializerType(),
+		Stride:         c.stride,
+		Filters:        c.filters,
+		Biases:         c.biases,
+
+		InputWidth:  c.upstreamGradient.Width,
+		InputHeight: c.upstreamGradient.Height,
+		InputDepth:  c.upstreamGradient.Depth,
+
+		OutputWidth:  c.output.Width,
+		OutputHeight: c.output.Height,
+		OutputDepth:  c.output.Depth,
+	}
+	data, _ := json.Marshal(&s)
+	return data
+}
+
+func (c *ConvLayer) SerializerType() string {
+	return "convlayer"
+}
+
+type serializedConvLayer struct {
+	ActivationData []byte
+	ActivationType string
+
+	Stride int
+
+	Filters []*Tensor3
+	Biases  []float64
+
+	InputWidth  int
+	InputHeight int
+	InputDepth  int
+
+	OutputWidth  int
+	OutputHeight int
+	OutputDepth  int
 }

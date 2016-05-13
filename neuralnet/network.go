@@ -96,6 +96,17 @@ func DeserializeNetwork(data []byte) (*Network, error) {
 		}
 
 		res.Layers[i] = layerObj.(Layer)
+
+		if i != 0 {
+			ok := res.Layers[i].SetInput(res.Layers[i-1].Output())
+			if !ok {
+				return nil, fmt.Errorf("layer %d cannot feed into layer %d", i-1, i)
+			}
+			ok = res.Layers[i-1].SetDownstreamGradient(res.Layers[i].UpstreamGradient())
+			if !ok {
+				return nil, fmt.Errorf("layer %d cannot feed back into layer %d", i, i-1)
+			}
+		}
 	}
 
 	return res, nil

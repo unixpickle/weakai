@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	HiddenSize1      = 100
-	HiddenSize2      = 100
-	StepSize         = 0.1
-	StepDecreaseRate = 1e-3
-	Epochs           = 1000
+	FilterSize   = 5
+	FilterStride = 3
+	FilterCount  = 5
+	HiddenSize   = 100
+	StepSize     = 0.1
 )
 
 func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
@@ -45,20 +45,28 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 	log.Print("Training network...")
 	log.Print("Press ctrl+c to stop on next iteration.")
 
+	convOutWidth := (width-FilterSize)/FilterStride + 1
+	convOutHeight := (height-FilterSize)/FilterStride + 1
+
 	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
-			InputCount:  width * height * 3,
-			OutputCount: HiddenSize1,
+		&neuralnet.ConvParams{
+			Activation:   neuralnet.Sigmoid{},
+			FilterCount:  FilterCount,
+			FilterWidth:  FilterSize,
+			FilterHeight: FilterSize,
+			Stride:       FilterStride,
+			InputWidth:   width,
+			InputHeight:  height,
+			InputDepth:   3,
 		},
 		&neuralnet.DenseParams{
 			Activation:  neuralnet.Sigmoid{},
-			InputCount:  HiddenSize1,
-			OutputCount: HiddenSize2,
+			InputCount:  convOutWidth * convOutHeight * FilterCount,
+			OutputCount: HiddenSize,
 		},
 		&neuralnet.DenseParams{
 			Activation:  neuralnet.Sigmoid{},
-			InputCount:  HiddenSize2,
+			InputCount:  HiddenSize,
 			OutputCount: width * height * 3,
 		},
 	})
@@ -69,12 +77,11 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 	}
 
 	trainer := neuralnet.SGD{
-		CostFunc:         neuralnet.MeanSquaredCost{},
-		Inputs:           tensorSlices,
-		Outputs:          tensorSlices,
-		StepSize:         StepSize,
-		StepDecreaseRate: StepDecreaseRate,
-		Epochs:           1,
+		CostFunc: neuralnet.MeanSquaredCost{},
+		Inputs:   tensorSlices,
+		Outputs:  tensorSlices,
+		StepSize: StepSize,
+		Epochs:   1,
 	}
 
 	network.Randomize()
@@ -90,15 +97,17 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 		close(killChan)
 	}()
 
+	epochNum := 0
 TrainLoop:
-	for i := 0; i < Epochs; i++ {
+	for {
 		select {
 		case <-killChan:
 			log.Print("Finishing due to interrupt.")
 			break TrainLoop
 		default:
 		}
-		log.Println("Running epoch", i, "error is", trainerError(network, &trainer))
+		log.Println("Running epoch", epochNum, "error is", trainerError(network, &trainer))
+		epochNum++
 		trainer.Train(network)
 	}
 

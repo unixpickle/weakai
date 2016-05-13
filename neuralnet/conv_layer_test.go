@@ -177,7 +177,7 @@ func TestConvSerialize(t *testing.T) {
 	}
 	layer, ok := l.(*ConvLayer)
 	if !ok {
-		t.Fatal("deserialized object is not a *ConvLayer")
+		t.Fatalf("decoded layer was not a *ConvLayer, but a %T", l)
 	}
 
 	expLists := [][]float64{

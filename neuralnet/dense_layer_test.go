@@ -80,6 +80,52 @@ func TestDenseBackward(t *testing.T) {
 	}
 }
 
+func TestDenseSerialize(t *testing.T) {
+	layer := testingDenseLayer(t)
+	encoded := layer.Serialize()
+	layerType := layer.SerializerType()
+
+	decoded, err := Deserializers[layerType](encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	layer, ok := decoded.(*DenseLayer)
+	if !ok {
+		t.Fatalf("decoded layer was not a *DenseLayer, but a %T", decoded)
+	}
+
+	layer.SetDownstreamGradient([]float64{0.5, -0.3})
+	layer.SetInput([]float64{1, -1, 2})
+
+	layer.PropagateForward()
+	layer.PropagateBackward()
+
+	copy(layer.weights[0], []float64{1, 2, 3})
+	copy(layer.weights[1], []float64{-3, 2, -1})
+	copy(layer.biases, []float64{-6, 9})
+
+	expLists := [][]float64{
+		{1, 2, 3},
+		{-3, 2, -1},
+		{-6, 9},
+	}
+	actualLists := [][]float64{layer.weights[0], layer.weights[1], layer.biases}
+
+	for i, x := range expLists {
+		actual := actualLists[i]
+		equal := true
+		for j, v := range x {
+			if actual[j] != v {
+				equal = false
+			}
+		}
+		if !equal {
+			t.Errorf("list %d does not match", i)
+		}
+	}
+}
+
 func testingDenseLayer(t *testing.T) *DenseLayer {
 	params := &DenseParams{
 		Activation:  Sigmoid{},

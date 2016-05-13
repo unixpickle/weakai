@@ -143,3 +143,23 @@ func TestMaxPoolingBackward(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxPoolingSerialize(t *testing.T) {
+	layer := NewMaxPoolingLayer(&MaxPoolingParams{3, 3, 10, 11, 2})
+	encoded := layer.Serialize()
+	layerType := layer.SerializerType()
+	decoded, err := Deserializers[layerType](encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layer, ok := decoded.(*MaxPoolingLayer)
+	if !ok {
+		t.Fatalf("expected *MaxPoolingLayer but got %T", decoded)
+	}
+
+	// Make sure none of this triggers panics.
+	layer.SetDownstreamGradient(make([]float64, 4*4*2))
+	layer.SetInput(make([]float64, 20*11))
+	layer.PropagateForward()
+	layer.PropagateBackward()
+}

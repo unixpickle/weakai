@@ -13,11 +13,9 @@ import (
 )
 
 const (
-	FilterSize   = 5
-	FilterStride = 3
-	FilterCount  = 5
-	HiddenSize   = 100
-	StepSize     = 0.1
+	FilterSize  = 5
+	FilterCount = 2
+	StepSize    = 0.02
 )
 
 func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
@@ -45,8 +43,13 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 	log.Print("Training network...")
 	log.Print("Press ctrl+c to stop on next iteration.")
 
-	convOutWidth := (width-FilterSize)/FilterStride + 1
-	convOutHeight := (height-FilterSize)/FilterStride + 1
+	convOutWidth := (width - FilterSize) + 1
+	convOutHeight := (height - FilterSize) + 1
+
+	borderTargetWidth := (width + FilterSize) - 1
+	borderTargetHeight := (height + FilterSize) - 1
+	widthPadding := borderTargetWidth - convOutWidth
+	heightPadding := borderTargetHeight - convOutHeight
 
 	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
 		&neuralnet.ConvParams{
@@ -54,20 +57,29 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 			FilterCount:  FilterCount,
 			FilterWidth:  FilterSize,
 			FilterHeight: FilterSize,
-			Stride:       FilterStride,
+			Stride:       1,
 			InputWidth:   width,
 			InputHeight:  height,
 			InputDepth:   3,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
-			InputCount:  convOutWidth * convOutHeight * FilterCount,
-			OutputCount: HiddenSize,
+		&neuralnet.BorderParams{
+			InputWidth:   convOutWidth,
+			InputHeight:  convOutHeight,
+			InputDepth:   FilterCount,
+			LeftBorder:   widthPadding / 2,
+			RightBorder:  widthPadding - (widthPadding / 2),
+			TopBorder:    heightPadding / 2,
+			BottomBorder: heightPadding - (heightPadding / 2),
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
-			InputCount:  HiddenSize,
-			OutputCount: width * height * 3,
+		&neuralnet.ConvParams{
+			Activation:   neuralnet.Sigmoid{},
+			FilterCount:  3,
+			FilterWidth:  FilterSize,
+			FilterHeight: FilterSize,
+			Stride:       1,
+			InputWidth:   borderTargetWidth,
+			InputHeight:  borderTargetHeight,
+			InputDepth:   FilterCount,
 		},
 	})
 

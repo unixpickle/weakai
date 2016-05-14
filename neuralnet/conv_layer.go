@@ -141,6 +141,22 @@ func (c *ConvLayer) Biases() []float64 {
 	return c.biases
 }
 
+// FilterGradients returns the gradient for
+// each filter of this layer.
+// A cost function may modify gradient values
+// returned by this function.
+func (c *ConvLayer) FilterGradients() []*Tensor3 {
+	return c.filterGradients
+}
+
+// BiasGradients returns the gradients for
+// each bias of this layer.
+// A cost function may modify gradient values
+// returned by this function.
+func (c *ConvLayer) BiasGradients() []float64 {
+	return c.biasPartials
+}
+
 func (c *ConvLayer) Randomize() {
 	for i, filter := range c.filters {
 		filter.Randomize()

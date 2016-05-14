@@ -51,3 +51,57 @@ func (_ CrossEntropyCost) Deriv(layer Layer, expected, gradOut []float64) {
 
 func (_ CrossEntropyCost) UpdateInternal(Layer) {
 }
+
+// SparseRegularizingCost wraps another cost
+// function and adds the squares of every
+// weight and bias of every ConvLayer and
+// DenseLayer to the cost.
+type SparseRegularizingCost struct {
+	Cost CostFunc
+
+	BiasPenalty   float64
+	WeightPenalty float64
+}
+
+func (r SparseRegularizingCost) Deriv(layer Layer, expected, gradOut []float64) {
+	r.Cost.Deriv(layer, expected, gradOut)
+}
+
+func (r SparseRegularizingCost) UpdateInternal(layer Layer) {
+	switch layer := layer.(type) {
+	case *Network:
+		for _, subLayer := range layer.Layers {
+			r.UpdateInternal(subLayer)
+		}
+	case *ConvLayer:
+		filterGrads := layer.FilterGradients()
+		filterWeights := layer.Filters()
+		for i, weights := range filterWeights {
+			grads := filterGrads[i]
+			for j, w := range weights.Data {
+				grads.Data[j] += w * r.WeightPenalty
+			}
+		}
+
+		biases := layer.Biases()
+		biasGrads := layer.BiasGradients()
+		for i, bias := range biases {
+			biasGrads[i] += bias * r.BiasPenalty
+		}
+	case *DenseLayer:
+		weights := layer.Weights()
+		gradients := layer.WeightGradients()
+		for i, neuron := range weights {
+			neuronGrad := gradients[i]
+			for j, w := range neuron {
+				neuronGrad[j] += w * r.WeightPenalty
+			}
+		}
+
+		biases := layer.Biases()
+		biasGrads := layer.BiasGradients()
+		for i, bias := range biases {
+			biasGrads[i] += bias * r.BiasPenalty
+		}
+	}
+}

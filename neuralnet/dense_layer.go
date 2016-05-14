@@ -103,6 +103,20 @@ func (d *DenseLayer) Biases() []float64 {
 	return d.biases
 }
 
+// WeightGradients returns the gradients of
+// the weights.
+// A cost function may modify the result.
+func (d *DenseLayer) WeightGradients() [][]float64 {
+	return d.weightGradient
+}
+
+// BiasGradients returns the gradients of
+// the biases.
+// A cost function may modify the result.
+func (d *DenseLayer) BiasGradients() []float64 {
+	return d.biasGradient
+}
+
 // Randomize randomizes the weights and biases.
 // The biases are chosen uniformly such that
 // their variance is 1.

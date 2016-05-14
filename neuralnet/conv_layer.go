@@ -160,7 +160,7 @@ func (c *ConvLayer) BiasGradients() []float64 {
 func (c *ConvLayer) Randomize() {
 	for i, filter := range c.filters {
 		filter.Randomize()
-		c.biases[i] = rand.Float64()
+		c.biases[i] = (rand.Float64() * 2) - 1
 	}
 }
 

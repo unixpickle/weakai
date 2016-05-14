@@ -132,7 +132,7 @@ func (c *ConvGrowLayer) PropagateForward() {
 			internalX := x / c.inverseStride
 			internalOffset := ((x % c.inverseStride) + c.inverseStride*(y%c.inverseStride)) *
 				c.output.Depth
-			for z := 0; z < c.output.Depth; x++ {
+			for z := 0; z < c.output.Depth; z++ {
 				val := c.convLayer.output.Get(internalX, internalY, internalOffset+z)
 				c.output.Set(x, y, z, val)
 			}
@@ -147,7 +147,7 @@ func (c *ConvGrowLayer) PropagateBackward(upstream bool) {
 			internalX := x / c.inverseStride
 			internalOffset := ((x % c.inverseStride) + c.inverseStride*(y%c.inverseStride)) *
 				c.output.Depth
-			for z := 0; z < c.output.Depth; x++ {
+			for z := 0; z < c.output.Depth; z++ {
 				val := c.downstream.Get(x, y, z)
 				c.convDownstream.Set(internalX, internalY, internalOffset+z, val)
 			}

@@ -38,6 +38,32 @@ func (_ Sigmoid) SerializerType() string {
 	return "sigmoid"
 }
 
+type HyperbolicTangent struct{}
+
+func (_ HyperbolicTangent) Eval(x float64) float64 {
+	return math.Tanh(x)
+}
+
+func (_ HyperbolicTangent) Deriv(x float64) float64 {
+	cosh := math.Cosh(x)
+	if math.IsInf(cosh, 0) {
+		return 0
+	}
+	coshSquared := math.Pow(cosh, 2)
+	if math.IsInf(coshSquared, 0) {
+		return 0
+	}
+	return 1 / coshSquared
+}
+
+func (_ HyperbolicTangent) Serialize() []byte {
+	return []byte{}
+}
+
+func (_ HyperbolicTangent) SerializerType() string {
+	return "hyperbolictangent"
+}
+
 func deserializeActivation(data []byte, serializerType string) (ActivationFunc, error) {
 	activationDes, ok := Deserializers[serializerType]
 	if !ok {

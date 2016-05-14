@@ -31,6 +31,9 @@ func init() {
 		"sigmoid": func(d []byte) (Serializer, error) {
 			return Sigmoid{}, nil
 		},
+		"hyperbolictangent": func(d []byte) (Serializer, error) {
+			return HyperbolicTangent{}, nil
+		},
 		"convlayer": func(d []byte) (Serializer, error) {
 			return DeserializeConvLayer(d)
 		},

@@ -49,6 +49,9 @@ func init() {
 		"borderlayer": func(d []byte) (Serializer, error) {
 			return DeserializeBorderLayer(d)
 		},
+		"convgrowlayer": func(d []byte) (Serializer, error) {
+			return DeserializeConvGrowLayer(d)
+		},
 	}
 	for key, obj := range des {
 		Deserializers[key] = obj

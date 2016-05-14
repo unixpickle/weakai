@@ -54,8 +54,8 @@ func (_ CrossEntropyCost) UpdateInternal(Layer) {
 
 // SparseRegularizingCost wraps another cost
 // function and adds the squares of every
-// weight and bias of every ConvLayer and
-// DenseLayer to the cost.
+// weight and bias of every ConvLayer,
+// DenseLayer, and ConvGrowLayer.
 type SparseRegularizingCost struct {
 	Cost CostFunc
 
@@ -103,5 +103,7 @@ func (r SparseRegularizingCost) UpdateInternal(layer Layer) {
 		for i, bias := range biases {
 			biasGrads[i] += bias * r.BiasPenalty
 		}
+	case *ConvGrowLayer:
+		r.UpdateInternal(layer.ConvLayer())
 	}
 }

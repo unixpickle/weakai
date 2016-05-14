@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	FilterSize  = 5
-	FilterCount = 2
-	StepSize    = 0.02
+	FilterSize   = 4
+	FilterCount  = 4
+	FilterStride = 2
+	StepSize     = 0.01
 )
 
 func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
@@ -43,11 +44,11 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 	log.Print("Training network...")
 	log.Print("Press ctrl+c to stop on next iteration.")
 
-	convOutWidth := (width - FilterSize) + 1
-	convOutHeight := (height - FilterSize) + 1
+	convOutWidth := (width-FilterSize)/FilterStride + 1
+	convOutHeight := (height-FilterSize)/FilterStride + 1
 
-	borderTargetWidth := (width + FilterSize) - 1
-	borderTargetHeight := (height + FilterSize) - 1
+	borderTargetWidth := (width/FilterStride + FilterSize) - 1
+	borderTargetHeight := (height/FilterStride + FilterSize) - 1
 	widthPadding := borderTargetWidth - convOutWidth
 	heightPadding := borderTargetHeight - convOutHeight
 
@@ -57,7 +58,7 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 			FilterCount:  FilterCount,
 			FilterWidth:  FilterSize,
 			FilterHeight: FilterSize,
-			Stride:       1,
+			Stride:       FilterStride,
 			InputWidth:   width,
 			InputHeight:  height,
 			InputDepth:   3,
@@ -71,15 +72,25 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 			TopBorder:    heightPadding / 2,
 			BottomBorder: heightPadding - (heightPadding / 2),
 		},
-		&neuralnet.ConvParams{
-			Activation:   neuralnet.Sigmoid{},
-			FilterCount:  3,
-			FilterWidth:  FilterSize,
-			FilterHeight: FilterSize,
-			Stride:       1,
-			InputWidth:   borderTargetWidth,
-			InputHeight:  borderTargetHeight,
-			InputDepth:   FilterCount,
+		&neuralnet.ConvGrowParams{
+			ConvParams: neuralnet.ConvParams{
+				Activation:   neuralnet.Sigmoid{},
+				FilterCount:  3,
+				FilterWidth:  FilterSize,
+				FilterHeight: FilterSize,
+				Stride:       1,
+				InputWidth:   borderTargetWidth,
+				InputHeight:  borderTargetHeight,
+				InputDepth:   FilterCount,
+			},
+			InverseStride: FilterStride,
+		},
+		&neuralnet.BorderParams{
+			InputWidth:  width - (width % FilterStride),
+			InputHeight: height - (height % FilterStride),
+			InputDepth:  3,
+			LeftBorder:  width % FilterStride,
+			TopBorder:   height % FilterStride,
 		},
 	})
 

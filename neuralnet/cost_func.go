@@ -24,3 +24,13 @@ func (_ MeanSquaredCost) Deriv(layer Layer, expected, gradOut []float64) {
 		gradOut[i] = x - expected[i]
 	}
 }
+
+type CrossEntropyCost struct{}
+
+func (_ CrossEntropyCost) Deriv(layer Layer, expected, gradOut []float64) {
+	actual := layer.Output()
+	for i, x := range expected {
+		a := actual[i]
+		gradOut[i] = (a - x) / ((a + 1) * a)
+	}
+}

@@ -61,8 +61,11 @@ type Layer interface {
 	// PropagateBackward performs backward propagation,
 	// using the downstream gradients and information
 	// from the latest PropagateForward() to generate
-	// upstream gradients.
-	PropagateBackward()
+	// internal and, potentially, upstream gradients.
+	//
+	// If upstream is false, then this will only
+	// generate internal gradients, not upstream ones.
+	PropagateBackward(upstream bool)
 
 	// GradientMagSquared takes the gradient vector of
 	// this layer's parameters with respect to the cost

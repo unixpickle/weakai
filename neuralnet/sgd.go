@@ -44,7 +44,7 @@ func (s *SGD) Train(n *Network) {
 			n.PropagateForward()
 			s.CostFunc.Deriv(n, output, downstreamGrad)
 
-			n.PropagateBackward()
+			n.PropagateBackward(false)
 
 			grad := math.Sqrt(n.GradientMagSquared())
 			if grad == 0 {

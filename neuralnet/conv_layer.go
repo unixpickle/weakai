@@ -163,12 +163,15 @@ func (c *ConvLayer) PropagateForward() {
 	}
 }
 
-func (c *ConvLayer) PropagateBackward() {
+func (c *ConvLayer) PropagateBackward(upstream bool) {
 	for i, x := range c.filterGradients {
 		x.Reset()
 		c.biasPartials[i] = 0
 	}
-	c.upstreamGradient.Reset()
+
+	if upstream {
+		c.upstreamGradient.Reset()
+	}
 
 	for y := 0; y < c.output.Height; y++ {
 		inputY := y * c.stride
@@ -178,8 +181,10 @@ func (c *ConvLayer) PropagateBackward() {
 				sumPartial := c.downstreamGradient.Get(x, y, z) *
 					c.activation.Deriv(c.convolutions.Get(x, y, z))
 				c.filterGradients[z].MulAdd(-inputX, -inputY, c.input, sumPartial)
-				c.upstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
 				c.biasPartials[z] += sumPartial
+				if upstream {
+					c.upstreamGradient.MulAdd(inputX, inputY, filter, sumPartial)
+				}
 			}
 		}
 	}

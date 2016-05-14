@@ -87,11 +87,11 @@ func TestConvBackward(t *testing.T) {
 	backup := input[13]
 	input[13] = 3.141592
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 	input[13] = backup
 
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 
 	filterGradients := []*Tensor3{
 		{
@@ -215,7 +215,7 @@ func TestConvSerialize(t *testing.T) {
 
 	// Make sure these don't trigger any errors.
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 }
 
 func testingConvLayer() *ConvLayer {

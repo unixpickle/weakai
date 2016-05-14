@@ -124,9 +124,13 @@ func (n *Network) PropagateForward() {
 	}
 }
 
-func (n *Network) PropagateBackward() {
+func (n *Network) PropagateBackward(upstream bool) {
 	for i := len(n.Layers) - 1; i >= 0; i-- {
-		n.Layers[i].PropagateBackward()
+		if i != 0 || upstream {
+			n.Layers[i].PropagateBackward(true)
+		} else {
+			n.Layers[i].PropagateBackward(false)
+		}
 	}
 }
 

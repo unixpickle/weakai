@@ -39,11 +39,11 @@ func TestDenseBackward(t *testing.T) {
 	backup := input[0]
 	input[0] = 3.141592
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 	input[0] = backup
 
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 
 	partial0 := 0.1966119333 * downGrad[0]
 	partial1 := 0.1049935854 * downGrad[1]
@@ -99,7 +99,7 @@ func TestDenseSerialize(t *testing.T) {
 	layer.SetInput([]float64{1, -1, 2})
 
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 
 	copy(layer.weights[0], []float64{1, 2, 3})
 	copy(layer.weights[1], []float64{-3, 2, -1})

@@ -134,9 +134,11 @@ func (d *DenseLayer) PropagateForward() {
 	}
 }
 
-func (d *DenseLayer) PropagateBackward() {
-	for i := range d.upstreamGradient {
-		d.upstreamGradient[i] = 0
+func (d *DenseLayer) PropagateBackward(upstream bool) {
+	if upstream {
+		for i := range d.upstreamGradient {
+			d.upstreamGradient[i] = 0
+		}
 	}
 
 	for i, weights := range d.weights {
@@ -144,7 +146,9 @@ func (d *DenseLayer) PropagateBackward() {
 		d.biasGradient[i] = sumPartial
 		for j, weight := range weights {
 			d.weightGradient[i][j] = d.input[j] * sumPartial
-			d.upstreamGradient[j] += sumPartial * weight
+			if upstream {
+				d.upstreamGradient[j] += sumPartial * weight
+			}
 		}
 	}
 }

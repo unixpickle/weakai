@@ -75,7 +75,7 @@ func (b *BorderLayer) PropagateForward() {
 	}
 }
 
-func (b *BorderLayer) PropagateBackward() {
+func (b *BorderLayer) PropagateBackward(upstream bool) {
 	for y := 0; y < b.input.Height; y++ {
 		for x := 0; x < b.input.Width; x++ {
 			for z := 0; z < b.input.Depth; z++ {

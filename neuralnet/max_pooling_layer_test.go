@@ -118,11 +118,11 @@ func TestMaxPoolingBackward(t *testing.T) {
 	backup := input[0]
 	input[0] = 1
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 	input[0] = backup
 
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 
 	idx := 0
 	for y := 0; y < 11; y++ {
@@ -161,5 +161,5 @@ func TestMaxPoolingSerialize(t *testing.T) {
 	layer.SetDownstreamGradient(make([]float64, 4*4*2))
 	layer.SetInput(make([]float64, 20*11))
 	layer.PropagateForward()
-	layer.PropagateBackward()
+	layer.PropagateBackward(true)
 }

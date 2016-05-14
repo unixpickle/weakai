@@ -132,7 +132,10 @@ func (r *MaxPoolingLayer) PropagateForward() {
 	}
 }
 
-func (r *MaxPoolingLayer) PropagateBackward() {
+func (r *MaxPoolingLayer) PropagateBackward(upstream bool) {
+	if !upstream {
+		return
+	}
 	for i := range r.upstreamGradient.Data {
 		r.upstreamGradient.Data[i] = 0
 	}

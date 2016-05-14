@@ -127,6 +127,20 @@ func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
 	return res, nil
 }
 
+// Filters returns filters that this layer
+// applies to inputs.
+// The caller should not modify the result.
+func (c *ConvLayer) Filters() []*Tensor3 {
+	return c.filters
+}
+
+// Biases returns the biases for each filter
+// used by this layer.
+// The caller should not modify the result.
+func (c *ConvLayer) Biases() []float64 {
+	return c.biases
+}
+
 func (c *ConvLayer) Randomize() {
 	for i, filter := range c.filters {
 		filter.Randomize()

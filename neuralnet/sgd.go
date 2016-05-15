@@ -1,9 +1,6 @@
 package neuralnet
 
-import (
-	"math"
-	"math/rand"
-)
+import "math/rand"
 
 // SGD trains neural networks using
 // gradient descent.
@@ -36,7 +33,6 @@ func (s *SGD) Train(n *Network) {
 		}
 
 		order := rand.Perm(len(s.Inputs))
-		descended := false
 		for _, j := range order {
 			input := s.Inputs[j]
 			output := s.Outputs[j]
@@ -45,16 +41,7 @@ func (s *SGD) Train(n *Network) {
 			s.CostFunc.Deriv(n, output, downstreamGrad)
 			n.PropagateBackward(false)
 			s.CostFunc.UpdateInternal(n)
-
-			grad := math.Sqrt(n.GradientMagSquared())
-			if grad == 0 {
-				continue
-			}
-			descended = true
-			n.StepGradient(-stepSize / grad)
-		}
-		if !descended {
-			break
+			n.StepGradient(-stepSize)
 		}
 	}
 }

@@ -61,7 +61,7 @@ func firstBitTest() {
 		Outputs:          trainingOutputs,
 		StepSize:         0.1,
 		StepDecreaseRate: 0,
-		Epochs:           100,
+		Epochs:           5000,
 	}
 
 	network.Randomize()

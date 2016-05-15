@@ -2,12 +2,9 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"image"
 	"log"
 	"math"
-	"os"
-	"os/signal"
 
 	"github.com/unixpickle/weakai/neuralnet"
 )
@@ -16,7 +13,8 @@ const (
 	FilterSize   = 4
 	FilterCount  = 4
 	FilterStride = 2
-	StepSize     = 0.01
+	StepSize     = 1e-6
+	MaxEpochs    = 100000
 )
 
 func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
@@ -104,35 +102,11 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 		Inputs:   tensorSlices,
 		Outputs:  tensorSlices,
 		StepSize: StepSize,
-		Epochs:   1,
+		Epochs:   100000,
 	}
 
 	network.Randomize()
-
-	killChan := make(chan struct{})
-
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		<-c
-		signal.Stop(c)
-		fmt.Println("\nCaught interrupt. Ctrl+C again to terminate.")
-		close(killChan)
-	}()
-
-	epochNum := 0
-TrainLoop:
-	for {
-		select {
-		case <-killChan:
-			log.Print("Finishing due to interrupt.")
-			break TrainLoop
-		default:
-		}
-		log.Println("Running epoch", epochNum, "error is", trainerError(network, &trainer))
-		epochNum++
-		trainer.Train(network)
-	}
+	trainer.TrainInteractive(network)
 
 	return network, nil
 }

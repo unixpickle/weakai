@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -10,7 +9,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 
@@ -27,7 +25,8 @@ const (
 	Filter2Stride = 4
 	Filter2Depth  = 15
 
-	StepSize = 3e-2
+	StepSize  = 3e-2
+	MaxEpochs = 100000
 )
 
 func Train(samples0, samples1, classifierPath string) error {
@@ -57,32 +56,9 @@ func trainNetwork(samples0, samples1 string) (*neuralnet.Network, error) {
 	network.Randomize()
 
 	log.Println("Training network (ctrl+c to finish)...")
+	trainer.TrainInteractive(network)
 
-	log.Printf("Step 0 error %f", totalError(trainer, network))
-
-	killChan := make(chan struct{})
-
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		<-c
-		signal.Stop(c)
-		fmt.Println("\nCaught interrupt. Ctrl+C again to terminate.")
-		close(killChan)
-	}()
-
-	stepIdx := 0
-	for {
-		select {
-		case <-killChan:
-			log.Println("Stopping due to interrupt")
-			return network, nil
-		default:
-		}
-		stepIdx++
-		trainer.Train(network)
-		log.Printf("Step %d error %f", stepIdx, totalError(trainer, network))
-	}
+	return network, nil
 }
 
 func readSamples(dir1, dir2 string) (img1, img2 []*neuralnet.Tensor3, err error) {
@@ -165,7 +141,7 @@ func buildTrainer(img1, img2 []*neuralnet.Tensor3) *neuralnet.SGD {
 		Inputs:   input,
 		Outputs:  output,
 		StepSize: StepSize / float64(len(input)),
-		Epochs:   1,
+		Epochs:   100000,
 	}
 }
 

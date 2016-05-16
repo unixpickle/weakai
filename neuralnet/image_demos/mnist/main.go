@@ -11,10 +11,16 @@ import (
 const (
 	HiddenSize = 300
 	LabelCount = 10
-	StepSize   = 1e-3
+	StepSize   = 1e-2
 
-	SampleCount = 2000
-	TrainCount  = 1000
+	SampleCount = 6000
+	TrainCount  = 3500
+
+	FilterSize   = 3
+	FilterCount  = 5
+	FilterStride = 1
+
+	MaxPoolingSpan = 3
 )
 
 func main() {
@@ -41,10 +47,39 @@ func main() {
 }
 
 func trainNetwork(labels []int, samples []*neuralnet.Tensor3) {
+	convOutWidth := (samples[0].Width-FilterSize)/FilterStride + 1
+	convOutHeight := (samples[0].Height-FilterSize)/FilterStride + 1
+
+	poolOutWidth := convOutWidth / MaxPoolingSpan
+	if convOutWidth%MaxPoolingSpan != 0 {
+		poolOutWidth++
+	}
+	poolOutHeight := convOutWidth / MaxPoolingSpan
+	if convOutHeight%MaxPoolingSpan != 0 {
+		poolOutHeight++
+	}
+
 	net, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
+		&neuralnet.ConvParams{
+			Activation:   neuralnet.Sigmoid{},
+			FilterCount:  FilterCount,
+			FilterWidth:  FilterSize,
+			FilterHeight: FilterSize,
+			Stride:       FilterStride,
+			InputWidth:   samples[0].Width,
+			InputHeight:  samples[0].Height,
+			InputDepth:   samples[0].Depth,
+		},
+		&neuralnet.MaxPoolingParams{
+			XSpan:       MaxPoolingSpan,
+			YSpan:       MaxPoolingSpan,
+			InputWidth:  convOutWidth,
+			InputHeight: convOutHeight,
+			InputDepth:  FilterCount,
+		},
 		&neuralnet.DenseParams{
 			Activation:  neuralnet.Sigmoid{},
-			InputCount:  samples[0].Width * samples[0].Height,
+			InputCount:  poolOutWidth * poolOutHeight * FilterCount,
 			OutputCount: HiddenSize,
 		},
 		&neuralnet.DenseParams{

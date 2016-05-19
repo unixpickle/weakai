@@ -76,6 +76,36 @@ func (_ CrossEntropyCost) Deriv(layer Layer, expected, gradOut []float64) {
 func (_ CrossEntropyCost) UpdateInternal(Layer) {
 }
 
+// AbsDifferenceCost uses the absolute value of the
+// difference between an expected value and the
+// actual output.
+// Technically, this cost function is not differentiable,
+// but its derivative exists *almost* everywhere.
+type AbsDifferenceCost struct{}
+
+func (_ AbsDifferenceCost) Eval(layer Layer, expected []float64) float64 {
+	res := kahan.NewSummer64()
+	actual := layer.Output()
+	for i, x := range expected {
+		res.Add(math.Abs(x - actual[i]))
+	}
+	return res.Sum()
+}
+
+func (_ AbsDifferenceCost) Deriv(layer Layer, expected, gradOut []float64) {
+	actual := layer.Output()
+	for i, x := range expected {
+		if x < actual[i] {
+			gradOut[i] = 1
+		} else {
+			gradOut[i] = -1
+		}
+	}
+}
+
+func (_ AbsDifferenceCost) UpdateInternal(Layer) {
+}
+
 // SparseRegularizingCost wraps another cost
 // function and adds the squares of every
 // weight and bias of every ConvLayer,

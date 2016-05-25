@@ -38,9 +38,12 @@ func (r *RBM) Randomize(randMag float64) {
 // The visible vector will be written to output,
 // allowing the caller to cache a slice for visible
 // samples.
-func (r *RBM) SampleVisible(output, hiddenValues []bool) {
+//
+// If ra is nil, this uses the rand package's
+// default generator.
+func (r *RBM) SampleVisible(ra *rand.Rand, output, hiddenValues []bool) {
 	expected := r.ExpectedVisible(hiddenValues)
-	sampleVector(output, expected)
+	sampleVector(ra, output, expected)
 }
 
 // SampleHidden generates a random hidden vector
@@ -48,9 +51,12 @@ func (r *RBM) SampleVisible(output, hiddenValues []bool) {
 // The hidden values will be written to output,
 // allowing the caller to cache a slice for hidden
 // samples.
-func (r *RBM) SampleHidden(output, visibleValues []bool) {
+//
+// If ra is nil, this uses the rand package's
+// default generator.
+func (r *RBM) SampleHidden(ra *rand.Rand, output, visibleValues []bool) {
 	expected := r.ExpectedHidden(visibleValues)
-	sampleVector(output, expected)
+	sampleVector(ra, output, expected)
 }
 
 // ExpectedVisible returns the expected value of
@@ -100,9 +106,15 @@ func mapSigmoid(v linalg.Vector) {
 	}
 }
 
-func sampleVector(output []bool, expected linalg.Vector) {
+func sampleVector(r *rand.Rand, output []bool, expected linalg.Vector) {
 	for i, prob := range expected {
-		if rand.Float64() >= prob {
+		var num float64
+		if r != nil {
+			num = r.Float64()
+		} else {
+			num = rand.Float64()
+		}
+		if num >= prob {
 			output[i] = false
 		} else {
 			output[i] = true

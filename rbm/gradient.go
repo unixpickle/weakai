@@ -1,6 +1,10 @@
 package rbm
 
-import "github.com/unixpickle/num-analysis/linalg"
+import (
+	"math/rand"
+
+	"github.com/unixpickle/num-analysis/linalg"
+)
 
 // RBMGradient is structured like an RBM itself,
 // but its values represent the partials of some
@@ -14,7 +18,7 @@ type RBMGradient RBM
 // The markovSteps parameter specifies how many steps
 // of Gibbs sampling this should perform for
 // contrastive divergence.
-func (r *RBM) LogLikelihoodGradient(inputs [][]bool, gibbsSteps int) *RBMGradient {
+func (r *RBM) LogLikelihoodGradient(ra *rand.Rand, inputs [][]bool, gibbsSteps int) *RBMGradient {
 	grad := RBMGradient(*NewRBM(len(r.VisibleBiases), len(r.HiddenBiases)))
 
 	visibleVec := make(linalg.Vector, len(r.VisibleBiases))
@@ -39,17 +43,17 @@ func (r *RBM) LogLikelihoodGradient(inputs [][]bool, gibbsSteps int) *RBMGradien
 		}
 	}
 
-	contrastiveDivergence(r, &grad, len(inputs), gibbsSteps)
+	contrastiveDivergence(r, ra, &grad, len(inputs), gibbsSteps)
 
 	return &grad
 }
 
-func contrastiveDivergence(r *RBM, grad *RBMGradient, sampleCount int, steps int) {
+func contrastiveDivergence(r *RBM, ra *rand.Rand, grad *RBMGradient, sampleCount int, steps int) {
 	visibleState := make([]bool, len(r.VisibleBiases))
 	hiddenState := make([]bool, len(r.HiddenBiases))
 	for i := 0; i < steps; i++ {
-		r.SampleHidden(hiddenState, visibleState)
-		r.SampleVisible(visibleState, hiddenState)
+		r.SampleHidden(ra, hiddenState, visibleState)
+		r.SampleVisible(ra, visibleState, hiddenState)
 	}
 
 	scaler := float64(sampleCount)

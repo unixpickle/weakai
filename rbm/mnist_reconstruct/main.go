@@ -73,8 +73,8 @@ func reconstruct(dbn rbm.DBN, img []float64) []float64 {
 			binaryInput[i] = true
 		}
 	}
-	output := dbn.Sample(binaryInput)
-	binaryInput = dbn.SampleInput(output)
+	output := dbn.Sample(nil, binaryInput)
+	binaryInput = dbn.SampleInput(nil, output)
 	res := make([]float64, len(binaryInput))
 	for i, b := range binaryInput {
 		if b {

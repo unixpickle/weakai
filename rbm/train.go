@@ -23,8 +23,10 @@ func (t *Trainer) Train(r *RBM, inputs [][]bool) {
 
 	for i := 0; i < procCount; i++ {
 		go func() {
+			source := rand.NewSource(rand.Int63())
+			gen := rand.New(source)
 			for input := range inputChan {
-				grad := r.LogLikelihoodGradient([][]bool{input}, t.GibbsSteps)
+				grad := r.LogLikelihoodGradient(gen, [][]bool{input}, t.GibbsSteps)
 				outputChan <- grad
 			}
 		}()
@@ -68,7 +70,7 @@ func (t *Trainer) TrainDeep(layers DBN, inputs [][]bool) {
 		newInputs := make([][]bool, len(layerInputs))
 		for i, input := range layerInputs {
 			newInputs[i] = make([]bool, len(layer.HiddenBiases))
-			layer.SampleHidden(newInputs[i], input)
+			layer.SampleHidden(nil, newInputs[i], input)
 		}
 		layerInputs = newInputs
 	}

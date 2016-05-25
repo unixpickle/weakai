@@ -1,11 +1,25 @@
 package rbm
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 const benchmarkLayerSize = 50
 const benchmarkSampleCount = 10
 
 func BenchmarkTrain(b *testing.B) {
+	benchmarkTrain(b, 1)
+}
+
+func BenchmarkTrainConcurrent(b *testing.B) {
+	n := runtime.GOMAXPROCS(0)
+	runtime.GOMAXPROCS(10)
+	benchmarkTrain(b, 10)
+	runtime.GOMAXPROCS(n)
+}
+
+func benchmarkTrain(b *testing.B, batchSize int) {
 	samples := make([][]bool, benchmarkSampleCount)
 	for i := range samples {
 		s := make([]bool, benchmarkLayerSize)
@@ -22,7 +36,7 @@ func BenchmarkTrain(b *testing.B) {
 		GibbsSteps: 10,
 		StepSize:   0.01,
 		Epochs:     5,
-		BatchSize:  1,
+		BatchSize:  batchSize,
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

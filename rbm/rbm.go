@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/unixpickle/num-analysis/kahan"
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
@@ -55,45 +56,41 @@ func (r *RBM) SampleHidden(output, visibleValues []bool) {
 // ExpectedVisible returns the expected value of
 // the visible layer given a hidden vector.
 func (r *RBM) ExpectedVisible(hidden []bool) linalg.Vector {
-	hiddenRow := &linalg.Matrix{
-		Rows: 1,
-		Cols: len(hidden),
-		Data: make([]float64, len(hidden)),
-	}
-	for i, b := range hidden {
-		if b {
-			hiddenRow.Data[i] = 1
+	result := make(linalg.Vector, len(r.VisibleBiases))
+	for i := range result {
+		var sum kahan.Summer64
+		for j, h := range hidden {
+			if h {
+				sum.Add(r.Weights.Get(j, i))
+			}
 		}
+		result[i] = sum.Sum()
 	}
-	matrixProduct := hiddenRow.Mul(r.Weights)
-	weighted := linalg.Vector(matrixProduct.Data)
-	expected := weighted.Add(r.VisibleBiases)
 
-	mapSigmoid(expected)
+	result.Add(r.VisibleBiases)
+	mapSigmoid(result)
 
-	return expected
+	return result
 }
 
 // ExpectedHidden returns the expected value of
 // the hidden layer given a visible vector.
 func (r *RBM) ExpectedHidden(visible []bool) linalg.Vector {
-	visibleCol := &linalg.Matrix{
-		Rows: len(visible),
-		Cols: 1,
-		Data: make([]float64, len(visible)),
-	}
-	for i, b := range visible {
-		if b {
-			visibleCol.Data[i] = 1
+	result := make(linalg.Vector, len(r.HiddenBiases))
+	for i := range result {
+		var sum kahan.Summer64
+		for j, v := range visible {
+			if v {
+				sum.Add(r.Weights.Get(i, j))
+			}
 		}
+		result[i] = sum.Sum()
 	}
-	matrixProduct := r.Weights.Mul(visibleCol)
-	weighted := linalg.Vector(matrixProduct.Data)
-	expected := weighted.Add(r.HiddenBiases)
 
-	mapSigmoid(expected)
+	result.Add(r.HiddenBiases)
+	mapSigmoid(result)
 
-	return expected
+	return result
 }
 
 func mapSigmoid(v linalg.Vector) {

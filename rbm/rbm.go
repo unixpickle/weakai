@@ -23,6 +23,15 @@ func NewRBM(visibleCount, hiddenCount int) *RBM {
 	}
 }
 
+// Randomize initializes the weights randomly.
+// The random values will be clamped to
+// the range [-randMag, randMag].
+func (r *RBM) Randomize(randMag float64) {
+	for i := range r.Weights.Data {
+		r.Weights.Data[i] = rand.Float64()*randMag*2 - randMag
+	}
+}
+
 // SampleVisible generates a random visible vector
 // given a vector of hidden layer values.
 // The visible vector will be written to output,

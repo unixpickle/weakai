@@ -48,8 +48,8 @@ func contrastiveDivergence(r *RBM, grad *RBMGradient, sampleCount int, steps int
 	visibleState := make([]bool, len(r.VisibleBiases))
 	hiddenState := make([]bool, len(r.HiddenBiases))
 	for i := 0; i < steps; i++ {
-		r.ExpectedHidden(visibleState)
-		r.ExpectedVisible(hiddenState)
+		r.SampleHidden(hiddenState, visibleState)
+		r.SampleVisible(visibleState, hiddenState)
 	}
 
 	scaler := float64(sampleCount)
@@ -57,22 +57,22 @@ func contrastiveDivergence(r *RBM, grad *RBMGradient, sampleCount int, steps int
 	hiddenVec := make(linalg.Vector, len(hiddenState))
 	for i, v := range visibleState {
 		if v {
-			visibleVec[i] = scaler
+			visibleVec[i] = 1
 		}
 	}
 	for i, h := range hiddenState {
 		if h {
-			hiddenVec[i] = scaler
+			hiddenVec[i] = 1
 		}
 	}
 
-	grad.HiddenBiases.Add(hiddenVec)
-	grad.VisibleBiases.Add(visibleVec)
+	grad.HiddenBiases.Add(hiddenVec.Copy().Scale(-scaler))
+	grad.VisibleBiases.Add(visibleVec.Copy().Scale(-scaler))
 
 	for hiddenIdx := 0; hiddenIdx < grad.Weights.Rows; hiddenIdx++ {
 		for visibleIdx := 0; visibleIdx < grad.Weights.Cols; visibleIdx++ {
 			val := grad.Weights.Get(hiddenIdx, visibleIdx)
-			val += hiddenVec[hiddenIdx] + visibleVec[visibleIdx]
+			val -= scaler * (hiddenVec[hiddenIdx] + visibleVec[visibleIdx])
 			grad.Weights.Set(hiddenIdx, visibleIdx, val)
 		}
 	}

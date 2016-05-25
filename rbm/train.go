@@ -58,11 +58,10 @@ func (t *Trainer) Train(r *RBM, inputs [][]bool) {
 	}
 }
 
-// TrainDeep performs pre-training on a DBN (i.e.
-// a bunch of stacked RBMs).
+// TrainDeep performs pre-training on a DBN.
 // The layers are ordered from the input layer to
 // the output layer.
-func (t *Trainer) TrainDeep(layers []*RBM, inputs [][]bool) {
+func (t *Trainer) TrainDeep(layers DBN, inputs [][]bool) {
 	layerInputs := inputs
 	for _, layer := range layers {
 		t.Train(layer, layerInputs)

@@ -72,7 +72,7 @@ func contrastiveDivergence(r *RBM, grad *RBMGradient, sampleCount int, steps int
 	for hiddenIdx := 0; hiddenIdx < grad.Weights.Rows; hiddenIdx++ {
 		for visibleIdx := 0; visibleIdx < grad.Weights.Cols; visibleIdx++ {
 			val := grad.Weights.Get(hiddenIdx, visibleIdx)
-			val -= scaler * (hiddenVec[hiddenIdx] + visibleVec[visibleIdx])
+			val -= scaler * hiddenVec[hiddenIdx] * visibleVec[visibleIdx]
 			grad.Weights.Set(hiddenIdx, visibleIdx, val)
 		}
 	}

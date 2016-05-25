@@ -11,15 +11,15 @@ import (
 const (
 	ImageSize     = 28 * 28
 	GibbsSteps    = 10
-	BigStepSize   = 1e-6
-	BigEpochs     = 300
-	SmallStepSize = 0
-	SmallEpochs   = 0
+	BigStepSize   = 1e-2
+	BigEpochs     = 100
+	SmallStepSize = 1e-3
+	SmallEpochs   = 100
 
 	ReconstructionGridSize = 5
 )
 
-var HiddenSizes = []int{50}
+var HiddenSizes = []int{300, 100}
 
 func main() {
 	training := mnist.LoadTrainingDataSet()
@@ -41,10 +41,10 @@ func main() {
 		BatchSize:  runtime.GOMAXPROCS(0),
 	}
 	log.Println("Training...")
-	trainer.TrainDeep(layers, samples[:100])
+	trainer.TrainDeep(layers, samples[:1000])
 	trainer.StepSize = SmallStepSize
 	trainer.Epochs = SmallEpochs
-	trainer.TrainDeep(layers, samples[:100])
+	trainer.TrainDeep(layers, samples[:1000])
 	log.Println("Generating outputs...")
 
 	testingSamples := mnist.LoadTestingDataSet()

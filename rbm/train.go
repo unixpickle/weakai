@@ -35,10 +35,10 @@ func (t *Trainer) Train(r *RBM, inputs [][]bool) {
 		for j := 0; j < len(inputs); j += t.BatchSize {
 			batchCount := t.BatchSize
 			if j+batchCount > len(inputs) {
-				j = len(inputs) - batchCount
+				batchCount = len(inputs) - j
 			}
 			for k := j; k < j+batchCount; k++ {
-				inputChan <- inputs[perm[j]]
+				inputChan <- inputs[perm[k]]
 			}
 			var batch *RBMGradient
 			for k := 0; k < batchCount; k++ {

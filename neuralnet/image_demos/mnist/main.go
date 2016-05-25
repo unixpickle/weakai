@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
+	"github.com/unixpickle/mnist"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -12,9 +11,6 @@ const (
 	HiddenSize = 300
 	LabelCount = 10
 	StepSize   = 1e-2
-
-	SampleCount = 6000
-	TrainCount  = 3500
 
 	FilterSize   = 3
 	FilterCount  = 5
@@ -24,31 +20,24 @@ const (
 )
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "Usage: mnist <labels> <samples>")
-		os.Exit(1)
+	training := mnist.LoadTrainingDataSet()
+	crossValidation := mnist.LoadTestingDataSet()
+
+	log.Println("Printing initial scores...")
+
+	net, trainer := createNetAndTrainer(training)
+	printScore("Initial training", net, training)
+	printScore("Initial cross", net, crossValidation)
+	for {
+		trainer.Train(net)
+		printScore("Training", net, training)
+		printScore("Cross", net, crossValidation)
 	}
-
-	labels, err := ReadLabels(os.Args[1])
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to read labels:", err)
-		os.Exit(1)
-	}
-
-	samples, err := ReadSamples(os.Args[2])
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to read samples:", err)
-		os.Exit(1)
-	}
-
-	log.Printf("Read %d samples", len(samples))
-
-	trainNetwork(labels[:SampleCount], samples[:SampleCount])
 }
 
-func trainNetwork(labels []int, samples []*neuralnet.Tensor3) {
-	convOutWidth := (samples[0].Width-FilterSize)/FilterStride + 1
-	convOutHeight := (samples[0].Height-FilterSize)/FilterStride + 1
+func createNetAndTrainer(d mnist.DataSet) (*neuralnet.Network, *neuralnet.SGD) {
+	convOutWidth := (d.Width-FilterSize)/FilterStride + 1
+	convOutHeight := (d.Height-FilterSize)/FilterStride + 1
 
 	poolOutWidth := convOutWidth / MaxPoolingSpan
 	if convOutWidth%MaxPoolingSpan != 0 {
@@ -66,9 +55,9 @@ func trainNetwork(labels []int, samples []*neuralnet.Tensor3) {
 			FilterWidth:  FilterSize,
 			FilterHeight: FilterSize,
 			Stride:       FilterStride,
-			InputWidth:   samples[0].Width,
-			InputHeight:  samples[0].Height,
-			InputDepth:   samples[0].Depth,
+			InputWidth:   d.Width,
+			InputHeight:  d.Height,
+			InputDepth:   1,
 		},
 		&neuralnet.MaxPoolingParams{
 			XSpan:       MaxPoolingSpan,
@@ -90,52 +79,26 @@ func trainNetwork(labels []int, samples []*neuralnet.Tensor3) {
 	})
 	net.Randomize()
 
-	inputList := make([][]float64, len(samples))
-	outputList := make([][]float64, len(samples))
-	for i, x := range samples {
-		inputList[i] = x.Data
-		out := make([]float64, LabelCount)
-		out[labels[i]] = 1
-		outputList[i] = out
-	}
-
 	trainer := &neuralnet.SGD{
 		CostFunc: neuralnet.MeanSquaredCost{},
-		Inputs:   inputList[:TrainCount],
-		Outputs:  outputList[:TrainCount],
+		Inputs:   d.IntensityVectors(),
+		Outputs:  d.LabelVectors(),
 		StepSize: StepSize,
 		Epochs:   1,
 	}
 
-	// Used only for input/output fields.
-	crossTrainer := &neuralnet.SGD{
-		Inputs:  inputList[TrainCount:],
-		Outputs: outputList[TrainCount:],
-	}
-
-	log.Printf("Initial score: %d/%d (%d/%d cross)",
-		networkCorrectCount(trainer, net), TrainCount,
-		networkCorrectCount(crossTrainer, net), SampleCount-TrainCount)
-
-	for {
-		trainer.Train(net)
-		log.Printf("New score: %d/%d (%d/%d cross)",
-			networkCorrectCount(trainer, net), TrainCount,
-			networkCorrectCount(crossTrainer, net), SampleCount-TrainCount)
-	}
+	return net, trainer
 }
 
-func networkCorrectCount(t *neuralnet.SGD, n *neuralnet.Network) int {
-	var count int
-	for i, sample := range t.Inputs {
-		n.SetInput(sample)
+func printScore(prefix string, n *neuralnet.Network, d mnist.DataSet) {
+	classifier := func(v []float64) int {
+		n.SetInput(v)
 		n.PropagateForward()
-		out := networkOutput(n)
-		if t.Outputs[i][out] == 1 {
-			count++
-		}
+		return networkOutput(n)
 	}
-	return count
+	correctCount := d.NumCorrect(classifier)
+	histogram := d.CorrectnessHistogram(classifier)
+	log.Printf("%s: %d/%d - %s", prefix, correctCount, len(d.Samples), histogram)
 }
 
 func networkOutput(n *neuralnet.Network) int {

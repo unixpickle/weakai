@@ -2,6 +2,7 @@ package rbm
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/unixpickle/num-analysis/kahan"
@@ -16,6 +17,12 @@ const (
 func TestRBMExpectedVisible(t *testing.T) {
 	r := NewRBM(rbmTestVisibleSize, rbmTestHiddenSize)
 	r.Randomize(1)
+	for i := range r.HiddenBiases {
+		r.HiddenBiases[i] = rand.Float64()
+	}
+	for i := range r.VisibleBiases {
+		r.VisibleBiases[i] = rand.Float64()
+	}
 	for i := 0; i < (1 << rbmTestHiddenSize); i++ {
 		hidden := boolVecFromInt(i, rbmTestHiddenSize)
 		actual := r.ExpectedVisible(hidden)
@@ -32,6 +39,12 @@ func TestRBMExpectedVisible(t *testing.T) {
 func TestRBMExpectedHidden(t *testing.T) {
 	r := NewRBM(rbmTestVisibleSize, rbmTestHiddenSize)
 	r.Randomize(1)
+	for i := range r.HiddenBiases {
+		r.HiddenBiases[i] = rand.Float64()
+	}
+	for i := range r.VisibleBiases {
+		r.VisibleBiases[i] = rand.Float64()
+	}
 	for i := 0; i < (1 << rbmTestVisibleSize); i++ {
 		visible := boolVecFromInt(i, rbmTestVisibleSize)
 		actual := r.ExpectedHidden(visible)

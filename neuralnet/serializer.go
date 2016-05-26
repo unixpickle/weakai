@@ -52,6 +52,9 @@ func init() {
 		"convgrowlayer": func(d []byte) (Serializer, error) {
 			return DeserializeConvGrowLayer(d)
 		},
+		"softmaxlayer": func(d []byte) (Serializer, error) {
+			return DeserializeSoftmaxLayer(d)
+		},
 	}
 	for key, obj := range des {
 		Deserializers[key] = obj

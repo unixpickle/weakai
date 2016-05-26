@@ -1,4 +1,4 @@
-package main
+package neuralnet
 
 import (
 	"math"
@@ -26,6 +26,7 @@ func NewSoftmaxLayer(p *SoftmaxParams) *SoftmaxLayer {
 	return &SoftmaxLayer{
 		output:           make([]float64, p.Size),
 		upstreamGradient: make([]float64, p.Size),
+		exponentials:     make([]float64, p.Size),
 	}
 }
 
@@ -34,7 +35,7 @@ func DeserializeSoftmaxLayer(d []byte) (*SoftmaxLayer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSoftmaxLayer(&SoftmaxParams{Size: size})
+	return NewSoftmaxLayer(&SoftmaxParams{Size: size}), nil
 }
 
 func (s *SoftmaxLayer) Output() []float64 {
@@ -54,6 +55,7 @@ func (s *SoftmaxLayer) SetInput(v []float64) bool {
 		return false
 	}
 	s.input = v
+	return true
 }
 
 func (s *SoftmaxLayer) DownstreamGradient() []float64 {
@@ -65,6 +67,7 @@ func (s *SoftmaxLayer) SetDownstreamGradient(v []float64) bool {
 		return false
 	}
 	s.downstreamGradient = v
+	return true
 }
 
 func (s *SoftmaxLayer) Randomize() {
@@ -85,20 +88,26 @@ func (s *SoftmaxLayer) PropagateForward() {
 }
 
 func (s *SoftmaxLayer) PropagateBackward(upstream bool) {
+	if !upstream {
+		return
+	}
+
 	sum := s.lastExpSum
 	normalizer := 1 / sum
 	for i, x := range s.exponentials {
 		var partial kahan.Summer64
 
+		outProb := s.output[i]
+
 		restSum := sum - x
-		selfPartial := s.output[i] * normalizer * restSum
+		selfPartial := outProb * normalizer * restSum
 		partial.Add(selfPartial * s.downstreamGradient[i])
 
-		for j, x := range s.output {
+		for j, x := range s.exponentials {
 			if j == i {
 				continue
 			}
-			otherPartial := -math.Pow(x, 2) * s.exponentials[j]
+			otherPartial := -outProb * normalizer * x
 			partial.Add(otherPartial * s.downstreamGradient[j])
 		}
 

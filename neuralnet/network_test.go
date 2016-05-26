@@ -3,7 +3,7 @@ package neuralnet
 import "testing"
 
 func TestNetworkSerialize(t *testing.T) {
-	network, _ := NewNetwork([]LayerPrototype{
+	network, err := NewNetwork([]LayerPrototype{
 		&ConvParams{
 			Activation:   Sigmoid{},
 			FilterCount:  4,
@@ -25,6 +25,9 @@ func TestNetworkSerialize(t *testing.T) {
 			OutputCount: 1,
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	encoded := network.Serialize()
 	layerType := network.SerializerType()

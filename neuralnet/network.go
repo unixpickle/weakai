@@ -29,21 +29,12 @@ type Network struct {
 // If layer dimensions do not match, this returns
 // an error describing the issue.
 func NewNetwork(prototypes []LayerPrototype) (*Network, error) {
-	n := &Network{Layers: make([]Layer, len(prototypes))}
-	for i, proto := range prototypes {
+	n := &Network{Layers: make([]Layer, 0, len(prototypes))}
+	for _, proto := range prototypes {
 		layer := proto.Make()
-		if i != 0 {
-			ok := layer.SetInput(n.Layers[i-1].Output())
-			if !ok {
-				return nil, fmt.Errorf("layer %d cannot feed into layer %d", i-1, i)
-			}
-
-			ok = n.Layers[i-1].SetDownstreamGradient(layer.UpstreamGradient())
-			if !ok {
-				return nil, fmt.Errorf("layer %d cannot feed back into layer %d", i, i-1)
-			}
+		if err := n.AddLayer(layer); err != nil {
+			return nil, err
 		}
-		n.Layers[i] = layer
 	}
 	return n, nil
 }
@@ -56,9 +47,9 @@ func DeserializeNetwork(data []byte) (*Network, error) {
 		return nil, err
 	}
 
-	res := &Network{make([]Layer, int(count))}
+	res := &Network{make([]Layer, 0, int(count))}
 
-	for i := range res.Layers {
+	for i := 0; i < int(count); i++ {
 		var typeLen uint32
 		if err := binary.Read(buffer, networkEncodingEndian, &typeLen); err != nil {
 			return nil, err
@@ -95,21 +86,31 @@ func DeserializeNetwork(data []byte) (*Network, error) {
 			return nil, fmt.Errorf("layer %d is not Layer, it's %T", i, layerObj)
 		}
 
-		res.Layers[i] = layerObj.(Layer)
-
-		if i != 0 {
-			ok := res.Layers[i].SetInput(res.Layers[i-1].Output())
-			if !ok {
-				return nil, fmt.Errorf("layer %d cannot feed into layer %d", i-1, i)
-			}
-			ok = res.Layers[i-1].SetDownstreamGradient(res.Layers[i].UpstreamGradient())
-			if !ok {
-				return nil, fmt.Errorf("layer %d cannot feed back into layer %d", i, i-1)
-			}
+		if err := res.AddLayer(layerObj.(Layer)); err != nil {
+			return nil, err
 		}
 	}
 
 	return res, nil
+}
+
+// AddLayer adds a layer to the tail of this network.
+// This fails if the layer's dimensionality does not
+// match the previous layer's output dimensions.
+func (n *Network) AddLayer(l Layer) error {
+	idx := len(n.Layers)
+	n.Layers = append(n.Layers, l)
+	if idx != 0 {
+		ok := n.Layers[idx].SetInput(n.Layers[idx-1].Output())
+		if !ok {
+			return fmt.Errorf("layer %d cannot feed into layer %d", idx-1, idx)
+		}
+		ok = n.Layers[idx-1].SetDownstreamGradient(n.Layers[idx].UpstreamGradient())
+		if !ok {
+			return fmt.Errorf("layer %d cannot feed back into layer %d", idx, idx-1)
+		}
+	}
+	return nil
 }
 
 func (n *Network) Randomize() {

@@ -60,7 +60,7 @@ func (s *SGD) train(n *Network, interactive bool) {
 
 	downstreamGrad := make([]float64, len(n.Output()))
 	n.SetDownstreamGradient(downstreamGrad)
-	for i := 0; i < s.Epochs; i++ {
+	for i := 0; i < s.Epochs || s.Epochs == 0; i++ {
 		select {
 		case <-killChan:
 			log.Println("Finishing due to interrupt")

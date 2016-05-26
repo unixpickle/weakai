@@ -8,6 +8,7 @@ Here are the weak AI demos I've implemented:
 
  * [svm](svm) - an implementation of Support Vector Machines, complete with my own solver. I am no expert at numerical analysis or quadratic optimization, but my solver works fairly well.
  * [neuralnet](neuralnet) - a Go library for feed-forward neural networks.
+ * [rbm](rbm) - Restricted Boltzmann Machine sampler and trainer.
  * [objectrecog](objectrecog) - an implementation of correlative object recognition. First, you show it an object from your webcam, then it finds that object in other pictures. This works surprisingly well for face tracking. This is a web application intended for desktops, since it does not support touch screens and most mobile devices do not support the `getUserMedia()` API.
  * [idtrees](idtrees) - a general identification tree implementation with an accompanying command-line tool that parses CSV files. This includes sample data about various celebrities.
  * [hopfield](hopfield) - a graphical (HTML) demonstration of [Hopfield networks](https://en.wikipedia.org/wiki/Hopfield_network).

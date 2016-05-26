@@ -92,13 +92,18 @@ func DeserializeDenseLayer(data []byte) (*DenseLayer, error) {
 // Weights returns a list of weight slices,
 // where each slice corresponds to a hidden
 // neuron.
-// The caller should not modify the result.
+// This is the same slice that the layer uses
+// internally, so modifying it will modify
+// the layer's parameters.
 func (d *DenseLayer) Weights() [][]float64 {
 	return d.weights
 }
 
 // Biases returns a list of biases, one
 // for each hidden neuron.
+// This is the same slice that the layer uses
+// internally, so modifying it will modify
+// the layer's parameters.
 func (d *DenseLayer) Biases() []float64 {
 	return d.biases
 }

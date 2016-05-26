@@ -129,14 +129,18 @@ func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
 
 // Filters returns filters that this layer
 // applies to inputs.
-// The caller should not modify the result.
+// This is the same slice that the layer uses
+// internally, so modifying it will modify
+// the layer's parameters.
 func (c *ConvLayer) Filters() []*Tensor3 {
 	return c.filters
 }
 
 // Biases returns the biases for each filter
 // used by this layer.
-// The caller should not modify the result.
+// This is the same slice that the layer uses
+// internally, so modifying it will modify
+// the layer's parameters.
 func (c *ConvLayer) Biases() []float64 {
 	return c.biases
 }

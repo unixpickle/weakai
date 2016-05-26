@@ -1,6 +1,10 @@
 package rbm
 
-import "math/rand"
+import (
+	"math/rand"
+
+	"github.com/unixpickle/weakai/neuralnet"
+)
 
 // A DBN is a Deep Belief Network, which is
 // nothing more than stacked RBMs.
@@ -33,4 +37,30 @@ func (d DBN) SampleInput(r *rand.Rand, output []bool) []bool {
 		currentOutput = input
 	}
 	return currentOutput
+}
+
+// BuildANN builds a feed-forward neural network
+// that is based off of the weights and biases in
+// this DBN.
+func (d DBN) BuildANN() *neuralnet.Network {
+	network := &neuralnet.Network{Layers: nil}
+	for _, x := range d {
+		inputSize := len(x.VisibleBiases)
+		outputSize := len(x.HiddenBiases)
+		layer := neuralnet.NewDenseLayer(&neuralnet.DenseParams{
+			Activation:  neuralnet.Sigmoid{},
+			InputCount:  inputSize,
+			OutputCount: outputSize,
+		})
+		weights := layer.Weights()
+		for i, output := range weights {
+			for j := range output {
+				output[j] = x.Weights.Get(i, j)
+			}
+		}
+		biases := layer.Biases()
+		copy(biases, x.HiddenBiases)
+		network.Layers = append(network.Layers, layer)
+	}
+	return network
 }

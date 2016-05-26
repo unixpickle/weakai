@@ -43,7 +43,7 @@ func (d DBN) SampleInput(r *rand.Rand, output []bool) []bool {
 // that is based off of the weights and biases in
 // this DBN.
 func (d DBN) BuildANN() *neuralnet.Network {
-	network := &neuralnet.Network{Layers: nil}
+	network := &neuralnet.Network{}
 	for _, x := range d {
 		inputSize := len(x.VisibleBiases)
 		outputSize := len(x.HiddenBiases)
@@ -60,7 +60,7 @@ func (d DBN) BuildANN() *neuralnet.Network {
 		}
 		biases := layer.Biases()
 		copy(biases, x.HiddenBiases)
-		network.Layers = append(network.Layers, layer)
+		network.AddLayer(layer)
 	}
 	return network
 }

@@ -11,6 +11,13 @@ type SoftmaxParams struct {
 	Size int
 }
 
+// Make creates a new *SoftmaxLayer using
+// the parameters specified in s.
+// This is equivalent to NewSoftmaxLayer(s).
+func (s *SoftmaxParams) Make() Layer {
+	return NewSoftmaxLayer(s)
+}
+
 type SoftmaxLayer struct {
 	output           []float64
 	exponentials     []float64
@@ -120,6 +127,10 @@ func (s *SoftmaxLayer) GradientMagSquared() float64 {
 }
 
 func (s *SoftmaxLayer) StepGradient(f float64) {
+}
+
+func (s *SoftmaxLayer) Alias() Layer {
+	return NewSoftmaxLayer(&SoftmaxParams{Size: len(s.output)})
 }
 
 func (s *SoftmaxLayer) Serialize() []byte {

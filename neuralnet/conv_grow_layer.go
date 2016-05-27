@@ -197,6 +197,20 @@ func (c *ConvGrowLayer) StepGradient(f float64) {
 	c.convLayer.StepGradient(f)
 }
 
+func (c *ConvGrowLayer) Alias() Layer {
+	res := &ConvGrowLayer{
+		output: NewTensor3(c.output.Width, c.output.Height, c.output.Depth),
+
+		convLayer: c.convLayer.Alias().(*ConvLayer),
+		convDownstream: NewTensor3(c.convDownstream.Width, c.convDownstream.Height,
+			c.convDownstream.Depth),
+
+		inverseStride: c.inverseStride,
+	}
+	res.convLayer.SetDownstreamGradient(res.convDownstream.Data)
+	return res
+}
+
 func (c *ConvGrowLayer) Serialize() []byte {
 	var buf bytes.Buffer
 

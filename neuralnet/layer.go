@@ -83,6 +83,16 @@ type Layer interface {
 	// It uses the gradient computed during the last
 	// back propagation.
 	StepGradient(f float64)
+
+	// Alias creates another version of this Layer
+	// which shares the layer's parameters but may
+	// have different inputs, outputs, and gradients.
+	//
+	// Multiple aliases of a layer may do propagation
+	// simultaneously, but only one alias may run
+	// StepGradient() at once, since it changes the
+	// layer's parameters.
+	Alias() Layer
 }
 
 // LayerPrototype represents a prototype

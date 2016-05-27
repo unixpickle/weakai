@@ -173,6 +173,14 @@ func (n *Network) StepGradient(f float64) {
 	}
 }
 
+func (n *Network) Alias() Layer {
+	net := &Network{}
+	for _, l := range n.Layers {
+		net.AddLayer(l.Alias())
+	}
+	return net
+}
+
 func (n *Network) Serialize() []byte {
 	var buf bytes.Buffer
 

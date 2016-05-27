@@ -230,6 +230,23 @@ func (d *DenseLayer) SetDownstreamGradient(v []float64) bool {
 	return true
 }
 
+func (d *DenseLayer) Alias() Layer {
+	res := &DenseLayer{
+		activation:       d.activation,
+		weights:          d.weights,
+		biases:           d.biases,
+		output:           make([]float64, len(d.output)),
+		weightGradient:   make([][]float64, len(d.weightGradient)),
+		biasGradient:     make([]float64, len(d.biasGradient)),
+		upstreamGradient: make([]float64, len(d.upstreamGradient)),
+		outputSums:       make([]float64, len(d.outputSums)),
+	}
+	for i, wg := range d.weightGradient {
+		res.weightGradient[i] = make([]float64, len(wg))
+	}
+	return res
+}
+
 func (d *DenseLayer) Serialize() []byte {
 	s := serializedDenseLayer{
 		ActivationData: d.activation.Serialize(),

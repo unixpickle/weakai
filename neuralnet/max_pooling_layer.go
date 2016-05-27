@@ -159,6 +159,28 @@ func (r *MaxPoolingLayer) GradientMagSquared() float64 {
 func (r *MaxPoolingLayer) StepGradient(f float64) {
 }
 
+func (r *MaxPoolingLayer) Alias() Layer {
+	res := &MaxPoolingLayer{
+		tensorLayer: tensorLayer{
+			output: NewTensor3(r.output.Width, r.output.Height, r.output.Depth),
+			upstreamGradient: NewTensor3(r.upstreamGradient.Width, r.upstreamGradient.Height,
+				r.upstreamGradient.Depth),
+		},
+		xSpan:         r.xSpan,
+		ySpan:         r.ySpan,
+		outputChoices: make([][][][2]int, len(r.outputChoices)),
+	}
+	for i, outer := range r.outputChoices {
+		newOuter := make([][][2]int, len(outer))
+		for j, inner := range outer {
+			newInner := make([][2]int, len(inner))
+			newOuter[j] = newInner
+		}
+		res.outputChoices[i] = newOuter
+	}
+	return res
+}
+
 func (r *MaxPoolingLayer) Serialize() []byte {
 	s := serializedMaxPoolingLayer{
 		InputWidth:  r.upstreamGradient.Width,

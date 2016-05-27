@@ -232,6 +232,33 @@ func (c *ConvLayer) StepGradient(f float64) {
 	}
 }
 
+func (c *ConvLayer) Alias() Layer {
+	res := &ConvLayer{
+		tensorLayer: tensorLayer{
+			output: NewTensor3(c.output.Width, c.output.Height, c.output.Depth),
+			upstreamGradient: NewTensor3(c.upstreamGradient.Width, c.upstreamGradient.Height,
+				c.upstreamGradient.Depth),
+		},
+
+		activation: c.activation,
+		stride:     c.stride,
+
+		filters:         c.filters,
+		filterGradients: make([]*Tensor3, len(c.filters)),
+		biases:          c.biases,
+		biasPartials:    make([]float64, len(c.biases)),
+
+		convolutions: NewTensor3(c.output.Width, c.output.Height, c.output.Depth),
+	}
+
+	for i := range res.filters {
+		f := c.filters[i]
+		res.filterGradients[i] = NewTensor3(f.Width, f.Height, f.Depth)
+	}
+
+	return res
+}
+
 // Serialize encodes all of the parameters for
 // this layer, including its current weights
 // and biases.

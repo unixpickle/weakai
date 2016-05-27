@@ -93,6 +93,18 @@ func (b *BorderLayer) GradientMagSquared() float64 {
 func (b *BorderLayer) StepGradient(f float64) {
 }
 
+func (b *BorderLayer) Alias() Layer {
+	return &BorderLayer{
+		tensorLayer: tensorLayer{
+			output: NewTensor3(b.output.Width, b.output.Height, b.output.Depth),
+			upstreamGradient: NewTensor3(b.upstreamGradient.Width, b.upstreamGradient.Height,
+				b.upstreamGradient.Depth),
+		},
+		leftBorder: b.leftBorder,
+		topBorder:  b.topBorder,
+	}
+}
+
 func (b *BorderLayer) Serialize() []byte {
 	s := serializedBorderLayer{
 		Depth:      b.output.Depth,

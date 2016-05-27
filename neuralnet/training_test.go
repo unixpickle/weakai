@@ -22,6 +22,7 @@ func TestTrainingXOR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	trainer := &SGD{
 		CostFunc: MeanSquaredCost{},
 		Inputs: [][]float64{
@@ -33,6 +34,10 @@ func TestTrainingXOR(t *testing.T) {
 		Outputs:  [][]float64{{0}, {1}, {1}, {0}},
 		StepSize: 0.9,
 		Epochs:   100000,
+
+		// Adversarial batch size ensures that the batch
+		// needn't be 1 and needn't divide the len(Inputs).
+		BatchSize: 3,
 	}
 
 	rand.Seed(123123)

@@ -29,6 +29,14 @@ type SGD struct {
 	// Epochs is the number of rounds of descent
 	// the solver should perform before stopping.
 	Epochs int
+
+	// BatchSize is the number of input samples
+	// per SGD mini-batch.
+	// If this is 1 or 0, then pure SGD is used.
+	// If this is more than one, then each input
+	// in a mini-batch will be handled in its own
+	// Goroutine, allowing for potential speedup.
+	BatchSize int
 }
 
 // Train runs stochastic gradient descent on
@@ -58,8 +66,21 @@ func (s *SGD) train(n *Network, interactive bool) {
 		}()
 	}
 
-	downstreamGrad := make([]float64, len(n.Output()))
-	n.SetDownstreamGradient(downstreamGrad)
+	batchSize := s.batchGoroutineCount()
+
+	aliases := make([]Layer, batchSize)
+	trainChans := make([]chan int, batchSize)
+	doneChan := make(chan struct{}, batchSize)
+	aliases[0] = n
+	for i := range aliases {
+		if i != 0 {
+			aliases[i] = n.Alias()
+		}
+		trainChans[i] = make(chan int)
+		go s.trainRoutine(aliases[i], trainChans[i], doneChan)
+		defer close(trainChans[i])
+	}
+
 	for i := 0; i < s.Epochs || s.Epochs == 0; i++ {
 		select {
 		case <-killChan:
@@ -78,16 +99,36 @@ func (s *SGD) train(n *Network, interactive bool) {
 		}
 
 		order := rand.Perm(len(s.Inputs))
-		for _, j := range order {
-			input := s.Inputs[j]
-			output := s.Outputs[j]
-			n.SetInput(input)
-			n.PropagateForward()
-			s.CostFunc.Deriv(n, output, downstreamGrad)
-			n.PropagateBackward(false)
-			s.CostFunc.UpdateInternal(n)
-			n.StepGradient(-stepSize)
+		for j := 0; j < len(order); j += batchSize {
+			size := batchSize
+			if j+size > len(order) {
+				size = len(order) - j
+			}
+			for k := 0; k < size; k++ {
+				trainChans[k] <- order[j+k]
+			}
+			for k := 0; k < size; k++ {
+				<-doneChan
+			}
+			for k := 0; k < size; k++ {
+				aliases[k].StepGradient(-stepSize)
+			}
 		}
+	}
+}
+
+func (s *SGD) trainRoutine(l Layer, inChan <-chan int, doneChan chan<- struct{}) {
+	downstreamGrad := make([]float64, len(l.Output()))
+	l.SetDownstreamGradient(downstreamGrad)
+	for idx := range inChan {
+		input := s.Inputs[idx]
+		output := s.Outputs[idx]
+		l.SetInput(input)
+		l.PropagateForward()
+		s.CostFunc.Deriv(l, output, downstreamGrad)
+		l.PropagateBackward(false)
+		s.CostFunc.UpdateInternal(l)
+		doneChan <- struct{}{}
 	}
 }
 
@@ -99,4 +140,13 @@ func (s *SGD) totalCost(n *Network) float64 {
 		sum.Add(s.CostFunc.Eval(n, s.Outputs[i]))
 	}
 	return sum.Sum()
+}
+
+func (s *SGD) batchGoroutineCount() int {
+	if s.BatchSize == 0 {
+		return 1
+	} else if s.BatchSize > len(s.Inputs) {
+		return len(s.Inputs)
+	}
+	return s.BatchSize
 }

@@ -7,7 +7,15 @@ import (
 	"testing"
 )
 
-func TestTrainingXOR(t *testing.T) {
+func TestTrainingXORSerial(t *testing.T) {
+	testTrainingXOR(t, 1)
+}
+
+func TestTrainingXORParallel(t *testing.T) {
+	testTrainingXOR(t, 3)
+}
+
+func testTrainingXOR(t *testing.T, batchSize int) {
 	net, err := NewNetwork([]LayerPrototype{
 		&DenseParams{
 			Activation:  Sigmoid{},
@@ -32,13 +40,10 @@ func TestTrainingXOR(t *testing.T) {
 			{1, 0},
 			{1, 1},
 		},
-		Outputs:  [][]float64{{0}, {1}, {1}, {0}},
-		StepSize: 0.9,
-		Epochs:   100000,
-
-		// Adversarial batch size ensures that the batch
-		// needn't be 1 and needn't divide the len(Inputs).
-		BatchSize: 3,
+		Outputs:   [][]float64{{0}, {1}, {1}, {0}},
+		StepSize:  0.9,
+		Epochs:    100000,
+		BatchSize: batchSize,
 	}
 
 	rand.Seed(123123)
@@ -74,7 +79,7 @@ func benchmarkTrainingBig(b *testing.B) {
 	inputs := make([][]float64, 100)
 	outputs := make([][]float64, len(inputs))
 	for i := range inputs {
-		inputs[i] = make([]float64, 100)
+		inputs[i] = make([]float64, 1000)
 		outputs[i] = make([]float64, len(inputs[i]))
 		for j := range inputs[i] {
 			inputs[i][j] = rand.Float64()
@@ -86,7 +91,7 @@ func benchmarkTrainingBig(b *testing.B) {
 		Inputs:    inputs,
 		Outputs:   outputs,
 		StepSize:  0.01,
-		Epochs:    100,
+		Epochs:    10,
 		BatchSize: runtime.GOMAXPROCS(0),
 	}
 

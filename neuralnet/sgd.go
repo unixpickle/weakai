@@ -68,6 +68,11 @@ func (s *SGD) train(n *Network, interactive bool) {
 
 	batchSize := s.batchGoroutineCount()
 
+	if batchSize == 1 {
+		s.trainSerially(n, killChan, interactive)
+		return
+	}
+
 	aliases := make([]Layer, batchSize)
 	trainChans := make([]chan int, batchSize)
 	doneChan := make(chan struct{}, batchSize)
@@ -117,19 +122,52 @@ func (s *SGD) train(n *Network, interactive bool) {
 	}
 }
 
+func (s *SGD) trainSerially(n *Network, killChan <-chan struct{}, interactive bool) {
+	downstreamGrad := make([]float64, len(n.Output()))
+	n.SetDownstreamGradient(downstreamGrad)
+
+	for i := 0; i < s.Epochs || s.Epochs == 0; i++ {
+		select {
+		case <-killChan:
+			log.Println("Finishing due to interrupt")
+			return
+		default:
+		}
+
+		stepSize := s.StepSize - float64(i)*s.StepDecreaseRate
+		if stepSize <= 0 {
+			break
+		}
+
+		if interactive {
+			log.Printf("Epoch %d: stepSize = %f; cost = %f", i, stepSize, s.totalCost(n))
+		}
+
+		order := rand.Perm(len(s.Inputs))
+		for _, j := range order {
+			s.propagateSample(n, j)
+			n.StepGradient(-stepSize)
+		}
+	}
+}
+
 func (s *SGD) trainRoutine(l Layer, inChan <-chan int, doneChan chan<- struct{}) {
 	downstreamGrad := make([]float64, len(l.Output()))
 	l.SetDownstreamGradient(downstreamGrad)
 	for idx := range inChan {
-		input := s.Inputs[idx]
-		output := s.Outputs[idx]
-		l.SetInput(input)
-		l.PropagateForward()
-		s.CostFunc.Deriv(l, output, downstreamGrad)
-		l.PropagateBackward(false)
-		s.CostFunc.UpdateInternal(l)
+		s.propagateSample(l, idx)
 		doneChan <- struct{}{}
 	}
+}
+
+func (s *SGD) propagateSample(l Layer, idx int) {
+	input := s.Inputs[idx]
+	output := s.Outputs[idx]
+	l.SetInput(input)
+	l.PropagateForward()
+	s.CostFunc.Deriv(l, output, l.DownstreamGradient())
+	l.PropagateBackward(false)
+	s.CostFunc.UpdateInternal(l)
 }
 
 func (s *SGD) totalCost(n *Network) float64 {

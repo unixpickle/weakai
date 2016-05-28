@@ -14,9 +14,9 @@ type RNN struct {
 	memoryParams *LSTM
 	currentState linalg.Vector
 
-	inputs       []linalg.Vector
-	outputStates []linalg.Vector
-	outputs      []linalg.Vector
+	inputs      []linalg.Vector
+	lstmOutputs []*LSTMOutput
+	outputs     []linalg.Vector
 
 	expectedOutputs []linalg.Vector
 }
@@ -33,23 +33,22 @@ func NewRNN(inputSize, stateSize, outputSize int) *RNN {
 func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 	r.expectedOutputs = append(r.expectedOutputs, out)
 	r.inputs = append(r.inputs, in)
-	r.expectedOutputs = append(r.expectedOutputs, out)
 
-	newState, masked := r.memoryParams.PropagateForward(r.currentState, in)
-	r.currentState = newState
+	output := r.memoryParams.PropagateForward(r.currentState, in)
+	r.currentState = output.NewState
 
 	augmentedInput := &linalg.Matrix{
-		Rows: len(in) + len(masked),
+		Rows: len(in) + len(output.MaskedState),
 		Cols: 1,
-		Data: make([]float64, len(in)+len(masked)),
+		Data: make([]float64, len(in)+len(output.MaskedState)),
 	}
 	copy(augmentedInput.Data, in)
-	copy(augmentedInput.Data[len(in):], masked)
+	copy(augmentedInput.Data[len(in):], output.MaskedState)
 	result := linalg.Vector(r.outWeights.Mul(augmentedInput).Data).Add(r.outBiases)
 	sigmoidAll(result)
 
 	r.outputs = append(r.outputs, result)
-	r.outputStates = append(r.outputStates, masked)
+	r.lstmOutputs = append(r.lstmOutputs, output)
 
 	return result
 }
@@ -89,7 +88,7 @@ func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
 			for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
 				col := hiddenIdx + inputCount
 				val := g.OutWeights.Get(neuronIdx, col)
-				val += r.outputStates[t][hiddenIdx]
+				val += r.lstmOutputs[t].MaskedState[hiddenIdx]
 				g.OutWeights.Set(neuronIdx, col, val)
 			}
 		}

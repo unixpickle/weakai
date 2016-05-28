@@ -24,9 +24,17 @@ const (
 	errorThreshold = 1e-5
 )
 
-func TestRNNGradients(t *testing.T) {
+func TestRNNGradientsOneTime(t *testing.T) {
+	testRNNGradients(t, 1)
+}
+
+func TestRNNGradientsThroughTime(t *testing.T) {
+	testRNNGradients(t, len(rnnTestInputs))
+}
+
+func testRNNGradients(t *testing.T, inCount int) {
 	net := rnnForTesting()
-	measureTestCost(net)
+	measureTestCost(net, inCount)
 	grad := net.CostGradient(MeanSquaredCost{})
 
 	gradSlices := []linalg.Vector{
@@ -64,7 +72,7 @@ func TestRNNGradients(t *testing.T) {
 	for i, gradSlice := range gradSlices {
 		paramSlice := paramSlices[i]
 		for j, actual := range gradSlice {
-			expected := approxCostDerivative(net, &paramSlice[j])
+			expected := approxCostDerivative(net, &paramSlice[j], inCount)
 			if math.Abs(actual-expected) > errorThreshold {
 				t.Errorf("invalid '%s' partial: got %f expected %f (idx %d)",
 					names[i], actual, expected, j)
@@ -74,17 +82,17 @@ func TestRNNGradients(t *testing.T) {
 	}
 }
 
-func approxCostDerivative(r *RNN, param *float64) float64 {
+func approxCostDerivative(r *RNN, param *float64, inCount int) float64 {
 	old := *param
 	*param -= rnnTestDelta
-	cost1 := measureTestCost(r)
+	cost1 := measureTestCost(r, inCount)
 	*param = old + rnnTestDelta
-	cost2 := measureTestCost(r)
+	cost2 := measureTestCost(r, inCount)
 	*param = old
 	return (cost2 - cost1) / (2 * rnnTestDelta)
 }
 
-func measureTestCost(r *RNN) float64 {
+func measureTestCost(r *RNN, inputCount int) float64 {
 	r.inputs = nil
 	r.lstmOutputs = nil
 	r.outputs = nil
@@ -92,7 +100,7 @@ func measureTestCost(r *RNN) float64 {
 	r.currentState = make(linalg.Vector, r.memoryParams.StateSize)
 
 	var cost float64
-	for t, output := range rnnTestOutputs {
+	for t, output := range rnnTestOutputs[:inputCount] {
 		vecOut := r.StepTime(rnnTestInputs[t], output)
 		for i, x := range vecOut {
 			diff := x - output[i]

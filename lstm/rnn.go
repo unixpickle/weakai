@@ -64,8 +64,6 @@ func (r *RNN) CostGradient(cost CostFunc) *Gradient {
 
 	r.computeOutputPartials(grad, costPartials)
 
-	// TODO: compute partials w.r.t. LSTM parameters.
-
 	return grad
 }
 
@@ -88,8 +86,28 @@ func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
 			for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
 				col := hiddenIdx + inputCount
 				val := g.OutWeights.Get(neuronIdx, col)
-				val += r.lstmOutputs[t].MaskedState[hiddenIdx]
+				val += r.lstmOutputs[t].MaskedState[hiddenIdx] * sumPartial
 				g.OutWeights.Set(neuronIdx, col, val)
+
+				weightVal := r.outWeights.Get(neuronIdx, col)
+				stateVal := r.lstmOutputs[t].NewState[hiddenIdx]
+				maskVal := r.lstmOutputs[t].OutputMask[hiddenIdx]
+				maskSigmoidPartial := (maskVal - 1) * maskVal
+				maskSumPartial := maskSigmoidPartial * weightVal * stateVal * sumPartial
+				g.OutGateBiases[hiddenIdx] += maskSumPartial
+				for inputIdx1 := 0; inputIdx1 < inputCount; inputIdx1++ {
+					val := g.OutGate.Get(neuronIdx, inputIdx1)
+					val += r.inputs[t][inputIdx1] * maskSumPartial
+					g.OutGate.Set(neuronIdx, inputIdx1, val)
+				}
+				if t > 0 {
+					for hiddenIdx1 := 0; hiddenIdx1 < hiddenCount; hiddenIdx1++ {
+						col1 := hiddenIdx1 + inputCount
+						val := g.OutGate.Get(neuronIdx, col1)
+						val += r.lstmOutputs[t-1].NewState[hiddenIdx1] * maskSumPartial
+						g.OutGate.Set(neuronIdx, col1, val)
+					}
+				}
 			}
 		}
 	}

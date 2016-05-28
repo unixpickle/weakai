@@ -27,10 +27,10 @@ func NewGradient(inSize, hiddenSize, outSize int) *Gradient {
 		RemGate:   linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
 		OutGate:   linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
 
-		InBiases:      make(linalg.Vector, hiddenSize+inSize),
-		InGateBiases:  make(linalg.Vector, hiddenSize+inSize),
-		RemGateBiases: make(linalg.Vector, hiddenSize+inSize),
-		OutGateBiases: make(linalg.Vector, hiddenSize+inSize),
+		InBiases:      make(linalg.Vector, hiddenSize),
+		InGateBiases:  make(linalg.Vector, hiddenSize),
+		RemGateBiases: make(linalg.Vector, hiddenSize),
+		OutGateBiases: make(linalg.Vector, hiddenSize),
 	}
 }
 

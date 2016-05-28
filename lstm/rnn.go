@@ -96,16 +96,16 @@ func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
 				maskSumPartial := maskSigmoidPartial * weightVal * stateVal * sumPartial
 				g.OutGateBiases[hiddenIdx] += maskSumPartial
 				for inputIdx1 := 0; inputIdx1 < inputCount; inputIdx1++ {
-					val := g.OutGate.Get(neuronIdx, inputIdx1)
+					val := g.OutGate.Get(hiddenIdx, inputIdx1)
 					val += r.inputs[t][inputIdx1] * maskSumPartial
-					g.OutGate.Set(neuronIdx, inputIdx1, val)
+					g.OutGate.Set(hiddenIdx, inputIdx1, val)
 				}
 				if t > 0 {
 					for hiddenIdx1 := 0; hiddenIdx1 < hiddenCount; hiddenIdx1++ {
 						col1 := hiddenIdx1 + inputCount
-						val := g.OutGate.Get(neuronIdx, col1)
+						val := g.OutGate.Get(hiddenIdx, col1)
 						val += r.lstmOutputs[t-1].NewState[hiddenIdx1] * maskSumPartial
-						g.OutGate.Set(neuronIdx, col1, val)
+						g.OutGate.Set(hiddenIdx, col1, val)
 					}
 				}
 			}

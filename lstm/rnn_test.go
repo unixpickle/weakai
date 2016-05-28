@@ -34,14 +34,32 @@ func TestRNNGradients(t *testing.T) {
 		grad.OutBiases,
 		linalg.Vector(grad.OutGate.Data),
 		grad.OutGateBiases,
+		linalg.Vector(grad.InWeights.Data),
+		grad.InBiases,
+		linalg.Vector(grad.InGate.Data),
+		grad.InGateBiases,
+		linalg.Vector(grad.RemGate.Data),
+		grad.RemGateBiases,
+		linalg.Vector(grad.OutGate.Data),
+		grad.OutGateBiases,
 	}
 	paramSlices := []linalg.Vector{
 		linalg.Vector(net.outWeights.Data),
 		net.outBiases,
 		linalg.Vector(net.memoryParams.OutGate.Data),
 		net.memoryParams.OutGateBiases,
+		linalg.Vector(net.memoryParams.InWeights.Data),
+		net.memoryParams.InBiases,
+		linalg.Vector(net.memoryParams.InGate.Data),
+		net.memoryParams.InGateBiases,
+		linalg.Vector(net.memoryParams.RemGate.Data),
+		net.memoryParams.RemGateBiases,
+		linalg.Vector(net.memoryParams.OutGate.Data),
+		net.memoryParams.OutGateBiases,
 	}
-	names := []string{"out weight", "out bias", "out gate weight", "out gate bias"}
+	names := []string{"out weight", "out bias", "out gate weight", "out gate bias",
+		"in weight", "in bias", "in gate weight", "in gate bias",
+		"rem gate weight", "rem gate bias", "out gate weight", "out gate bias"}
 
 	for i, gradSlice := range gradSlices {
 		paramSlice := paramSlices[i]

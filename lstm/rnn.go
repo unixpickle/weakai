@@ -63,6 +63,7 @@ func (r *RNN) CostGradient(cost CostFunc) *Gradient {
 	}
 
 	r.computeOutputPartials(grad, costPartials)
+	r.computeTimedPartials(grad, costPartials)
 
 	return grad
 }

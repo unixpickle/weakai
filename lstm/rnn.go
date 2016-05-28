@@ -3,60 +3,49 @@ package lstm
 import "github.com/unixpickle/num-analysis/linalg"
 
 type RNN struct {
-	// Columns of this matrix correspond first to
-	// input values and then to values of the
-	// masked output state.
+	// The columns in this matrix correspond first
+	// to input values and then to state values.
 	outWeights *linalg.Matrix
 
+	// The elements in this vector correspond to
+	// elements of the output.
 	outBiases linalg.Vector
 
-	stateSize int
+	memoryParams *LSTM
+	currentState linalg.Vector
 
-	// prototype is a template for all LSTM blocks
-	// in this network.
-	// It is aliased again and again for each time
-	// iteration of the network.
-	prototype *LSTM
+	inputs  []linalg.Vector
+	outputs []linalg.Vector
 
-	timeLayers      []*LSTM
-	outputs         []linalg.Vector
 	expectedOutputs []linalg.Vector
 }
 
 func NewRNN(inputSize, stateSize, outputSize int) *RNN {
 	return &RNN{
-		outWeights: linalg.NewMatrix(outputSize, inputSize+stateSize),
-		outBiases:  make(linalg.Vector, outputSize),
-		stateSize:  stateSize,
-		prototype:  NewLSTM(inputSize, stateSize),
+		outWeights:   linalg.NewMatrix(outputSize, inputSize+stateSize),
+		outBiases:    make(linalg.Vector, outputSize),
+		memoryParams: NewLSTM(inputSize, stateSize),
+		currentState: make(linalg.Vector, stateSize),
 	}
 }
 
 func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 	r.expectedOutputs = append(r.expectedOutputs, out)
+	r.inputs = append(r.inputs, in)
+	r.expectedOutputs = append(r.expectedOutputs, out)
 
-	layer := r.prototype.Alias()
-	if len(r.timeLayers) > 0 {
-		lastLayer := r.timeLayers[len(r.timeLayers)-1]
-		layer.StateIn = lastLayer.NewState()
-	} else {
-		layer.StateIn = make(linalg.Vector, r.stateSize)
-	}
-	layer.Input = in
-
-	layer.PropagateForward()
-	stateOut := layer.StateOut()
+	newState, masked := r.memoryParams.PropagateForward(r.currentState, in)
+	r.currentState = newState
 
 	augmentedInput := &linalg.Matrix{
-		Rows: len(in) + len(stateOut),
+		Rows: len(in) + len(masked),
 		Cols: 1,
-		Data: make([]float64, len(in)+len(stateOut)),
+		Data: make([]float64, len(in)+len(masked)),
 	}
 	copy(augmentedInput.Data, in)
-	copy(augmentedInput.Data[len(in):], stateOut)
+	copy(augmentedInput.Data[len(in):], masked)
 	result := linalg.Vector(r.outWeights.Mul(augmentedInput).Data).Add(r.outBiases)
 
-	r.timeLayers = append(r.timeLayers, layer)
 	r.outputs = append(r.outputs, result)
 
 	return result

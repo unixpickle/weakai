@@ -6,104 +6,79 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
-// LSTM is one instance of an LSTM layer.
+// LSTM stores the parameters of a
+// Long Short-Term Memory layer.
 type LSTM struct {
-	// These are input vectors which should be set
-	// externally.
-	StateIn linalg.Vector
-	Input   linalg.Vector
-
 	// The columns in these matrices correspond
-	// first to inputs, then to previous states.
+	// first to inputs, then to the last state.
 	// The rows correspond to different neurons
 	// in the hidden (state) layer.
-	inWeights *linalg.Matrix
-	inGate    *linalg.Matrix
-	remGate   *linalg.Matrix
-	outGate   *linalg.Matrix
+	InWeights *linalg.Matrix
+	InGate    *linalg.Matrix
+	RemGate   *linalg.Matrix
+	OutGate   *linalg.Matrix
 
 	// Each element of these vectors corresponds
-	// to a hidden neuron's index.
-	inBiases      linalg.Vector
-	inGateBiases  linalg.Vector
-	remGateBiases linalg.Vector
-	outGateBiases linalg.Vector
+	// to one hidden gated neuron.
+	InBiases      linalg.Vector
+	InGateBiases  linalg.Vector
+	RemGateBiases linalg.Vector
+	OutGateBiases linalg.Vector
 
-	// newState is an output vector which is set
-	// by NewLSTM to store the internal state
-	// resulting from forward propagation.
-	newState linalg.Vector
-
-	// stateOut is an output vector which is set
-	// by NewLSTM to store the gated output of
-	// the layer.
-	stateOut linalg.Vector
+	InputSize int
+	StateSize int
 }
 
 func NewLSTM(inputSize, stateSize int) *LSTM {
 	return &LSTM{
-		inWeights: linalg.NewMatrix(stateSize, inputSize+stateSize),
-		inGate:    linalg.NewMatrix(stateSize, inputSize+stateSize),
-		remGate:   linalg.NewMatrix(stateSize, inputSize+stateSize),
-		outGate:   linalg.NewMatrix(stateSize, inputSize+stateSize),
+		InWeights: linalg.NewMatrix(stateSize, inputSize+stateSize),
+		InGate:    linalg.NewMatrix(stateSize, inputSize+stateSize),
+		RemGate:   linalg.NewMatrix(stateSize, inputSize+stateSize),
+		OutGate:   linalg.NewMatrix(stateSize, inputSize+stateSize),
 
-		inBiases:      make(linalg.Vector, stateSize),
-		inGateBiases:  make(linalg.Vector, stateSize),
-		remGateBiases: make(linalg.Vector, stateSize),
-		outGateBiases: make(linalg.Vector, stateSize),
+		InBiases:      make(linalg.Vector, stateSize),
+		InGateBiases:  make(linalg.Vector, stateSize),
+		RemGateBiases: make(linalg.Vector, stateSize),
+		OutGateBiases: make(linalg.Vector, stateSize),
 
-		newState: make(linalg.Vector, stateSize),
-		stateOut: make(linalg.Vector, stateSize),
+		InputSize: inputSize,
+		StateSize: stateSize,
 	}
 }
 
-func (l *LSTM) PropagateForward() {
-	augInSize := len(l.StateIn) + len(l.Input)
+// PropagateForward takes a state and an input and
+// generates a new state and a masked, output-ready
+// version of that state.
+func (l *LSTM) PropagateForward(state, input linalg.Vector) (newState, masked linalg.Vector) {
+	augInSize := len(state) + len(input)
 	inputMat := &linalg.Matrix{
 		Rows: augInSize,
 		Cols: 1,
 		Data: make([]float64, augInSize),
 	}
-	copy(inputMat.Data, l.Input)
-	copy(inputMat.Data[len(l.Input):], l.StateIn)
+	copy(inputMat.Data, input)
+	copy(inputMat.Data[len(input):], state)
 
-	inputVal := linalg.Vector(l.inWeights.Mul(inputMat).Data).Add(l.inBiases)
-	inputMask := linalg.Vector(l.inGate.Mul(inputMat).Data).Add(l.inGateBiases)
-	memoryMask := linalg.Vector(l.remGate.Mul(inputMat).Data).Add(l.remGateBiases)
-	outputMask := linalg.Vector(l.outGate.Mul(inputMat).Data).Add(l.outGateBiases)
+	inputVal := linalg.Vector(l.InWeights.Mul(inputMat).Data).Add(l.InBiases)
+	inputMask := linalg.Vector(l.InGate.Mul(inputMat).Data).Add(l.InGateBiases)
+	memoryMask := linalg.Vector(l.RemGate.Mul(inputMat).Data).Add(l.RemGateBiases)
+	outputMask := linalg.Vector(l.OutGate.Mul(inputMat).Data).Add(l.OutGateBiases)
 
 	sigmoidAll(inputVal, inputMask, memoryMask, outputMask)
-
 	piecewiseMul(inputVal, inputMask)
+
+	masked = make(linalg.Vector, len(state))
+	newState = make(linalg.Vector, len(state))
 	for i, m := range memoryMask {
-		l.newState[i] = m * l.StateIn[i]
+		newState[i] = m * state[i]
 	}
 
-	piecewiseMul(l.newState, memoryMask)
-	l.newState.Add(inputVal)
-	copy(l.stateOut, l.newState)
-	piecewiseMul(l.stateOut, outputMask)
-}
+	piecewiseMul(newState, memoryMask)
+	newState.Add(inputVal)
+	copy(masked, newState)
+	piecewiseMul(masked, outputMask)
 
-func (l *LSTM) Alias() *LSTM {
-	res := *l
-	res.newState = make(linalg.Vector, len(l.newState))
-	res.stateOut = make(linalg.Vector, len(l.stateOut))
-	res.StateIn = nil
-	res.Input = nil
-	return &res
-}
-
-// NewState returns a vector which forward propagation
-// fills with the new internal state of the LSTM unit.
-func (l *LSTM) NewState() linalg.Vector {
-	return l.newState
-}
-
-// StateOut returns a vector which forward propagation
-// fills with the new, masked output state of the unit.
-func (l *LSTM) StateOut() linalg.Vector {
-	return l.stateOut
+	return
 }
 
 func piecewiseMul(target linalg.Vector, mask linalg.Vector) {

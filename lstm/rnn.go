@@ -14,8 +14,9 @@ type RNN struct {
 	memoryParams *LSTM
 	currentState linalg.Vector
 
-	inputs  []linalg.Vector
-	outputs []linalg.Vector
+	inputs       []linalg.Vector
+	outputStates []linalg.Vector
+	outputs      []linalg.Vector
 
 	expectedOutputs []linalg.Vector
 }
@@ -45,8 +46,52 @@ func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 	copy(augmentedInput.Data, in)
 	copy(augmentedInput.Data[len(in):], masked)
 	result := linalg.Vector(r.outWeights.Mul(augmentedInput).Data).Add(r.outBiases)
+	sigmoidAll(result)
 
 	r.outputs = append(r.outputs, result)
+	r.outputStates = append(r.outputStates, masked)
 
 	return result
+}
+
+func (r *RNN) CostGradient(cost CostFunc) *Gradient {
+	grad := NewGradient(r.memoryParams.InputSize, r.memoryParams.StateSize, len(r.outBiases))
+
+	costPartials := make([]linalg.Vector, len(r.outputs))
+	for i, out := range r.outputs {
+		costPartials[i] = make(linalg.Vector, len(out))
+		cost.Gradient(out, r.expectedOutputs[i], costPartials[i])
+	}
+
+	r.computeOutputPartials(grad, costPartials)
+
+	// TODO: compute partials w.r.t. LSTM parameters.
+
+	return grad
+}
+
+func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
+	inputCount := r.memoryParams.InputSize
+	hiddenCount := r.memoryParams.StateSize
+
+	for t, partial := range costPartials {
+		for neuronIdx, costPartial := range partial {
+			neuronOut := r.outputs[t][neuronIdx]
+			sigmoidPartial := (neuronOut - 1) * neuronOut
+			sumPartial := sigmoidPartial * costPartial
+
+			g.OutBiases[neuronIdx] += sumPartial
+			for inputIdx := 0; inputIdx < inputCount; inputIdx++ {
+				val := g.OutWeights.Get(neuronIdx, inputIdx)
+				val += r.inputs[t][inputIdx] * sumPartial
+				g.OutWeights.Set(neuronIdx, inputIdx, val)
+			}
+			for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
+				col := hiddenIdx + inputCount
+				val := g.OutWeights.Get(neuronIdx, col)
+				val += r.outputStates[t][hiddenIdx]
+				g.OutWeights.Set(neuronIdx, col, val)
+			}
+		}
+	}
 }

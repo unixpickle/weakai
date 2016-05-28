@@ -2,7 +2,7 @@ package lstm
 
 import "github.com/unixpickle/num-analysis/linalg"
 
-type RNNGradient struct {
+type Gradient struct {
 	OutWeights *linalg.Matrix
 	OutBiases  linalg.Vector
 
@@ -17,7 +17,24 @@ type RNNGradient struct {
 	OutGateBiases linalg.Vector
 }
 
-func (r *RNNGradient) Add(r1 *RNNGradient) {
+func NewGradient(inSize, hiddenSize, outSize int) *Gradient {
+	return &Gradient{
+		OutWeights: linalg.NewMatrix(outSize, hiddenSize+inSize),
+		OutBiases:  make(linalg.Vector, outSize),
+
+		InWeights: linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
+		InGate:    linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
+		RemGate:   linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
+		OutGate:   linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
+
+		InBiases:      make(linalg.Vector, hiddenSize+inSize),
+		InGateBiases:  make(linalg.Vector, hiddenSize+inSize),
+		RemGateBiases: make(linalg.Vector, hiddenSize+inSize),
+		OutGateBiases: make(linalg.Vector, hiddenSize+inSize),
+	}
+}
+
+func (r *Gradient) Add(r1 *Gradient) {
 	r.OutWeights.Add(r1.OutWeights)
 	r.OutBiases.Add(r1.OutBiases)
 	r.InWeights.Add(r1.InWeights)

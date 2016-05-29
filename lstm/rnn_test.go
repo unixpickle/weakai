@@ -131,7 +131,7 @@ func runTestSequence(r *RNN, cases *rnnTestCase) (cost float64, costGrad []linal
 	r.Reset()
 
 	for t, output := range cases.outputs {
-		vecOut := r.StepTime(cases.inputs[t], output)
+		vecOut := r.StepTime(cases.inputs[t])
 		for i, x := range vecOut {
 			diff := x - output[i]
 			cost += diff * diff

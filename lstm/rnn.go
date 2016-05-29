@@ -30,11 +30,9 @@ func NewRNN(inputSize, stateSize, outputSize int) *RNN {
 	}
 }
 
-// StepTime gives the RNN another input as well
-// as the expected output for that input (used
-// as an argument to the cost function).
-// It returns the actual output from the RNN.
-func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
+// StepTime gives the RNN another input and
+// returns the RNN's output for that input.
+func (r *RNN) StepTime(in linalg.Vector) linalg.Vector {
 	r.inputs = append(r.inputs, in)
 
 	output := r.memoryParams.PropagateForward(r.currentState, in)

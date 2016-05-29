@@ -63,10 +63,11 @@ func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 // each of the outputs for each of the time steps
 // performed on this network.
 func (r *RNN) CostGradient(costPartials []linalg.Vector) *Gradient {
-	grad := NewGradient(r.memoryParams.InputSize, r.memoryParams.StateSize, len(r.outBiases))
+	grad := NewGradient(r.memoryParams.InputSize, r.memoryParams.StateSize, len(r.outBiases),
+		len(r.inputs))
 
-	r.computeOutputPartials(grad, costPartials)
-	r.computeTimedPartials(grad, costPartials)
+	r.computeShallowPartials(grad, costPartials)
+	r.computeDeepPartials(grad, costPartials)
 
 	return grad
 }
@@ -100,7 +101,7 @@ func (r *RNN) Reset() {
 	r.currentState = make(linalg.Vector, r.memoryParams.StateSize)
 }
 
-func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
+func (r *RNN) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) {
 	inputCount := r.memoryParams.InputSize
 	hiddenCount := r.memoryParams.StateSize
 
@@ -115,6 +116,9 @@ func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
 				val := g.OutWeights.Get(neuronIdx, inputIdx)
 				val += r.inputs[t][inputIdx] * sumPartial
 				g.OutWeights.Set(neuronIdx, inputIdx, val)
+
+				weight := r.outWeights.Get(neuronIdx, inputIdx)
+				g.Inputs[t][inputIdx] += weight * sumPartial
 			}
 			for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
 				col := hiddenIdx + inputCount
@@ -146,14 +150,15 @@ func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {
 	}
 }
 
-func (r *RNN) computeTimedPartials(g *Gradient, costPartials []linalg.Vector) {
+func (r *RNN) computeDeepPartials(g *Gradient, costPartials []linalg.Vector) {
 	hiddenCount := r.memoryParams.StateSize
 	upstreamStateGrad := make(linalg.Vector, hiddenCount)
 
 	for t := len(costPartials) - 1; t >= 0; t-- {
-		statePartial, olderPartial := r.localStateGrads(costPartials[t], t)
+		statePartial, olderPartial, inGrad := r.localStateGrads(costPartials[t], t)
 		statePartial.Add(upstreamStateGrad)
 		upstreamStateGrad = olderPartial
+		g.Inputs[t].Add(inGrad)
 
 		if t > 0 {
 			for hiddenIdx, rememberMask := range r.lstmOutputs[t].RememberMask {
@@ -167,7 +172,7 @@ func (r *RNN) computeTimedPartials(g *Gradient, costPartials []linalg.Vector) {
 	}
 }
 
-// localStateGrads computes two gradients:
+// localStateGrads computes three gradients:
 //
 // 1) the gradient of the part of the cost function
 // influenced directly from the output at time t
@@ -180,10 +185,15 @@ func (r *RNN) computeTimedPartials(g *Gradient, costPartials []linalg.Vector) {
 // This is only "part" of the gradient because it only
 // accounts for the contribution of state t-1 to the
 // output mask and thus to the output at time t.
-func (r *RNN) localStateGrads(costGrad linalg.Vector, t int) (current, older linalg.Vector) {
+//
+// 3) similar to 2), except with respect to the input
+// vector at time t instead of the previous state.
+func (r *RNN) localStateGrads(costGrad linalg.Vector, t int) (current, older,
+	inGrad linalg.Vector) {
 	hiddenCount := r.memoryParams.StateSize
 	inputCount := r.memoryParams.InputSize
 	current = make(linalg.Vector, hiddenCount)
+	inGrad = make(linalg.Vector, inputCount)
 
 	if t > 0 {
 		older = make(linalg.Vector, hiddenCount)
@@ -199,13 +209,18 @@ func (r *RNN) localStateGrads(costGrad linalg.Vector, t int) (current, older lin
 			outMask := r.lstmOutputs[t].OutputMask[hiddenIdx]
 			current[hiddenIdx] += outMask * weight * sumDeriv
 
+			stateVal := r.lstmOutputs[t].NewState[hiddenIdx]
+			maskSigmoidPartial := outMask * (1 - outMask)
+			maskSumPartial := maskSigmoidPartial * stateVal * weight * sumDeriv
+			for inputIdx := range inGrad {
+				val := r.memoryParams.OutGate.Get(hiddenIdx, inputIdx)
+				inGrad[inputIdx] += val * maskSumPartial
+			}
+
 			if t == 0 {
 				continue
 			}
 
-			stateVal := r.lstmOutputs[t].NewState[hiddenIdx]
-			maskSigmoidPartial := outMask * (1 - outMask)
-			maskSumPartial := maskSigmoidPartial * stateVal * weight * sumDeriv
 			for hiddenIdx1 := range older {
 				col := inputCount + hiddenIdx1
 				val := r.memoryParams.OutGate.Get(hiddenIdx, col)
@@ -229,6 +244,9 @@ func (r *RNN) rememberGateGrad(g *Gradient, upstreamGrad, statePartial linalg.Ve
 			val := g.RemGate.Get(hiddenIdx, inputIdx)
 			val += inVal * maskSumPartial
 			g.RemGate.Set(hiddenIdx, inputIdx, val)
+
+			weight := r.memoryParams.RemGate.Get(hiddenIdx, inputIdx)
+			g.Inputs[t][inputIdx] += weight * maskSumPartial
 		}
 
 		for hiddenIdx1, inVal := range r.lstmOutputs[t-1].NewState {
@@ -255,6 +273,9 @@ func (r *RNN) inputGateGrad(g *Gradient, upstreamGrad, statePartial linalg.Vecto
 			val := g.InGate.Get(hiddenIdx, inputIdx)
 			val += inVal * maskSumPartial
 			g.InGate.Set(hiddenIdx, inputIdx, val)
+
+			weight := r.memoryParams.InGate.Get(hiddenIdx, inputIdx)
+			g.Inputs[t][inputIdx] += weight * maskSumPartial
 		}
 
 		if t == 0 {
@@ -285,6 +306,9 @@ func (r *RNN) inputGrad(g *Gradient, upstreamGrad, statePartial linalg.Vector, t
 			val := g.InWeights.Get(hiddenIdx, inputIdx)
 			val += inVal * inputSumPartial
 			g.InWeights.Set(hiddenIdx, inputIdx, val)
+
+			weight := r.memoryParams.InWeights.Get(hiddenIdx, inputIdx)
+			g.Inputs[t][inputIdx] += weight * inputSumPartial
 		}
 
 		if t == 0 {

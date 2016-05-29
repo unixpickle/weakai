@@ -1,6 +1,7 @@
 package lstm
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -78,6 +79,8 @@ func testRNNGradients(t *testing.T, r *rnnTestCase) {
 		linalg.Vector(grad.OutGate.Data),
 		grad.OutGateBiases,
 	}
+	gradSlices = append(gradSlices, grad.Inputs...)
+
 	paramSlices := []linalg.Vector{
 		linalg.Vector(net.outWeights.Data),
 		net.outBiases,
@@ -92,9 +95,14 @@ func testRNNGradients(t *testing.T, r *rnnTestCase) {
 		linalg.Vector(net.memoryParams.OutGate.Data),
 		net.memoryParams.OutGateBiases,
 	}
+	paramSlices = append(paramSlices, r.inputs...)
+
 	names := []string{"out weight", "out bias", "out gate weight", "out gate bias",
 		"in weight", "in bias", "in gate weight", "in gate bias",
 		"rem gate weight", "rem gate bias", "out gate weight", "out gate bias"}
+	for t := range r.inputs {
+		names = append(names, fmt.Sprintf("input at t=%d", t))
+	}
 
 	for i, gradSlice := range gradSlices {
 		paramSlice := paramSlices[i]

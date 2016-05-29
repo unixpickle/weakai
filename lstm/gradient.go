@@ -15,10 +15,12 @@ type Gradient struct {
 	InGateBiases  linalg.Vector
 	RemGateBiases linalg.Vector
 	OutGateBiases linalg.Vector
+
+	Inputs []linalg.Vector
 }
 
-func NewGradient(inSize, hiddenSize, outSize int) *Gradient {
-	return &Gradient{
+func NewGradient(inSize, hiddenSize, outSize, time int) *Gradient {
+	res := &Gradient{
 		OutWeights: linalg.NewMatrix(outSize, hiddenSize+inSize),
 		OutBiases:  make(linalg.Vector, outSize),
 
@@ -31,7 +33,13 @@ func NewGradient(inSize, hiddenSize, outSize int) *Gradient {
 		InGateBiases:  make(linalg.Vector, hiddenSize),
 		RemGateBiases: make(linalg.Vector, hiddenSize),
 		OutGateBiases: make(linalg.Vector, hiddenSize),
+
+		Inputs: make([]linalg.Vector, time),
 	}
+	for i := range res.Inputs {
+		res.Inputs[i] = make(linalg.Vector, inSize)
+	}
+	return res
 }
 
 func (r *Gradient) Add(r1 *Gradient) {
@@ -45,4 +53,7 @@ func (r *Gradient) Add(r1 *Gradient) {
 	r.InGateBiases.Add(r1.InGateBiases)
 	r.RemGateBiases.Add(r1.RemGateBiases)
 	r.OutGateBiases.Add(r1.OutGateBiases)
+	for i, x := range r.Inputs {
+		x.Add(r1.Inputs[i])
+	}
 }

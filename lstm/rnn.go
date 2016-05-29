@@ -2,6 +2,8 @@ package lstm
 
 import "github.com/unixpickle/num-analysis/linalg"
 
+// An RNN is a single-layer recurrent neural network
+// with LSTM hidden units.
 type RNN struct {
 	// The columns in this matrix correspond first
 	// to input values and then to state values.
@@ -30,6 +32,10 @@ func NewRNN(inputSize, stateSize, outputSize int) *RNN {
 	}
 }
 
+// StepTime gives the RNN another input as well
+// as the expected output for that input (used
+// as an argument to the cost function).
+// It returns the actual output from the RNN.
 func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 	r.expectedOutputs = append(r.expectedOutputs, out)
 	r.inputs = append(r.inputs, in)
@@ -53,6 +59,10 @@ func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 	return result
 }
 
+// CostGradient returns the gradient of the cost
+// with respect to all of the RNN parameters.
+// This gradient encompasses all of the time steps
+// that have been run on this RNN (since a Reset).
 func (r *RNN) CostGradient(cost CostFunc) *Gradient {
 	grad := NewGradient(r.memoryParams.InputSize, r.memoryParams.StateSize, len(r.outBiases))
 
@@ -66,6 +76,36 @@ func (r *RNN) CostGradient(cost CostFunc) *Gradient {
 	r.computeTimedPartials(grad, costPartials)
 
 	return grad
+}
+
+// StepGradient updates the parameters of the RNN
+// using the given gradient.
+// This automatically resets the RNN as if Reset
+// were called on it, since the old forward-propagated
+// outputs will be inaccurate after stepping.
+func (r *RNN) StepGradient(g *Gradient, stepSize float64, reforward bool) {
+	r.outWeights.Add(g.OutWeights)
+	r.outBiases.Add(g.OutBiases)
+	r.memoryParams.InWeights.Add(g.InWeights)
+	r.memoryParams.InGate.Add(g.InGate)
+	r.memoryParams.RemGate.Add(g.RemGate)
+	r.memoryParams.OutGate.Add(g.OutGate)
+	r.memoryParams.InBiases.Add(g.InBiases)
+	r.memoryParams.InGateBiases.Add(g.InGateBiases)
+	r.memoryParams.RemGateBiases.Add(g.RemGateBiases)
+	r.memoryParams.OutGateBiases.Add(g.OutGateBiases)
+	r.Reset()
+}
+
+// Reset goes back to time 0 and erases all the
+// previous inputs and states.
+// This does not reset weights or biases.
+func (r *RNN) Reset() {
+	r.inputs = nil
+	r.lstmOutputs = nil
+	r.outputs = nil
+	r.expectedOutputs = nil
+	r.currentState = make(linalg.Vector, r.memoryParams.StateSize)
 }
 
 func (r *RNN) computeOutputPartials(g *Gradient, costPartials []linalg.Vector) {

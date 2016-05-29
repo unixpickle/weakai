@@ -218,7 +218,7 @@ func (r *RNN) inputGateGrad(g *Gradient, upstreamGrad, statePartial linalg.Vecto
 		maskSigmoidPartial := mask * (1 - mask)
 		maskSumPartial := maskSigmoidPartial * inputValue * partial
 
-		g.InGateBiases[hiddenIdx] = maskSumPartial
+		g.InGateBiases[hiddenIdx] += maskSumPartial
 		for inputIdx, inVal := range r.inputs[t] {
 			val := g.InGate.Get(hiddenIdx, inputIdx)
 			val += inVal * maskSumPartial
@@ -248,7 +248,7 @@ func (r *RNN) inputGrad(g *Gradient, upstreamGrad, statePartial linalg.Vector, t
 		inputSigmoidPartial := inputValue * (1 - inputValue)
 		inputSumPartial := inputSigmoidPartial * mask * partial
 
-		g.InBiases[hiddenIdx] = inputSumPartial
+		g.InBiases[hiddenIdx] += inputSumPartial
 		for inputIdx, inVal := range r.inputs[t] {
 			val := g.InWeights.Get(hiddenIdx, inputIdx)
 			val += inVal * inputSumPartial

@@ -71,11 +71,16 @@ func (r *RNN) CostGradient(costPartials []linalg.Vector) *Gradient {
 }
 
 // StepGradient updates the parameters of the RNN
-// using the given gradient.
+// by adding values from the given gradient.
+//
 // This automatically resets the RNN as if Reset
 // were called on it, since the old forward-propagated
 // outputs will be inaccurate after stepping.
-func (r *RNN) StepGradient(g *Gradient, stepSize float64, reforward bool) {
+//
+// To perform gradient descent, you should negate
+// the gradient and scale it down using its Scale()
+// method before calling StepGradient().
+func (r *RNN) StepGradient(g *Gradient) {
 	r.outWeights.Add(g.OutWeights)
 	r.outBiases.Add(g.OutBiases)
 	r.memoryParams.InWeights.Add(g.InWeights)

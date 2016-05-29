@@ -42,6 +42,22 @@ func NewGradient(inSize, hiddenSize, outSize, time int) *Gradient {
 	return res
 }
 
+func (r *Gradient) Scale(f float64) {
+	r.OutWeights.Scale(f)
+	r.OutBiases.Scale(f)
+	r.InWeights.Scale(f)
+	r.InGate.Scale(f)
+	r.RemGate.Scale(f)
+	r.OutGate.Scale(f)
+	r.InBiases.Scale(f)
+	r.InGateBiases.Scale(f)
+	r.RemGateBiases.Scale(f)
+	r.OutGateBiases.Scale(f)
+	for _, x := range r.Inputs {
+		x.Scale(f)
+	}
+}
+
 func (r *Gradient) Add(r1 *Gradient) {
 	r.OutWeights.Add(r1.OutWeights)
 	r.OutBiases.Add(r1.OutBiases)

@@ -17,19 +17,22 @@ func main() {
 	outWeight := autodiff.NewNumVar(0.075439, varCount, 4)
 	lastState := autodiff.NewNumVar(0.25, varCount, 5)
 	half := autodiff.NewNum(0.5, 6)
+	constLastState := autodiff.NewNum(0.25, varCount)
 
 	memIn := sigmoid(inWeight.Mul(lastState))
-	maskedIn := memIn.Mul(sigmoid(inGate.Mul(lastState)))
-	maskedMem := sigmoid(rememberGate.Mul(lastState)).Mul(lastState)
+	maskedIn := memIn.Mul(sigmoid(inGate.Mul(constLastState)))
+	maskedMem := sigmoid(rememberGate.Mul(constLastState)).Mul(lastState)
 	outState := maskedMem.Add(maskedIn)
-	outMask := sigmoid(outGate.Mul(lastState))
+	outMask := sigmoid(outGate.Mul(constLastState))
 	realOutput := sigmoid(outMask.Mul(outState).Mul(outWeight))
 
 	outError := half.Mul(realOutput.PowScaler(2))
+	fmt.Println("inWeight partial:", outError.Gradient[0])
 	fmt.Println("last state partial:", outError.Gradient[5])
 }
 
 func sigmoid(n autodiff.Num) autodiff.Num {
 	one := autodiff.NewNum(1, len(n.Gradient))
-	return n.Exp().Add(one).Reciprocal()
+	negOne := autodiff.NewNum(-1, len(n.Gradient))
+	return n.Mul(negOne).Exp().Add(one).Reciprocal()
 }

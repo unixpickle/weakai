@@ -19,8 +19,6 @@ type RNN struct {
 	inputs      []linalg.Vector
 	lstmOutputs []*LSTMOutput
 	outputs     []linalg.Vector
-
-	expectedOutputs []linalg.Vector
 }
 
 func NewRNN(inputSize, stateSize, outputSize int) *RNN {
@@ -37,7 +35,6 @@ func NewRNN(inputSize, stateSize, outputSize int) *RNN {
 // as an argument to the cost function).
 // It returns the actual output from the RNN.
 func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
-	r.expectedOutputs = append(r.expectedOutputs, out)
 	r.inputs = append(r.inputs, in)
 
 	output := r.memoryParams.PropagateForward(r.currentState, in)
@@ -61,16 +58,12 @@ func (r *RNN) StepTime(in, out linalg.Vector) linalg.Vector {
 
 // CostGradient returns the gradient of the cost
 // with respect to all of the RNN parameters.
-// This gradient encompasses all of the time steps
-// that have been run on this RNN (since a Reset).
-func (r *RNN) CostGradient(cost CostFunc) *Gradient {
+// The costPartials argument specifies the partial
+// derivatives of the cost function with respect to
+// each of the outputs for each of the time steps
+// performed on this network.
+func (r *RNN) CostGradient(costPartials []linalg.Vector) *Gradient {
 	grad := NewGradient(r.memoryParams.InputSize, r.memoryParams.StateSize, len(r.outBiases))
-
-	costPartials := make([]linalg.Vector, len(r.outputs))
-	for i, out := range r.outputs {
-		costPartials[i] = make(linalg.Vector, len(out))
-		cost.Gradient(out, r.expectedOutputs[i], costPartials[i])
-	}
 
 	r.computeOutputPartials(grad, costPartials)
 	r.computeTimedPartials(grad, costPartials)
@@ -104,7 +97,6 @@ func (r *RNN) Reset() {
 	r.inputs = nil
 	r.lstmOutputs = nil
 	r.outputs = nil
-	r.expectedOutputs = nil
 	r.currentState = make(linalg.Vector, r.memoryParams.StateSize)
 }
 

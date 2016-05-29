@@ -13,12 +13,10 @@ type LSTMOutput struct {
 	OutputMask  linalg.Vector
 	MaskedState linalg.Vector
 
-	MemInput    linalg.Vector
-	InputMask   linalg.Vector
-	MaskedInput linalg.Vector
+	MemInput  linalg.Vector
+	InputMask linalg.Vector
 
-	RememberMask   linalg.Vector
-	MaskedOldState linalg.Vector
+	RememberMask linalg.Vector
 }
 
 // LSTM stores the parameters of a
@@ -81,10 +79,10 @@ func (l *LSTM) PropagateForward(state, input linalg.Vector) *LSTMOutput {
 	res.OutputMask = linalg.Vector(l.OutGate.Mul(inputMat).Data).Add(l.OutGateBiases)
 
 	sigmoidAll(res.MemInput, res.InputMask, res.RememberMask, res.OutputMask)
-	res.MaskedInput = piecewiseMul(res.MemInput, res.InputMask)
+	maskedInput := piecewiseMul(res.MemInput, res.InputMask)
 
-	res.MaskedOldState = piecewiseMul(state, res.RememberMask)
-	res.NewState = res.MaskedOldState.Copy().Add(res.MaskedInput)
+	maskedOldState := piecewiseMul(state, res.RememberMask)
+	res.NewState = maskedOldState.Copy().Add(maskedInput)
 	res.MaskedState = piecewiseMul(res.NewState, res.OutputMask)
 
 	return &res

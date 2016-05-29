@@ -19,6 +19,8 @@ var rnnTestOutputs = []linalg.Vector{
 	{0.54129, 0.62811},
 }
 
+var rnnTestCostFunc = MeanSquaredCost{}
+
 const (
 	rnnTestDelta   = 1e-7
 	errorThreshold = 1e-7
@@ -58,8 +60,9 @@ func TestRNNGradientsThroughTimeSingleVar(t *testing.T) {
 
 func testRNNGradients(t *testing.T, r *rnnTestCase) {
 	net := rnnForTesting(r)
-	measureTestCost(net, r)
-	grad := net.CostGradient(MeanSquaredCost{})
+	_, costGrad := runTestSequence(net, r)
+
+	grad := net.CostGradient(costGrad)
 
 	gradSlices := []linalg.Vector{
 		linalg.Vector(grad.OutWeights.Data),
@@ -109,30 +112,30 @@ func testRNNGradients(t *testing.T, r *rnnTestCase) {
 func approxCostDerivative(r *RNN, param *float64, cases *rnnTestCase) float64 {
 	old := *param
 	*param -= rnnTestDelta
-	cost1 := measureTestCost(r, cases)
+	cost1, _ := runTestSequence(r, cases)
 	*param = old + rnnTestDelta
-	cost2 := measureTestCost(r, cases)
+	cost2, _ := runTestSequence(r, cases)
 	*param = old
 	return (cost2 - cost1) / (2 * rnnTestDelta)
 }
 
-func measureTestCost(r *RNN, cases *rnnTestCase) float64 {
-	r.inputs = nil
-	r.lstmOutputs = nil
-	r.outputs = nil
-	r.expectedOutputs = nil
-	r.currentState = make(linalg.Vector, r.memoryParams.StateSize)
+func runTestSequence(r *RNN, cases *rnnTestCase) (cost float64, costGrad []linalg.Vector) {
+	r.Reset()
 
-	var cost float64
 	for t, output := range cases.outputs {
 		vecOut := r.StepTime(cases.inputs[t], output)
 		for i, x := range vecOut {
 			diff := x - output[i]
 			cost += diff * diff
 		}
+		grad := make(linalg.Vector, len(vecOut))
+		rnnTestCostFunc.Gradient(vecOut, output, grad)
+		costGrad = append(costGrad, grad)
 	}
 
-	return cost * 0.5
+	cost /= 2
+
+	return
 }
 
 func rnnForTesting(r *rnnTestCase) *RNN {

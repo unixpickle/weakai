@@ -123,14 +123,10 @@ func (r *RNN) computeTimedPartials(g *Gradient, costPartials []linalg.Vector) {
 		statePartial.Add(upstreamStateGrad)
 		upstreamStateGrad = olderPartial
 
-		for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
-			if t > 0 {
-				rememberMask := r.lstmOutputs[t].RememberMask[hiddenIdx]
+		if t > 0 {
+			for hiddenIdx, rememberMask := range r.lstmOutputs[t].RememberMask {
 				upstreamStateGrad[hiddenIdx] += rememberMask * statePartial[hiddenIdx]
 			}
-		}
-
-		if t > 0 {
 			r.rememberGateGrad(g, upstreamStateGrad, statePartial, t)
 		}
 
@@ -178,7 +174,7 @@ func (r *RNN) localStateGrads(costGrad linalg.Vector, t int) (current, older lin
 			stateVal := r.lstmOutputs[t].NewState[hiddenIdx]
 			maskSigmoidPartial := outMask * (1 - outMask)
 			maskSumPartial := maskSigmoidPartial * stateVal * weight * sumDeriv
-			for hiddenIdx1 := range current {
+			for hiddenIdx1 := range older {
 				col := inputCount + hiddenIdx1
 				val := r.memoryParams.OutGate.Get(hiddenIdx, col)
 				older[hiddenIdx1] += val * maskSumPartial

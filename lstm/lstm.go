@@ -2,6 +2,7 @@ package lstm
 
 import (
 	"math"
+	"math/rand"
 
 	"github.com/unixpickle/num-analysis/linalg"
 )
@@ -56,6 +57,17 @@ func NewLSTM(inputSize, stateSize int) *LSTM {
 
 		InputSize: inputSize,
 		StateSize: stateSize,
+	}
+}
+
+// Randomize randomizes the weights in this LSTM
+// unit to break symmetry.
+func (l *LSTM) Randomize() {
+	for _, mat := range []*linalg.Matrix{l.InWeights, l.InGate, l.RemGate, l.OutGate} {
+		weightCoeff := math.Sqrt(3.0 / float64(mat.Cols))
+		for i := range mat.Data {
+			mat.Data[i] = (rand.Float64()*2 - 1) * weightCoeff
+		}
 	}
 }
 

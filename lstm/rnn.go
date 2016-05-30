@@ -1,6 +1,11 @@
 package lstm
 
-import "github.com/unixpickle/num-analysis/linalg"
+import (
+	"math"
+	"math/rand"
+
+	"github.com/unixpickle/num-analysis/linalg"
+)
 
 // An RNN is a single-layer recurrent neural network
 // with LSTM hidden units.
@@ -28,6 +33,16 @@ func NewRNN(inputSize, stateSize, outputSize int) *RNN {
 		memoryParams: NewLSTM(inputSize, stateSize),
 		currentState: make(linalg.Vector, stateSize),
 	}
+}
+
+// Randomize randomly initializes the output
+// and LSTM parameters.
+func (r *RNN) Randomize() {
+	weightCoeff := math.Sqrt(3.0 / float64(r.outWeights.Cols))
+	for i := range r.outWeights.Data {
+		r.outWeights.Data[i] = (rand.Float64()*2 - 1) * weightCoeff
+	}
+	r.memoryParams.Randomize()
 }
 
 // StepTime gives the RNN another input and

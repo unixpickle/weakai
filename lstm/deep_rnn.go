@@ -42,6 +42,12 @@ func NewDeepRNN(inputSize, outputSize int, hiddenSizes ...int) DeepRNN {
 	return res
 }
 
+func (d DeepRNN) Randomize() {
+	for _, r := range d {
+		r.Randomize()
+	}
+}
+
 func (d DeepRNN) StepTime(in linalg.Vector) linalg.Vector {
 	for _, r := range d {
 		in = r.StepTime(in)

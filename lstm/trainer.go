@@ -17,6 +17,10 @@ type Trainer struct {
 }
 
 func (t *Trainer) Train(r *RNN) {
+	t.TrainDeep(DeepRNN{r})
+}
+
+func (t *Trainer) TrainDeep(r DeepRNN) {
 	for i := 0; i < t.Epochs; i++ {
 		perm := rand.Perm(len(t.InSeqs))
 		for _, j := range perm {

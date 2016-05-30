@@ -35,7 +35,7 @@ func NewDeepRNN(inputSize, outputSize int, hiddenSizes ...int) DeepRNN {
 		}
 		outSize := outputSize
 		if i+1 < len(hiddenSizes) {
-			outSize = hiddenSizes[i+1]
+			outSize = h
 		}
 		res = append(res, NewRNN(inSize, h, outSize))
 	}
@@ -68,7 +68,7 @@ func (d DeepRNN) CostGradient(costPartials []linalg.Vector) DeepGradient {
 
 func (d DeepRNN) StepGradient(g DeepGradient) {
 	for i, r := range d {
-		r.StepGradient(g[i])
+		r.StepGradient(g[len(d)-(i+1)])
 	}
 }
 

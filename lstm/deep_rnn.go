@@ -26,7 +26,7 @@ func (d DeepGradient) Add(d1 DeepGradient) {
 // "output" layer, which gives outputs.
 type DeepRNN []*RNN
 
-func NewDeepRNN(inputSize, outputSize int, hiddenSizes ...int) DeepRNN {
+func NewDeepRNN(a ActivationFunc, inputSize, outputSize int, hiddenSizes ...int) DeepRNN {
 	var res DeepRNN
 	for i, h := range hiddenSizes {
 		inSize := inputSize
@@ -37,7 +37,7 @@ func NewDeepRNN(inputSize, outputSize int, hiddenSizes ...int) DeepRNN {
 		if i+1 < len(hiddenSizes) {
 			outSize = h
 		}
-		res = append(res, NewRNN(inSize, h, outSize))
+		res = append(res, NewRNN(a, inSize, h, outSize))
 	}
 	return res
 }

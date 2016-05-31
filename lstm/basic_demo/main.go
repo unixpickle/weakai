@@ -34,7 +34,7 @@ func main() {
 		trainer.InSeqs = append(trainer.InSeqs, inSeq)
 		trainer.OutSeqs = append(trainer.OutSeqs, outSeq)
 	}
-	net := lstm.NewRNN(2, HiddenSize, 2)
+	net := lstm.NewRNN(lstm.Sigmoid{}, 2, HiddenSize, 2)
 	net.Randomize()
 	trainer.Train(net)
 

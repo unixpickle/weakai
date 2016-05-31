@@ -150,7 +150,7 @@ func rnnForTesting(r *rnnTestCase) *RNN {
 	inSize := len(r.inputs[0])
 	outSize := len(r.outputs[0])
 	hiddenSize := r.hiddenSize
-	net := NewRNN(inSize, hiddenSize, outSize)
+	net := NewRNN(Tanh{}, inSize, hiddenSize, outSize)
 	net.outWeights.Data = []float64{
 		0.075439, 0.926433, 0.549735, 0.351469, 0.121239,
 		0.415574, 0.094576, 0.727178, 0.858073, 0.758361,

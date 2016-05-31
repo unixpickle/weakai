@@ -10,6 +10,8 @@ import (
 // An RNN is a single-layer recurrent neural network
 // with LSTM hidden units.
 type RNN struct {
+	activation ActivationFunc
+
 	// The columns in this matrix correspond first
 	// to input values and then to state values.
 	outWeights *linalg.Matrix
@@ -26,8 +28,9 @@ type RNN struct {
 	outputs     []linalg.Vector
 }
 
-func NewRNN(inputSize, stateSize, outputSize int) *RNN {
+func NewRNN(activation ActivationFunc, inputSize, stateSize, outputSize int) *RNN {
 	return &RNN{
+		activation:   activation,
 		outWeights:   linalg.NewMatrix(outputSize, inputSize+stateSize),
 		outBiases:    make(linalg.Vector, outputSize),
 		memoryParams: NewLSTM(inputSize, stateSize),
@@ -61,7 +64,9 @@ func (r *RNN) StepTime(in linalg.Vector) linalg.Vector {
 	copy(augmentedInput.Data, in)
 	copy(augmentedInput.Data[len(in):], output.MaskedState)
 	result := linalg.Vector(r.outWeights.Mul(augmentedInput).Data).Add(r.outBiases)
-	sigmoidAll(result)
+	for i, x := range result {
+		result[i] = r.activation.Eval(x)
+	}
 
 	r.outputs = append(r.outputs, result)
 	r.lstmOutputs = append(r.lstmOutputs, output)
@@ -126,8 +131,8 @@ func (r *RNN) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) 
 	for t, partial := range costPartials {
 		for neuronIdx, costPartial := range partial {
 			neuronOut := r.outputs[t][neuronIdx]
-			sigmoidPartial := (1 - neuronOut) * neuronOut
-			sumPartial := sigmoidPartial * costPartial
+			activationPartial := r.activation.Deriv(neuronOut)
+			sumPartial := activationPartial * costPartial
 
 			g.OutBiases[neuronIdx] += sumPartial
 			for inputIdx := 0; inputIdx < inputCount; inputIdx++ {
@@ -219,8 +224,8 @@ func (r *RNN) localStateGrads(costGrad linalg.Vector, t int) (current, older,
 
 	for neuronIdx, partial := range costGrad {
 		output := r.outputs[t][neuronIdx]
-		sigmoidDeriv := output * (1 - output)
-		sumDeriv := sigmoidDeriv * partial
+		activationDeriv := r.activation.Deriv(output)
+		sumDeriv := activationDeriv * partial
 		for hiddenIdx := range current {
 			col := hiddenIdx + inputCount
 			weight := r.outWeights.Get(neuronIdx, col)

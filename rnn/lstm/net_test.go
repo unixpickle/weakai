@@ -64,7 +64,7 @@ func testRNNGradients(t *testing.T, r *rnnTestCase) {
 	net := rnnForTesting(r)
 	_, costGrad := runTestSequence(net, r)
 
-	grad := net.CostGradient(costGrad)
+	grad := net.CostGradient(costGrad).(*Gradient)
 
 	gradSlices := []linalg.Vector{
 		linalg.Vector(grad.OutWeights.Data),

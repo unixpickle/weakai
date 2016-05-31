@@ -60,13 +60,14 @@ func (d DeepRNN) Reset() {
 	}
 }
 
-func (d DeepRNN) StepGradient(g DeepGradient) {
+func (d DeepRNN) StepGradient(gInterface Gradient) {
+	g := gInterface.(DeepGradient)
 	for i, r := range d {
 		r.StepGradient(g[len(d)-(i+1)])
 	}
 }
 
-func (d DeepRNN) Alias() DeepRNN {
+func (d DeepRNN) Alias() RNN {
 	res := make(DeepRNN, len(d))
 	for i, x := range d {
 		res[i] = x.Alias()

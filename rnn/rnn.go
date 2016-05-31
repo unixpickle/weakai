@@ -39,4 +39,14 @@ type RNN interface {
 	// StepGradient updates the RNN's parameters by adding
 	// the gradient to them.
 	StepGradient(grad Gradient)
+
+	// Alias creates a read-only alias of this RNN.
+	// All aliases of an RNN share parameters (e.g. weights)
+	// but do not share memory.
+	//
+	// Each alias can run StepTime(), CostGradient(), and
+	// Reset() calls concurrently from every other alias,
+	// but only one Alias can run StepGradient() or Randomize()
+	// at once.
+	Alias() RNN
 }

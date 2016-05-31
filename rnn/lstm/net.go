@@ -155,6 +155,15 @@ func (r *Net) Reset() {
 	r.currentState = nil
 }
 
+func (r *Net) Alias() rnn.RNN {
+	return &Net{
+		Activation:   r.Activation,
+		OutWeights:   r.OutWeights,
+		OutBiases:    r.OutBiases,
+		MemoryParams: r.MemoryParams,
+	}
+}
+
 func (r *Net) Serialize() ([]byte, error) {
 	jsonData, err := json.Marshal(r)
 	if err != nil {

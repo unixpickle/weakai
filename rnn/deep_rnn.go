@@ -66,6 +66,14 @@ func (d DeepRNN) StepGradient(g DeepGradient) {
 	}
 }
 
+func (d DeepRNN) Alias() DeepRNN {
+	res := make(DeepRNN, len(d))
+	for i, x := range d {
+		res[i] = x.Alias()
+	}
+	return res
+}
+
 func (d DeepRNN) Serialize() ([]byte, error) {
 	s := make([]serializer.Serializer, len(d))
 	for i, x := range d {

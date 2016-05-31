@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/unixpickle/num-analysis/linalg"
-	"github.com/unixpickle/weakai/lstm"
+	"github.com/unixpickle/weakai/rnn"
 )
 
 const (
@@ -24,8 +24,8 @@ const (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	trainer := lstm.Trainer{
-		CostFunc: lstm.MeanSquaredCost{},
+	trainer := rnn.Trainer{
+		CostFunc: rnn.MeanSquaredCost{},
 		StepSize: StepSize,
 		Epochs:   Epochs,
 	}
@@ -34,7 +34,7 @@ func main() {
 		trainer.InSeqs = append(trainer.InSeqs, inSeq)
 		trainer.OutSeqs = append(trainer.OutSeqs, outSeq)
 	}
-	net := lstm.NewRNN(lstm.Sigmoid{}, 2, HiddenSize, 2)
+	net := rnn.NewRNN(rnn.Sigmoid{}, 2, HiddenSize, 2)
 	net.Randomize()
 	trainer.Train(net)
 
@@ -72,7 +72,7 @@ func genEvenOddSeq(size int) (ins, outs []linalg.Vector) {
 	return
 }
 
-func runTestSample(ins, outs []linalg.Vector, r *lstm.RNN) float64 {
+func runTestSample(ins, outs []linalg.Vector, r *rnn.RNN) float64 {
 	var correct int
 	var total int
 	for i, in := range ins {

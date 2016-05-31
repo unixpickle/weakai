@@ -1,4 +1,4 @@
-package lstm
+package rnn
 
 import "github.com/unixpickle/num-analysis/linalg"
 

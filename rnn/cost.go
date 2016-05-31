@@ -1,4 +1,4 @@
-package lstm
+package rnn
 
 type CostFunc interface {
 	Gradient(actual, expected, gradient []float64)

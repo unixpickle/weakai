@@ -1,52 +1,77 @@
 package lstm
 
 import (
+	"encoding/json"
+	"errors"
 	"math"
 	"math/rand"
 
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/weakai/rnn"
 )
 
 // An Net is a single-layer recurrent neural net
 // with LSTM hidden units.
 type Net struct {
-	activation rnn.ActivationFunc
+	Activation rnn.ActivationFunc `json:"-"`
 
 	// The columns in this matrix correspond first
 	// to input values and then to state values.
-	outWeights *linalg.Matrix
+	OutWeights *linalg.Matrix
 
 	// The elements in this vector correspond to
 	// elements of the output.
-	outBiases linalg.Vector
+	OutBiases linalg.Vector
 
-	memoryParams *LSTM
+	MemoryParams *LSTM
+
 	currentState linalg.Vector
-
-	inputs      []linalg.Vector
-	lstmOutputs []*LSTMOutput
-	outputs     []linalg.Vector
+	inputs       []linalg.Vector
+	lstmOutputs  []*LSTMOutput
+	outputs      []linalg.Vector
 }
 
 func NewNet(activation rnn.ActivationFunc, inputSize, stateSize, outputSize int) *Net {
 	return &Net{
-		activation:   activation,
-		outWeights:   linalg.NewMatrix(outputSize, inputSize+stateSize),
-		outBiases:    make(linalg.Vector, outputSize),
-		memoryParams: NewLSTM(inputSize, stateSize),
-		currentState: make(linalg.Vector, stateSize),
+		Activation:   activation,
+		OutWeights:   linalg.NewMatrix(outputSize, inputSize+stateSize),
+		OutBiases:    make(linalg.Vector, outputSize),
+		MemoryParams: NewLSTM(inputSize, stateSize),
 	}
+}
+
+func DeserializeNet(d []byte) (serializer.Serializer, error) {
+	slice, err := serializer.DeserializeSlice(d)
+	if err != nil {
+		return nil, err
+	} else if len(slice) != 2 {
+		return nil, errors.New("invalid deserialized slice")
+	}
+	data, ok := slice[0].(serializer.Bytes)
+	if !ok {
+		return nil, errors.New("expected Bytes for first element")
+	}
+	activation, ok := slice[1].(rnn.ActivationFunc)
+	if !ok {
+		return nil, errors.New("expected ActivationFunc for second element")
+	}
+	var n Net
+	if err := json.Unmarshal(data, &n); err != nil {
+		return nil, err
+	}
+	n.Activation = activation
+	return &n, nil
 }
 
 // Randomize randomly initializes the output
 // and LSTM parameters.
 func (r *Net) Randomize() {
-	weightCoeff := math.Sqrt(3.0 / float64(r.outWeights.Cols))
-	for i := range r.outWeights.Data {
-		r.outWeights.Data[i] = (rand.Float64()*2 - 1) * weightCoeff
+	weightCoeff := math.Sqrt(3.0 / float64(r.OutWeights.Cols))
+	for i := range r.OutWeights.Data {
+		r.OutWeights.Data[i] = (rand.Float64()*2 - 1) * weightCoeff
 	}
-	r.memoryParams.Randomize()
+	r.MemoryParams.Randomize()
 }
 
 // StepTime gives the Net another input and
@@ -54,7 +79,11 @@ func (r *Net) Randomize() {
 func (r *Net) StepTime(in linalg.Vector) linalg.Vector {
 	r.inputs = append(r.inputs, in)
 
-	output := r.memoryParams.PropagateForward(r.currentState, in)
+	if r.currentState == nil {
+		r.currentState = make(linalg.Vector, r.MemoryParams.StateSize)
+	}
+
+	output := r.MemoryParams.PropagateForward(r.currentState, in)
 	r.currentState = output.NewState
 
 	augmentedInput := &linalg.Matrix{
@@ -64,9 +93,9 @@ func (r *Net) StepTime(in linalg.Vector) linalg.Vector {
 	}
 	copy(augmentedInput.Data, in)
 	copy(augmentedInput.Data[len(in):], output.MaskedState)
-	result := linalg.Vector(r.outWeights.Mul(augmentedInput).Data).Add(r.outBiases)
+	result := linalg.Vector(r.OutWeights.Mul(augmentedInput).Data).Add(r.OutBiases)
 	for i, x := range result {
-		result[i] = r.activation.Eval(x)
+		result[i] = r.Activation.Eval(x)
 	}
 
 	r.outputs = append(r.outputs, result)
@@ -82,7 +111,7 @@ func (r *Net) StepTime(in linalg.Vector) linalg.Vector {
 // each of the outputs for each of the time steps
 // performed on this network.
 func (r *Net) CostGradient(costPartials []linalg.Vector) rnn.Gradient {
-	grad := NewGradient(r.memoryParams.InputSize, r.memoryParams.StateSize, len(r.outBiases),
+	grad := NewGradient(r.MemoryParams.InputSize, r.MemoryParams.StateSize, len(r.OutBiases),
 		len(r.inputs))
 
 	r.computeShallowPartials(grad, costPartials)
@@ -103,16 +132,16 @@ func (r *Net) CostGradient(costPartials []linalg.Vector) rnn.Gradient {
 // method before calling StepGradient().
 func (r *Net) StepGradient(gInterface rnn.Gradient) {
 	g := gInterface.(*Gradient)
-	r.outWeights.Add(g.OutWeights)
-	r.outBiases.Add(g.OutBiases)
-	r.memoryParams.InWeights.Add(g.InWeights)
-	r.memoryParams.InGate.Add(g.InGate)
-	r.memoryParams.RemGate.Add(g.RemGate)
-	r.memoryParams.OutGate.Add(g.OutGate)
-	r.memoryParams.InBiases.Add(g.InBiases)
-	r.memoryParams.InGateBiases.Add(g.InGateBiases)
-	r.memoryParams.RemGateBiases.Add(g.RemGateBiases)
-	r.memoryParams.OutGateBiases.Add(g.OutGateBiases)
+	r.OutWeights.Add(g.OutWeights)
+	r.OutBiases.Add(g.OutBiases)
+	r.MemoryParams.InWeights.Add(g.InWeights)
+	r.MemoryParams.InGate.Add(g.InGate)
+	r.MemoryParams.RemGate.Add(g.RemGate)
+	r.MemoryParams.OutGate.Add(g.OutGate)
+	r.MemoryParams.InBiases.Add(g.InBiases)
+	r.MemoryParams.InGateBiases.Add(g.InGateBiases)
+	r.MemoryParams.RemGateBiases.Add(g.RemGateBiases)
+	r.MemoryParams.OutGateBiases.Add(g.OutGateBiases)
 	r.Reset()
 }
 
@@ -123,17 +152,32 @@ func (r *Net) Reset() {
 	r.inputs = nil
 	r.lstmOutputs = nil
 	r.outputs = nil
-	r.currentState = make(linalg.Vector, r.memoryParams.StateSize)
+	r.currentState = nil
+}
+
+func (r *Net) Serialize() ([]byte, error) {
+	jsonData, err := json.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return serializer.SerializeSlice([]serializer.Serializer{
+		serializer.Bytes(jsonData),
+		r.Activation,
+	})
+}
+
+func (r *Net) SerializerType() string {
+	return serializerTypeNet
 }
 
 func (r *Net) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) {
-	inputCount := r.memoryParams.InputSize
-	hiddenCount := r.memoryParams.StateSize
+	inputCount := r.MemoryParams.InputSize
+	hiddenCount := r.MemoryParams.StateSize
 
 	for t, partial := range costPartials {
 		for neuronIdx, costPartial := range partial {
 			neuronOut := r.outputs[t][neuronIdx]
-			activationPartial := r.activation.Deriv(neuronOut)
+			activationPartial := r.Activation.Deriv(neuronOut)
 			sumPartial := activationPartial * costPartial
 
 			g.OutBiases[neuronIdx] += sumPartial
@@ -142,7 +186,7 @@ func (r *Net) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) 
 				val += r.inputs[t][inputIdx] * sumPartial
 				g.OutWeights.Set(neuronIdx, inputIdx, val)
 
-				weight := r.outWeights.Get(neuronIdx, inputIdx)
+				weight := r.OutWeights.Get(neuronIdx, inputIdx)
 				g.InputGrads[t][inputIdx] += weight * sumPartial
 			}
 			for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
@@ -151,7 +195,7 @@ func (r *Net) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) 
 				val += r.lstmOutputs[t].MaskedState[hiddenIdx] * sumPartial
 				g.OutWeights.Set(neuronIdx, col, val)
 
-				weightVal := r.outWeights.Get(neuronIdx, col)
+				weightVal := r.OutWeights.Get(neuronIdx, col)
 				stateVal := r.lstmOutputs[t].NewState[hiddenIdx]
 				maskVal := r.lstmOutputs[t].OutputMask[hiddenIdx]
 				maskSigmoidPartial := (1 - maskVal) * maskVal
@@ -176,7 +220,7 @@ func (r *Net) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) 
 }
 
 func (r *Net) computeDeepPartials(g *Gradient, costPartials []linalg.Vector) {
-	hiddenCount := r.memoryParams.StateSize
+	hiddenCount := r.MemoryParams.StateSize
 	upstreamStateGrad := make(linalg.Vector, hiddenCount)
 
 	for t := len(costPartials) - 1; t >= 0; t-- {
@@ -215,8 +259,8 @@ func (r *Net) computeDeepPartials(g *Gradient, costPartials []linalg.Vector) {
 // vector at time t instead of the previous state.
 func (r *Net) localStateGrads(costGrad linalg.Vector, t int) (current, older,
 	inGrad linalg.Vector) {
-	hiddenCount := r.memoryParams.StateSize
-	inputCount := r.memoryParams.InputSize
+	hiddenCount := r.MemoryParams.StateSize
+	inputCount := r.MemoryParams.InputSize
 	current = make(linalg.Vector, hiddenCount)
 	inGrad = make(linalg.Vector, inputCount)
 
@@ -226,11 +270,11 @@ func (r *Net) localStateGrads(costGrad linalg.Vector, t int) (current, older,
 
 	for neuronIdx, partial := range costGrad {
 		output := r.outputs[t][neuronIdx]
-		activationDeriv := r.activation.Deriv(output)
+		activationDeriv := r.Activation.Deriv(output)
 		sumDeriv := activationDeriv * partial
 		for hiddenIdx := range current {
 			col := hiddenIdx + inputCount
-			weight := r.outWeights.Get(neuronIdx, col)
+			weight := r.OutWeights.Get(neuronIdx, col)
 			outMask := r.lstmOutputs[t].OutputMask[hiddenIdx]
 			current[hiddenIdx] += outMask * weight * sumDeriv
 
@@ -238,7 +282,7 @@ func (r *Net) localStateGrads(costGrad linalg.Vector, t int) (current, older,
 			maskSigmoidPartial := outMask * (1 - outMask)
 			maskSumPartial := maskSigmoidPartial * stateVal * weight * sumDeriv
 			for inputIdx := range inGrad {
-				val := r.memoryParams.OutGate.Get(hiddenIdx, inputIdx)
+				val := r.MemoryParams.OutGate.Get(hiddenIdx, inputIdx)
 				inGrad[inputIdx] += val * maskSumPartial
 			}
 
@@ -248,7 +292,7 @@ func (r *Net) localStateGrads(costGrad linalg.Vector, t int) (current, older,
 
 			for hiddenIdx1 := range older {
 				col := inputCount + hiddenIdx1
-				val := r.memoryParams.OutGate.Get(hiddenIdx, col)
+				val := r.MemoryParams.OutGate.Get(hiddenIdx, col)
 				older[hiddenIdx1] += val * maskSumPartial
 			}
 		}
@@ -270,17 +314,17 @@ func (r *Net) rememberGateGrad(g *Gradient, upstreamGrad, statePartial linalg.Ve
 			val += inVal * maskSumPartial
 			g.RemGate.Set(hiddenIdx, inputIdx, val)
 
-			weight := r.memoryParams.RemGate.Get(hiddenIdx, inputIdx)
+			weight := r.MemoryParams.RemGate.Get(hiddenIdx, inputIdx)
 			g.InputGrads[t][inputIdx] += weight * maskSumPartial
 		}
 
 		for hiddenIdx1, inVal := range r.lstmOutputs[t-1].NewState {
-			col := hiddenIdx1 + r.memoryParams.InputSize
+			col := hiddenIdx1 + r.MemoryParams.InputSize
 			val := g.RemGate.Get(hiddenIdx, col)
 			val += inVal * maskSumPartial
 			g.RemGate.Set(hiddenIdx, col, val)
 
-			weight := r.memoryParams.RemGate.Get(hiddenIdx, col)
+			weight := r.MemoryParams.RemGate.Get(hiddenIdx, col)
 			upstreamGrad[hiddenIdx1] += weight * maskSumPartial
 		}
 	}
@@ -299,7 +343,7 @@ func (r *Net) inputGateGrad(g *Gradient, upstreamGrad, statePartial linalg.Vecto
 			val += inVal * maskSumPartial
 			g.InGate.Set(hiddenIdx, inputIdx, val)
 
-			weight := r.memoryParams.InGate.Get(hiddenIdx, inputIdx)
+			weight := r.MemoryParams.InGate.Get(hiddenIdx, inputIdx)
 			g.InputGrads[t][inputIdx] += weight * maskSumPartial
 		}
 
@@ -308,12 +352,12 @@ func (r *Net) inputGateGrad(g *Gradient, upstreamGrad, statePartial linalg.Vecto
 		}
 
 		for hiddenIdx1, inVal := range r.lstmOutputs[t-1].NewState {
-			col := hiddenIdx1 + r.memoryParams.InputSize
+			col := hiddenIdx1 + r.MemoryParams.InputSize
 			val := g.InGate.Get(hiddenIdx, col)
 			val += inVal * maskSumPartial
 			g.InGate.Set(hiddenIdx, col, val)
 
-			weight := r.memoryParams.InGate.Get(hiddenIdx, col)
+			weight := r.MemoryParams.InGate.Get(hiddenIdx, col)
 			upstreamGrad[hiddenIdx1] += weight * maskSumPartial
 		}
 	}
@@ -332,7 +376,7 @@ func (r *Net) inputGrad(g *Gradient, upstreamGrad, statePartial linalg.Vector, t
 			val += inVal * inputSumPartial
 			g.InWeights.Set(hiddenIdx, inputIdx, val)
 
-			weight := r.memoryParams.InWeights.Get(hiddenIdx, inputIdx)
+			weight := r.MemoryParams.InWeights.Get(hiddenIdx, inputIdx)
 			g.InputGrads[t][inputIdx] += weight * inputSumPartial
 		}
 
@@ -341,12 +385,12 @@ func (r *Net) inputGrad(g *Gradient, upstreamGrad, statePartial linalg.Vector, t
 		}
 
 		for hiddenIdx1, inVal := range r.lstmOutputs[t-1].NewState {
-			col := hiddenIdx1 + r.memoryParams.InputSize
+			col := hiddenIdx1 + r.MemoryParams.InputSize
 			val := g.InWeights.Get(hiddenIdx, col)
 			val += inVal * inputSumPartial
 			g.InWeights.Set(hiddenIdx, col, val)
 
-			weight := r.memoryParams.InWeights.Get(hiddenIdx, col)
+			weight := r.MemoryParams.InWeights.Get(hiddenIdx, col)
 			upstreamGrad[hiddenIdx1] += weight * inputSumPartial
 		}
 	}

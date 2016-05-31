@@ -1,10 +1,16 @@
 package rnn
 
-import "math"
+import (
+	"math"
+
+	"github.com/unixpickle/serializer"
+)
 
 // An ActivationFunc is used to "squash" output
 // from neurons.
 type ActivationFunc interface {
+	serializer.Serializer
+
 	// Eval evaluates the activation function for
 	// the given input.
 	Eval(x float64) float64
@@ -29,6 +35,14 @@ func (_ Sigmoid) Deriv(evalOut float64) float64 {
 	return evalOut * (1 - evalOut)
 }
 
+func (_ Sigmoid) Serialize() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (_ Sigmoid) SerializerType() string {
+	return serializerTypeSigmoid
+}
+
 type ReLU struct{}
 
 func (_ ReLU) Eval(x float64) float64 {
@@ -47,6 +61,14 @@ func (_ ReLU) Deriv(evalOut float64) float64 {
 	}
 }
 
+func (_ ReLU) Serialize() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (_ ReLU) SerializerType() string {
+	return serializerTypeReLU
+}
+
 type Tanh struct{}
 
 func (_ Tanh) Eval(x float64) float64 {
@@ -55,4 +77,12 @@ func (_ Tanh) Eval(x float64) float64 {
 
 func (_ Tanh) Deriv(x float64) float64 {
 	return 1 - x*x
+}
+
+func (_ Tanh) Serialize() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (_ Tanh) SerializerType() string {
+	return serializerTypeTanh
 }

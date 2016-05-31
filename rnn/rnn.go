@@ -1,9 +1,14 @@
 package rnn
 
-import "github.com/unixpickle/num-analysis/linalg"
+import (
+	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/serializer"
+)
 
 // An RNN is a generic Recurrent Neural Network.
 type RNN interface {
+	serializer.Serializer
+
 	// Randomize randomly initializes the parameters
 	// of the RNN.
 	Randomize()

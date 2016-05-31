@@ -1,4 +1,4 @@
-package rnn
+package lstm
 
 import (
 	"math"

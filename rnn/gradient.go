@@ -2,74 +2,43 @@ package rnn
 
 import "github.com/unixpickle/num-analysis/linalg"
 
-type Gradient struct {
-	OutWeights *linalg.Matrix
-	OutBiases  linalg.Vector
+// Gradient is a generic vector which can be
+// added to a given RNN to adjust the RNN's
+// weights, biases, and other parameters.
+type Gradient interface {
+	// Inputs returns the partials of the cost
+	// function with respect to the inputs of the
+	// RNN that generated this Gradient.
+	Inputs() []linalg.Vector
 
-	InWeights *linalg.Matrix
-	InGate    *linalg.Matrix
-	RemGate   *linalg.Matrix
-	OutGate   *linalg.Matrix
+	// Scale scales the gradient in place and
+	// returns the same gradient for convenience.
+	Scale(f float64) Gradient
 
-	InBiases      linalg.Vector
-	InGateBiases  linalg.Vector
-	RemGateBiases linalg.Vector
-	OutGateBiases linalg.Vector
+	// Add adds another gradient to this gradient
+	// and returns this gradient for convenience.
+	//
+	// This is only guaranteed to work if both
+	// gradients are from the same RNN.
+	Add(g Gradient) Gradient
 
-	Inputs []linalg.Vector
-}
+	// LargestComponent returns the largest partial
+	// derivative (in terms of absolute value) out
+	// of the partial derivatives for all parameters
+	// of the underlying RNN.
+	//
+	// The exact meaning of this value may vary for
+	// each Gradient implementation.
+	//
+	// This value should not count input partials.
+	LargestComponent() float64
 
-func NewGradient(inSize, hiddenSize, outSize, time int) *Gradient {
-	res := &Gradient{
-		OutWeights: linalg.NewMatrix(outSize, hiddenSize+inSize),
-		OutBiases:  make(linalg.Vector, outSize),
-
-		InWeights: linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
-		InGate:    linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
-		RemGate:   linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
-		OutGate:   linalg.NewMatrix(hiddenSize, hiddenSize+inSize),
-
-		InBiases:      make(linalg.Vector, hiddenSize),
-		InGateBiases:  make(linalg.Vector, hiddenSize),
-		RemGateBiases: make(linalg.Vector, hiddenSize),
-		OutGateBiases: make(linalg.Vector, hiddenSize),
-
-		Inputs: make([]linalg.Vector, time),
-	}
-	for i := range res.Inputs {
-		res.Inputs[i] = make(linalg.Vector, inSize)
-	}
-	return res
-}
-
-func (r *Gradient) Scale(f float64) {
-	r.OutWeights.Scale(f)
-	r.OutBiases.Scale(f)
-	r.InWeights.Scale(f)
-	r.InGate.Scale(f)
-	r.RemGate.Scale(f)
-	r.OutGate.Scale(f)
-	r.InBiases.Scale(f)
-	r.InGateBiases.Scale(f)
-	r.RemGateBiases.Scale(f)
-	r.OutGateBiases.Scale(f)
-	for _, x := range r.Inputs {
-		x.Scale(f)
-	}
-}
-
-func (r *Gradient) Add(r1 *Gradient) {
-	r.OutWeights.Add(r1.OutWeights)
-	r.OutBiases.Add(r1.OutBiases)
-	r.InWeights.Add(r1.InWeights)
-	r.InGate.Add(r1.InGate)
-	r.RemGate.Add(r1.RemGate)
-	r.OutGate.Add(r1.OutGate)
-	r.InBiases.Add(r1.InBiases)
-	r.InGateBiases.Add(r1.InGateBiases)
-	r.RemGateBiases.Add(r1.RemGateBiases)
-	r.OutGateBiases.Add(r1.OutGateBiases)
-	for i, x := range r.Inputs {
-		x.Add(r1.Inputs[i])
-	}
+	// ClipComponents clips the magnitudes of partial
+	// derivatives to a certain range.
+	// If a partial derivative is greater than m or
+	// less than -m, it will be set to m or -m
+	// respectively.
+	//
+	// This should not affect input partials.
+	ClipComponents(m float64)
 }

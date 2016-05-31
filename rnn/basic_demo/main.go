@@ -7,6 +7,7 @@ import (
 
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/rnn"
+	"github.com/unixpickle/weakai/rnn/lstm"
 )
 
 const (
@@ -34,7 +35,7 @@ func main() {
 		trainer.InSeqs = append(trainer.InSeqs, inSeq)
 		trainer.OutSeqs = append(trainer.OutSeqs, outSeq)
 	}
-	net := rnn.NewRNN(rnn.Sigmoid{}, 2, HiddenSize, 2)
+	net := lstm.NewNet(rnn.Sigmoid{}, 2, HiddenSize, 2)
 	net.Randomize()
 	trainer.Train(net)
 
@@ -72,7 +73,7 @@ func genEvenOddSeq(size int) (ins, outs []linalg.Vector) {
 	return
 }
 
-func runTestSample(ins, outs []linalg.Vector, r *rnn.RNN) float64 {
+func runTestSample(ins, outs []linalg.Vector, r *lstm.Net) float64 {
 	var correct int
 	var total int
 	for i, in := range ins {

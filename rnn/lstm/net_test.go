@@ -1,4 +1,4 @@
-package rnn
+package lstm
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/weakai/rnn"
 )
 
 var rnnTestInputs = []linalg.Vector{
@@ -20,7 +21,7 @@ var rnnTestOutputs = []linalg.Vector{
 	{0.54129, 0.62811},
 }
 
-var rnnTestCostFunc = MeanSquaredCost{}
+var rnnTestCostFunc = rnn.MeanSquaredCost{}
 
 const (
 	rnnTestDelta   = 1e-7
@@ -79,7 +80,7 @@ func testRNNGradients(t *testing.T, r *rnnTestCase) {
 		linalg.Vector(grad.OutGate.Data),
 		grad.OutGateBiases,
 	}
-	gradSlices = append(gradSlices, grad.Inputs...)
+	gradSlices = append(gradSlices, grad.InputGrads...)
 
 	paramSlices := []linalg.Vector{
 		linalg.Vector(net.outWeights.Data),
@@ -117,7 +118,7 @@ func testRNNGradients(t *testing.T, r *rnnTestCase) {
 	}
 }
 
-func approxCostDerivative(r *RNN, param *float64, cases *rnnTestCase) float64 {
+func approxCostDerivative(r *Net, param *float64, cases *rnnTestCase) float64 {
 	old := *param
 	*param -= rnnTestDelta
 	cost1, _ := runTestSequence(r, cases)
@@ -127,7 +128,7 @@ func approxCostDerivative(r *RNN, param *float64, cases *rnnTestCase) float64 {
 	return (cost2 - cost1) / (2 * rnnTestDelta)
 }
 
-func runTestSequence(r *RNN, cases *rnnTestCase) (cost float64, costGrad []linalg.Vector) {
+func runTestSequence(r *Net, cases *rnnTestCase) (cost float64, costGrad []linalg.Vector) {
 	r.Reset()
 
 	for t, output := range cases.outputs {
@@ -146,11 +147,11 @@ func runTestSequence(r *RNN, cases *rnnTestCase) (cost float64, costGrad []linal
 	return
 }
 
-func rnnForTesting(r *rnnTestCase) *RNN {
+func rnnForTesting(r *rnnTestCase) *Net {
 	inSize := len(r.inputs[0])
 	outSize := len(r.outputs[0])
 	hiddenSize := r.hiddenSize
-	net := NewRNN(Tanh{}, inSize, hiddenSize, outSize)
+	net := NewNet(rnn.Tanh{}, inSize, hiddenSize, outSize)
 	net.outWeights.Data = []float64{
 		0.075439, 0.926433, 0.549735, 0.351469, 0.121239,
 		0.415574, 0.094576, 0.727178, 0.858073, 0.758361,

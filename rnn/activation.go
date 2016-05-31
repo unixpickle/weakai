@@ -2,6 +2,8 @@ package rnn
 
 import "math"
 
+// An ActivationFunc is used to "squash" output
+// from neurons.
 type ActivationFunc interface {
 	// Eval evaluates the activation function for
 	// the given input.

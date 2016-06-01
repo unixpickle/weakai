@@ -34,7 +34,10 @@ func Train(samples0, samples1, classifierPath string) error {
 	if err != nil {
 		return err
 	}
-	encoded := network.Serialize()
+	encoded, err := network.Serialize()
+	if err != nil {
+		return err
+	}
 	return ioutil.WriteFile(classifierPath, encoded, 0755)
 }
 

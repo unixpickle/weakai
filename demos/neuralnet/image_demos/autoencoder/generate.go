@@ -22,7 +22,12 @@ func Generate() {
 		os.Exit(1)
 	}
 
-	serialized := encoder.Serialize()
+	serialized, err := encoder.Serialize()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Could not serialize:", err)
+		os.Exit(1)
+	}
+
 	if err := ioutil.WriteFile(outputFile, serialized, 0755); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

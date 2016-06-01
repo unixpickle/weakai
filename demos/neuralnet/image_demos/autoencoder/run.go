@@ -18,7 +18,8 @@ func Run() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	encoder, err := neuralnet.Deserializers["network"](encoderData)
+
+	network, err := neuralnet.DeserializeNetwork(encoderData)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -39,7 +40,6 @@ func Run() {
 		os.Exit(1)
 	}
 
-	network := encoder.(*neuralnet.Network)
 	if !network.SetInput(ImageTensor(inputImage).Data) {
 		fmt.Fprintln(os.Stderr, "Bad image dimensions.")
 		os.Exit(1)

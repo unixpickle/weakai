@@ -3,6 +3,8 @@ package neuralnet
 import (
 	"math/rand"
 	"testing"
+
+	"github.com/unixpickle/serializer"
 )
 
 func TestMaxPoolingDimensions(t *testing.T) {
@@ -146,9 +148,12 @@ func TestMaxPoolingBackward(t *testing.T) {
 
 func TestMaxPoolingSerialize(t *testing.T) {
 	layer := NewMaxPoolingLayer(&MaxPoolingParams{3, 3, 10, 11, 2})
-	encoded := layer.Serialize()
+	encoded, err := layer.Serialize()
+	if err != nil {
+		t.Fatal(err)
+	}
 	layerType := layer.SerializerType()
-	decoded, err := Deserializers[layerType](encoded)
+	decoded, err := serializer.GetDeserializer(layerType)(encoded)
 	if err != nil {
 		t.Fatal(err)
 	}

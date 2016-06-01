@@ -1,12 +1,12 @@
 package neuralnet
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/unixpickle/num-analysis/kahan"
+	"github.com/unixpickle/serializer"
 )
 
 var networkEncodingEndian = binary.LittleEndian
@@ -40,54 +40,20 @@ func NewNetwork(prototypes []LayerPrototype) (*Network, error) {
 }
 
 func DeserializeNetwork(data []byte) (*Network, error) {
-	buffer := bytes.NewBuffer(data)
+	res := &Network{}
 
-	var count uint32
-	if err := binary.Read(buffer, networkEncodingEndian, &count); err != nil {
+	slice, err := serializer.DeserializeSlice(data)
+	if err != nil {
 		return nil, err
 	}
 
-	res := &Network{make([]Layer, 0, int(count))}
-
-	for i := 0; i < int(count); i++ {
-		var typeLen uint32
-		if err := binary.Read(buffer, networkEncodingEndian, &typeLen); err != nil {
-			return nil, err
-		}
-		typeData := make([]byte, int(typeLen))
-		n, err := buffer.Read(typeData)
-		if err != nil {
-			return nil, err
-		} else if n < len(typeData) {
-			return nil, errors.New("buffer underflow")
-		}
-
-		var dataLen uint64
-		if err := binary.Read(buffer, networkEncodingEndian, &dataLen); err != nil {
-			return nil, err
-		}
-		layerData := make([]byte, int(dataLen))
-		n, err = buffer.Read(layerData)
-		if err != nil {
-			return nil, err
-		} else if n < len(layerData) {
-			return nil, errors.New("buffer underflow")
-		}
-
-		typeStr := string(typeData)
-		decoder, ok := Deserializers[typeStr]
-		if !ok {
-			return nil, fmt.Errorf("unknown serializer type: %s", typeStr)
-		}
-		layerObj, err := decoder(layerData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode layer %d: %s", i, err.Error())
-		} else if _, ok := layerObj.(Layer); !ok {
-			return nil, fmt.Errorf("layer %d is not Layer, it's %T", i, layerObj)
-		}
-
-		if err := res.AddLayer(layerObj.(Layer)); err != nil {
-			return nil, err
+	for _, x := range slice {
+		if layer, ok := x.(Layer); ok {
+			if err := res.AddLayer(layer); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, errors.New("slice element is not Layer")
 		}
 	}
 
@@ -181,25 +147,14 @@ func (n *Network) Alias() Layer {
 	return net
 }
 
-func (n *Network) Serialize() []byte {
-	var buf bytes.Buffer
-
-	binary.Write(&buf, networkEncodingEndian, uint32(len(n.Layers)))
-
-	for _, l := range n.Layers {
-		encoded := l.Serialize()
-		typeName := []byte(l.SerializerType())
-
-		binary.Write(&buf, networkEncodingEndian, uint32(len(typeName)))
-		buf.Write(typeName)
-
-		binary.Write(&buf, networkEncodingEndian, uint64(len(encoded)))
-		buf.Write(encoded)
+func (n *Network) Serialize() ([]byte, error) {
+	serializers := make([]serializer.Serializer, len(n.Layers))
+	for i, x := range n.Layers {
+		serializers[i] = x
 	}
-
-	return buf.Bytes()
+	return serializer.SerializeSlice(serializers)
 }
 
 func (n *Network) SerializerType() string {
-	return "network"
+	return serializerTypeNetwork
 }

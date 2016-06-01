@@ -3,12 +3,14 @@ package neuralnet
 import (
 	"fmt"
 	"math"
+
+	"github.com/unixpickle/serializer"
 )
 
 // An ActivationFunc is a function designed to
 // introduce non-linearity into a neural net.
 type ActivationFunc interface {
-	Serializer
+	serializer.Serializer
 
 	// Eval evaluates the activation function for
 	// an input x.
@@ -30,12 +32,12 @@ func (s Sigmoid) Deriv(x float64) float64 {
 	return v * (1.0 - v)
 }
 
-func (_ Sigmoid) Serialize() []byte {
-	return []byte{}
+func (_ Sigmoid) Serialize() ([]byte, error) {
+	return []byte{}, nil
 }
 
 func (_ Sigmoid) SerializerType() string {
-	return "sigmoid"
+	return serializerTypeSigmoid
 }
 
 type HyperbolicTangent struct{}
@@ -56,24 +58,21 @@ func (_ HyperbolicTangent) Deriv(x float64) float64 {
 	return 1 / coshSquared
 }
 
-func (_ HyperbolicTangent) Serialize() []byte {
-	return []byte{}
+func (_ HyperbolicTangent) Serialize() ([]byte, error) {
+	return []byte{}, nil
 }
 
 func (_ HyperbolicTangent) SerializerType() string {
-	return "hyperbolictangent"
+	return serializerTypeHyperbolicTangent
 }
 
-func deserializeActivation(data []byte, serializerType string) (ActivationFunc, error) {
-	activationDes, ok := Deserializers[serializerType]
-	if !ok {
-		return nil, fmt.Errorf("unknown activation type: %s", serializerType)
-	}
-	activation, err := activationDes(data)
+func deserializeActivation(data []byte) (ActivationFunc, error) {
+	activation, err := serializer.DeserializeWithType(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize activation: %s", err.Error())
-	} else if _, ok := activation.(ActivationFunc); !ok {
+	} else if rightType, ok := activation.(ActivationFunc); !ok {
 		return nil, fmt.Errorf("expected ActivationFunc but got %T", activation)
+	} else {
+		return rightType, nil
 	}
-	return activation.(ActivationFunc), nil
 }

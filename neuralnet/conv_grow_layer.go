@@ -211,15 +211,19 @@ func (c *ConvGrowLayer) Alias() Layer {
 	return res
 }
 
-func (c *ConvGrowLayer) Serialize() []byte {
+func (c *ConvGrowLayer) Serialize() ([]byte, error) {
 	var buf bytes.Buffer
 
 	binary.Write(&buf, convGrowByteOrder, uint32(c.inverseStride))
-	buf.Write(c.convLayer.Serialize())
+	serialized, err := c.convLayer.Serialize()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(serialized)
 
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 func (c *ConvGrowLayer) SerializerType() string {
-	return "convgrowlayer"
+	return serializerTypeConvGrowLayer
 }

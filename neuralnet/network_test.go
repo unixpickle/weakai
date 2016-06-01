@@ -1,6 +1,10 @@
 package neuralnet
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/unixpickle/serializer"
+)
 
 func TestNetworkSerialize(t *testing.T) {
 	network, err := NewNetwork([]LayerPrototype{
@@ -29,10 +33,13 @@ func TestNetworkSerialize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encoded := network.Serialize()
+	encoded, err := network.Serialize()
+	if err != nil {
+		t.Fatal(err)
+	}
 	layerType := network.SerializerType()
 
-	decoded, err := Deserializers[layerType](encoded)
+	decoded, err := serializer.GetDeserializer(layerType)(encoded)
 	if err != nil {
 		t.Fatal(err)
 	}

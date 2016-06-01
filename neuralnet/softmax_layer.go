@@ -133,10 +133,10 @@ func (s *SoftmaxLayer) Alias() Layer {
 	return NewSoftmaxLayer(&SoftmaxParams{Size: len(s.output)})
 }
 
-func (s *SoftmaxLayer) Serialize() []byte {
-	return []byte(strconv.Itoa(len(s.output)))
+func (s *SoftmaxLayer) Serialize() ([]byte, error) {
+	return []byte(strconv.Itoa(len(s.output))), nil
 }
 
 func (s *SoftmaxLayer) SerializerType() string {
-	return "softmaxlayer"
+	return serializerTypeSoftmaxLayer
 }

@@ -1,5 +1,7 @@
 package neuralnet
 
+import "github.com/unixpickle/serializer"
+
 // A Layer represents any kind of "layer"
 // that a deep neural network may contain.
 //
@@ -11,7 +13,7 @@ package neuralnet
 // the function they perform, doing what is
 // known as back propagation.
 type Layer interface {
-	Serializer
+	serializer.Serializer
 
 	// Output is the output vector for this layer.
 	// The contents of this slice may change after

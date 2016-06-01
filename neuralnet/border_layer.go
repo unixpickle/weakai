@@ -105,7 +105,7 @@ func (b *BorderLayer) Alias() Layer {
 	}
 }
 
-func (b *BorderLayer) Serialize() []byte {
+func (b *BorderLayer) Serialize() ([]byte, error) {
 	s := serializedBorderLayer{
 		Depth:      b.output.Depth,
 		InWidth:    b.upstreamGradient.Width,
@@ -115,12 +115,11 @@ func (b *BorderLayer) Serialize() []byte {
 		LeftBorder: b.leftBorder,
 		TopBorder:  b.topBorder,
 	}
-	enc, _ := json.Marshal(&s)
-	return enc
+	return json.Marshal(&s)
 }
 
 func (b *BorderLayer) SerializerType() string {
-	return "borderlayer"
+	return serializerTypeBorderLayer
 }
 
 type serializedBorderLayer struct {

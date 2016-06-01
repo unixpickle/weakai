@@ -3,6 +3,8 @@ package neuralnet
 import (
 	"math"
 	"testing"
+
+	"github.com/unixpickle/serializer"
 )
 
 func TestConvDimensions(t *testing.T) {
@@ -168,10 +170,13 @@ func TestConvBackward(t *testing.T) {
 
 func TestConvSerialize(t *testing.T) {
 	layer := testingConvLayer()
-	data := layer.Serialize()
+	data, err := layer.Serialize()
+	if err != nil {
+		t.Fatal(err)
+	}
 	dataType := layer.SerializerType()
 
-	l, err := Deserializers[dataType](data)
+	l, err := serializer.GetDeserializer(dataType)(data)
 	if err != nil {
 		t.Fatal(err)
 	}

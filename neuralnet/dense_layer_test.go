@@ -3,6 +3,8 @@ package neuralnet
 import (
 	"math"
 	"testing"
+
+	"github.com/unixpickle/serializer"
 )
 
 func TestDenseForward(t *testing.T) {
@@ -82,10 +84,13 @@ func TestDenseBackward(t *testing.T) {
 
 func TestDenseSerialize(t *testing.T) {
 	layer := testingDenseLayer(t)
-	encoded := layer.Serialize()
+	encoded, err := layer.Serialize()
+	if err != nil {
+		t.Fatal(err)
+	}
 	layerType := layer.SerializerType()
 
-	decoded, err := Deserializers[layerType](encoded)
+	decoded, err := serializer.GetDeserializer(layerType)(encoded)
 	if err != nil {
 		t.Fatal(err)
 	}

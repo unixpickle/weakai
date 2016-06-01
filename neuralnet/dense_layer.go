@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/unixpickle/num-analysis/kahan"
+	"github.com/unixpickle/serializer"
 )
 
 // DenseParams are parameters for a dense
@@ -66,7 +67,7 @@ func DeserializeDenseLayer(data []byte) (*DenseLayer, error) {
 		return nil, err
 	}
 
-	activation, err := deserializeActivation(s.ActivationData, s.ActivationType)
+	activation, err := deserializeActivation(s.ActivationData)
 	if err != nil {
 		return nil, err
 	}
@@ -247,27 +248,28 @@ func (d *DenseLayer) Alias() Layer {
 	return res
 }
 
-func (d *DenseLayer) Serialize() []byte {
+func (d *DenseLayer) Serialize() ([]byte, error) {
+	serializedActivation, err := serializer.SerializeWithType(d.activation)
+	if err != nil {
+		return nil, err
+	}
 	s := serializedDenseLayer{
-		ActivationData: d.activation.Serialize(),
-		ActivationType: d.activation.SerializerType(),
+		ActivationData: serializedActivation,
 
 		Weights:    d.weights,
 		Biases:     d.biases,
 		InputSize:  len(d.upstreamGradient),
 		OutputSize: len(d.output),
 	}
-	data, _ := json.Marshal(&s)
-	return data
+	return json.Marshal(&s)
 }
 
 func (d *DenseLayer) SerializerType() string {
-	return "denselayer"
+	return serializerTypeDenseLayer
 }
 
 type serializedDenseLayer struct {
 	ActivationData []byte
-	ActivationType string
 
 	Weights [][]float64
 	Biases  []float64

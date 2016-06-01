@@ -181,7 +181,7 @@ func (r *MaxPoolingLayer) Alias() Layer {
 	return res
 }
 
-func (r *MaxPoolingLayer) Serialize() []byte {
+func (r *MaxPoolingLayer) Serialize() ([]byte, error) {
 	s := serializedMaxPoolingLayer{
 		InputWidth:  r.upstreamGradient.Width,
 		InputHeight: r.upstreamGradient.Height,
@@ -194,12 +194,11 @@ func (r *MaxPoolingLayer) Serialize() []byte {
 		XSpan: r.xSpan,
 		YSpan: r.ySpan,
 	}
-	data, _ := json.Marshal(&s)
-	return data
+	return json.Marshal(&s)
 }
 
 func (r *MaxPoolingLayer) SerializerType() string {
-	return "maxpoolinglayer"
+	return serializerTypeMaxPoolingLayer
 }
 
 // maxInput computes the maxmimum input value

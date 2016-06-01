@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/unixpickle/num-analysis/kahan"
+	"github.com/unixpickle/serializer"
 )
 
 // ConvParams stores parameters that define
@@ -97,7 +98,7 @@ func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
 		return nil, err
 	}
 
-	activation, err := deserializeActivation(s.ActivationData, s.ActivationType)
+	activation, err := deserializeActivation(s.ActivationData)
 	if err != nil {
 		return nil, err
 	}
@@ -265,10 +266,13 @@ func (c *ConvLayer) Alias() Layer {
 // It does not encode the current input/output,
 // upstream/downstream gradient, or parameter
 // gradient.
-func (c *ConvLayer) Serialize() []byte {
+func (c *ConvLayer) Serialize() ([]byte, error) {
+	serializedActivation, err := serializer.SerializeWithType(c.activation)
+	if err != nil {
+		return nil, err
+	}
 	s := serializedConvLayer{
-		ActivationData: c.activation.Serialize(),
-		ActivationType: c.activation.SerializerType(),
+		ActivationData: serializedActivation,
 		Stride:         c.stride,
 		Filters:        c.filters,
 		Biases:         c.biases,
@@ -281,17 +285,15 @@ func (c *ConvLayer) Serialize() []byte {
 		OutputHeight: c.output.Height,
 		OutputDepth:  c.output.Depth,
 	}
-	data, _ := json.Marshal(&s)
-	return data
+	return json.Marshal(&s)
 }
 
 func (c *ConvLayer) SerializerType() string {
-	return "convlayer"
+	return serializerTypeConvLayer
 }
 
 type serializedConvLayer struct {
 	ActivationData []byte
-	ActivationType string
 
 	Stride int
 

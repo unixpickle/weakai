@@ -181,7 +181,6 @@ func (r *Net) SerializerType() string {
 
 func (r *Net) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) {
 	inputCount := r.MemoryParams.InputSize
-	hiddenCount := r.MemoryParams.StateSize
 
 	for t, partial := range costPartials {
 		for neuronIdx, costPartial := range partial {
@@ -190,36 +189,41 @@ func (r *Net) computeShallowPartials(g *Gradient, costPartials []linalg.Vector) 
 			sumPartial := activationPartial * costPartial
 
 			g.OutBiases[neuronIdx] += sumPartial
-			for inputIdx := 0; inputIdx < inputCount; inputIdx++ {
+
+			inputGradList := g.InputGrads[t]
+			for inputIdx, inputVal := range r.inputs[t] {
 				val := g.OutWeights.Get(neuronIdx, inputIdx)
-				val += r.inputs[t][inputIdx] * sumPartial
+				val += inputVal * sumPartial
 				g.OutWeights.Set(neuronIdx, inputIdx, val)
 
 				weight := r.OutWeights.Get(neuronIdx, inputIdx)
-				g.InputGrads[t][inputIdx] += weight * sumPartial
+				inputGradList[inputIdx] += weight * sumPartial
 			}
-			for hiddenIdx := 0; hiddenIdx < hiddenCount; hiddenIdx++ {
+
+			newStateList := r.lstmOutputs[t].NewState
+			outputMaskList := r.lstmOutputs[t].OutputMask
+			for hiddenIdx, maskedVal := range r.lstmOutputs[t].MaskedState {
 				col := hiddenIdx + inputCount
 				val := g.OutWeights.Get(neuronIdx, col)
-				val += r.lstmOutputs[t].MaskedState[hiddenIdx] * sumPartial
+				val += maskedVal * sumPartial
 				g.OutWeights.Set(neuronIdx, col, val)
 
 				weightVal := r.OutWeights.Get(neuronIdx, col)
-				stateVal := r.lstmOutputs[t].NewState[hiddenIdx]
-				maskVal := r.lstmOutputs[t].OutputMask[hiddenIdx]
+				stateVal := newStateList[hiddenIdx]
+				maskVal := outputMaskList[hiddenIdx]
 				maskSigmoidPartial := (1 - maskVal) * maskVal
 				maskSumPartial := maskSigmoidPartial * weightVal * stateVal * sumPartial
 				g.OutGateBiases[hiddenIdx] += maskSumPartial
-				for inputIdx1 := 0; inputIdx1 < inputCount; inputIdx1++ {
+				for inputIdx1, inputVal := range r.inputs[t] {
 					val := g.OutGate.Get(hiddenIdx, inputIdx1)
-					val += r.inputs[t][inputIdx1] * maskSumPartial
+					val += inputVal * maskSumPartial
 					g.OutGate.Set(hiddenIdx, inputIdx1, val)
 				}
 				if t > 0 {
-					for hiddenIdx1 := 0; hiddenIdx1 < hiddenCount; hiddenIdx1++ {
+					for hiddenIdx1, newStateVal := range r.lstmOutputs[t-1].NewState {
 						col1 := hiddenIdx1 + inputCount
 						val := g.OutGate.Get(hiddenIdx, col1)
-						val += r.lstmOutputs[t-1].NewState[hiddenIdx1] * maskSumPartial
+						val += newStateVal * maskSumPartial
 						g.OutGate.Set(hiddenIdx, col1, val)
 					}
 				}
@@ -281,10 +285,9 @@ func (r *Net) localStateGrads(costGrad linalg.Vector, t int) (current, older,
 		output := r.outputs[t][neuronIdx]
 		activationDeriv := r.Activation.Deriv(output)
 		sumDeriv := activationDeriv * partial
-		for hiddenIdx := range current {
+		for hiddenIdx, outMask := range r.lstmOutputs[t].OutputMask {
 			col := hiddenIdx + inputCount
 			weight := r.OutWeights.Get(neuronIdx, col)
-			outMask := r.lstmOutputs[t].OutputMask[hiddenIdx]
 			current[hiddenIdx] += outMask * weight * sumDeriv
 
 			stateVal := r.lstmOutputs[t].NewState[hiddenIdx]

@@ -40,6 +40,32 @@ func (_ Sigmoid) SerializerType() string {
 	return serializerTypeSigmoid
 }
 
+type ReLU struct{}
+
+func (_ ReLU) Eval(x float64) float64 {
+	if x < 0 {
+		return 0
+	} else {
+		return x
+	}
+}
+
+func (_ ReLU) Deriv(evalOut float64) float64 {
+	if evalOut > 0 {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+func (_ ReLU) Serialize() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (_ ReLU) SerializerType() string {
+	return serializerTypeReLU
+}
+
 type HyperbolicTangent struct{}
 
 func (_ HyperbolicTangent) Eval(x float64) float64 {

@@ -17,12 +17,17 @@ const (
 	serializerTypeMaxPoolingLayer   = serializerTypePrefix + "MaxPoolingLayer"
 	serializerTypeSoftmaxLayer      = serializerTypePrefix + "SoftmaxLayer"
 	serializerTypeNetwork           = serializerTypePrefix + "Network"
+	serializerTypeReLU              = serializerTypePrefix + "ReLU"
 )
 
 func init() {
 	serializer.RegisterDeserializer(serializerTypeSigmoid,
 		func(d []byte) (serializer.Serializer, error) {
 			return Sigmoid{}, nil
+		})
+	serializer.RegisterDeserializer(serializerTypeReLU,
+		func(d []byte) (serializer.Serializer, error) {
+			return ReLU{}, nil
 		})
 	serializer.RegisterDeserializer(serializerTypeHyperbolicTangent,
 		func(d []byte) (serializer.Serializer, error) {

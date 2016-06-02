@@ -25,7 +25,7 @@ const (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	trainer := rnn.Trainer{
+	trainer := rnn.SGD{
 		CostFunc: rnn.MeanSquaredCost{},
 		StepSize: StepSize,
 		Epochs:   Epochs,

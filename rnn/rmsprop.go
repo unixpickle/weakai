@@ -79,7 +79,10 @@ func (r *RMSProp) normalize(g Gradient) {
 	}
 	for paramIdx, v := range g.Params() {
 		for i, x := range v {
-			v[i] = x / math.Sqrt(r.Mean[paramIdx][i])
+			meanSquare := r.Mean[paramIdx][i]
+			if meanSquare != 0 {
+				v[i] = x / math.Sqrt(meanSquare)
+			}
 		}
 	}
 }

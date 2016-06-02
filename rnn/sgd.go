@@ -2,6 +2,7 @@ package rnn
 
 import (
 	"math/rand"
+	"runtime"
 
 	"github.com/unixpickle/num-analysis/linalg"
 )
@@ -51,13 +52,54 @@ type SGD struct {
 }
 
 func (s *SGD) Train(r RNN) {
-	if s.BatchSize == 1 || s.BatchSize == 0 {
+	if s.BatchSize == 1 || s.BatchSize == 0 || runtime.GOMAXPROCS(0) < 2 {
 		s.TrainSynchronously(r)
 	}
 
-	// TODO: train using fancy goroutine magic and
-	// tons of nice aliasing hackery.
-	s.TrainSynchronously(r)
+	inChan := make(chan int, s.BatchSize)
+	outChan := make(chan Gradient, s.BatchSize)
+
+	defer close(inChan)
+
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		go func() {
+			net := r.Alias()
+			for sampleIdx := range inChan {
+				seq := s.InSeqs[sampleIdx]
+				outSeq := s.OutSeqs[sampleIdx]
+				var costPartials []linalg.Vector
+				for k, input := range seq {
+					actualOut := net.StepTime(input)
+					costGrad := make(linalg.Vector, len(actualOut))
+					s.CostFunc.Gradient(actualOut, outSeq[k], costGrad)
+					costPartials = append(costPartials, costGrad)
+				}
+				outChan <- net.CostGradient(costPartials)
+			}
+		}()
+	}
+
+	for i := 0; i < s.Epochs; i++ {
+		perm := rand.Perm(len(s.InSeqs))
+		for j := 0; j < len(perm); j += s.BatchSize {
+			batchSize := s.BatchSize
+			if j+batchSize > len(perm) {
+				batchSize = len(perm) - j
+			}
+			for k := 0; k < batchSize; k++ {
+				inChan <- perm[k+j]
+			}
+			var gradSum Gradient
+			for k := 0; k < batchSize; k++ {
+				if k == 0 {
+					gradSum = <-outChan
+				} else {
+					AddGradients(gradSum, <-outChan)
+				}
+			}
+			s.stepGrad(r, gradSum)
+		}
+	}
 }
 
 // TrainSynchronously is like Train, but it will

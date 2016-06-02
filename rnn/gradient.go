@@ -39,12 +39,9 @@ type Gradient interface {
 	Params() []linalg.Vector
 }
 
-// AddGradients adds all of the components of g1 to g.
+// AddGradients adds all of the parameter components
+// of g1 to g, but not the inputs.
 func AddGradients(g, g1 Gradient) {
-	g1Inputs := g1.Inputs()
-	for i, v := range g.Inputs() {
-		v.Add(g1Inputs[i])
-	}
 	g1Params := g1.Params()
 	for i, v := range g.Params() {
 		v.Add(g1Params[i])

@@ -93,7 +93,7 @@ func (r *Net) StepTime(in linalg.Vector) linalg.Vector {
 	}
 	copy(augmentedInput.Data, in)
 	copy(augmentedInput.Data[len(in):], output.MaskedState)
-	result := linalg.Vector(r.OutWeights.Mul(augmentedInput).Data).Add(r.OutBiases)
+	result := linalg.Vector(r.OutWeights.MulFast(augmentedInput).Data).Add(r.OutBiases)
 	for i, x := range result {
 		result[i] = r.Activation.Eval(x)
 	}

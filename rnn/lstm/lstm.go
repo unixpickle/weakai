@@ -85,10 +85,10 @@ func (l *LSTM) PropagateForward(state, input linalg.Vector) *LSTMOutput {
 	copy(inputMat.Data, input)
 	copy(inputMat.Data[len(input):], state)
 
-	res.MemInput = linalg.Vector(l.InWeights.Mul(inputMat).Data).Add(l.InBiases)
-	res.InputMask = linalg.Vector(l.InGate.Mul(inputMat).Data).Add(l.InGateBiases)
-	res.RememberMask = linalg.Vector(l.RemGate.Mul(inputMat).Data).Add(l.RemGateBiases)
-	res.OutputMask = linalg.Vector(l.OutGate.Mul(inputMat).Data).Add(l.OutGateBiases)
+	res.MemInput = linalg.Vector(l.InWeights.MulFast(inputMat).Data).Add(l.InBiases)
+	res.InputMask = linalg.Vector(l.InGate.MulFast(inputMat).Data).Add(l.InGateBiases)
+	res.RememberMask = linalg.Vector(l.RemGate.MulFast(inputMat).Data).Add(l.RemGateBiases)
+	res.OutputMask = linalg.Vector(l.OutGate.MulFast(inputMat).Data).Add(l.OutGateBiases)
 
 	sigmoidAll(res.MemInput, res.InputMask, res.RememberMask, res.OutputMask)
 	maskedInput := piecewiseMul(res.MemInput, res.InputMask)

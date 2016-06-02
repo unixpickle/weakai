@@ -30,7 +30,7 @@ func (t *Trainer) Train(r RNN) {
 				costPartials = append(costPartials, costGrad)
 			}
 			grad := r.CostGradient(costPartials)
-			grad.Scale(-t.StepSize)
+			ScaleGradient(grad, -t.StepSize)
 			r.StepGradient(grad)
 		}
 	}

@@ -5,40 +5,58 @@ import "github.com/unixpickle/num-analysis/linalg"
 // Gradient is a generic vector which can be
 // added to a given RNN to adjust the RNN's
 // weights, biases, and other parameters.
+//
+// Gradient implementations must store partials
+// in zero or more vectors (i.e. float slices).
+// This aggregate of vectors comprises a bigger
+// hypothetical vector which is the "gradient".
 type Gradient interface {
 	// Inputs returns the partials of the cost
 	// function with respect to the inputs of the
 	// RNN that generated this Gradient.
+	//
+	// The Gradient should expect for the returned
+	// vectors to be modified externally, but not
+	// the slices containing the vectors.
+	//
+	// This is useful for stacking multiple RNNs
+	// on top of each other and propagating gradients
+	// through the aggregate.
 	Inputs() []linalg.Vector
 
-	// Scale scales the gradient in place and
-	// returns the same gradient for convenience.
-	Scale(f float64) Gradient
+	// Params returns the partials of the cost
+	// function with respect to the parameters of
+	// the RNN that generated this Gradient.
+	//
+	// The Gradient should expect for the returned
+	// vectors to be modified externally, but not
+	// the slices containing the vectors.
+	//
+	// The returned slice must be structured the same
+	// for all Gradients from a given RNN.
+	// This way, multiple sets of param gradients can
+	// be added up, etc.
+	Params() []linalg.Vector
+}
 
-	// Add adds another gradient to this gradient
-	// and returns this gradient for convenience.
-	//
-	// This is only guaranteed to work if both
-	// gradients are from the same RNN.
-	Add(g Gradient) Gradient
+// AddGradients adds all of the components of g1 to g.
+func AddGradients(g, g1 Gradient) {
+	g1Inputs := g1.Inputs()
+	for i, v := range g.Inputs() {
+		v.Add(g1Inputs[i])
+	}
+	g1Params := g1.Params()
+	for i, v := range g.Params() {
+		v.Add(g1Params[i])
+	}
+}
 
-	// LargestComponent returns the largest partial
-	// derivative (in terms of absolute value) out
-	// of the partial derivatives for all parameters
-	// of the underlying RNN.
-	//
-	// The exact meaning of this value may vary for
-	// each Gradient implementation.
-	//
-	// This value should not count input partials.
-	LargestComponent() float64
-
-	// ClipComponents clips the magnitudes of partial
-	// derivatives to a certain range.
-	// If a partial derivative is greater than m or
-	// less than -m, it will be set to m or -m
-	// respectively.
-	//
-	// This should not affect input partials.
-	ClipComponents(m float64)
+// ScaleGradient scales the components of g.
+func ScaleGradient(g Gradient, f float64) {
+	for _, v := range g.Inputs() {
+		v.Scale(f)
+	}
+	for _, v := range g.Params() {
+		v.Scale(f)
+	}
 }

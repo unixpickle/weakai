@@ -54,6 +54,7 @@ type SGD struct {
 func (s *SGD) Train(r RNN) {
 	if s.BatchSize == 1 || s.BatchSize == 0 || runtime.GOMAXPROCS(0) < 2 {
 		s.TrainSynchronously(r)
+		return
 	}
 
 	inChan := make(chan int, s.BatchSize)
@@ -75,6 +76,7 @@ func (s *SGD) Train(r RNN) {
 					costPartials = append(costPartials, costGrad)
 				}
 				outChan <- net.CostGradient(costPartials)
+				net.Reset()
 			}
 		}()
 	}
@@ -135,6 +137,8 @@ func (s *SGD) TrainSynchronously(r RNN) {
 			if (samplesDone+1)%batchSize == 0 {
 				s.stepGrad(r, batchSum)
 				batchSum = nil
+			} else {
+				r.Reset()
 			}
 		}
 		if batchSum != nil {

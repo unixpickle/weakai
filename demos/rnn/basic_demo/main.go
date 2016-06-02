@@ -12,7 +12,7 @@ import (
 
 const (
 	StepSize = 0.1
-	Epochs   = 100
+	Epochs   = 30
 
 	TrainingCount = 100
 	TestingCount  = 100
@@ -25,10 +25,12 @@ const (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	trainer := rnn.SGD{
-		CostFunc: rnn.MeanSquaredCost{},
-		StepSize: StepSize,
-		Epochs:   Epochs,
+	trainer := rnn.RMSProp{
+		SGD: rnn.SGD{
+			CostFunc: rnn.MeanSquaredCost{},
+			StepSize: StepSize,
+			Epochs:   Epochs,
+		},
 	}
 	for i := 0; i < TrainingCount; i++ {
 		inSeq, outSeq := genEvenOddSeq(rand.Intn(MaxSeqLen-MinSeqLen) + MinSeqLen)

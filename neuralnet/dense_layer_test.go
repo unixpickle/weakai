@@ -7,6 +7,34 @@ import (
 	"github.com/unixpickle/serializer"
 )
 
+func BenchmarkDenseLayerBackProp(b *testing.B) {
+	net, _ := NewNetwork([]LayerPrototype{
+		&DenseParams{
+			Activation:  Sigmoid{},
+			InputCount:  1000,
+			OutputCount: 2000,
+		},
+		&DenseParams{
+			Activation:  Sigmoid{},
+			InputCount:  2000,
+			OutputCount: 512,
+		},
+		&DenseParams{
+			Activation:  Sigmoid{},
+			InputCount:  512,
+			OutputCount: 10,
+		},
+	})
+	net.SetInput(make([]float64, 1000))
+	net.SetDownstreamGradient(make([]float64, 10))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		net.PropagateForward()
+		net.PropagateBackward(false)
+	}
+}
+
 func TestDenseForward(t *testing.T) {
 	layer := testingDenseLayer(t)
 	input := layer.Input()

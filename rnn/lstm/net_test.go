@@ -36,6 +36,43 @@ type rnnTestCase struct {
 	sparse     bool
 }
 
+func BenchmarkRNNForwardProp(b *testing.B) {
+	net := NewNet(rnn.Sigmoid{}, 30, 100, 10)
+	samples := make([]linalg.Vector, 50)
+	for i := range samples {
+		samples[i] = make(linalg.Vector, 30)
+	}
+	outputGrads := make([]linalg.Vector, 50)
+	for i := range outputGrads {
+		outputGrads[i] = make(linalg.Vector, 10)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, input := range samples {
+			net.StepTime(input)
+		}
+	}
+}
+
+func BenchmarkRNNBackProp(b *testing.B) {
+	net := NewNet(rnn.Sigmoid{}, 30, 100, 10)
+	samples := make([]linalg.Vector, 50)
+	for i := range samples {
+		samples[i] = make(linalg.Vector, 30)
+	}
+	outputGrads := make([]linalg.Vector, 50)
+	for i := range outputGrads {
+		outputGrads[i] = make(linalg.Vector, 10)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, input := range samples {
+			net.StepTime(input)
+		}
+		net.CostGradient(outputGrads)
+	}
+}
+
 func TestRNNSerialize(t *testing.T) {
 	net := rnnForTesting(&rnnTestCase{
 		inputs:     rnnTestInputs,

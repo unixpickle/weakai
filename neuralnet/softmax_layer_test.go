@@ -2,6 +2,7 @@ package neuralnet
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 )
 
@@ -48,6 +49,39 @@ func TestSoftmaxLayerGradient(t *testing.T) {
 		if math.Abs(partial-grad[i]) > 1e-6 {
 			t.Errorf("invalid partial at index %d: got %f expected %f", i, grad[i], partial)
 		}
+	}
+}
+
+func BenchmarkSoftmaxForward(b *testing.B) {
+	rand.Seed(123)
+	inputVec := make([]float64, 3000)
+	for i := range inputVec {
+		inputVec[i] = rand.Float64()*5 - 2.5
+	}
+	layer := NewSoftmaxLayer(&SoftmaxParams{Size: len(inputVec)})
+	layer.SetInput(inputVec)
+	layer.SetDownstreamGradient(inputVec)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		layer.PropagateForward()
+	}
+}
+
+func BenchmarkSoftmaxBackProp(b *testing.B) {
+	rand.Seed(123)
+	inputVec := make([]float64, 3000)
+	for i := range inputVec {
+		inputVec[i] = rand.Float64()*5 - 2.5
+	}
+	layer := NewSoftmaxLayer(&SoftmaxParams{Size: len(inputVec)})
+	layer.SetInput(inputVec)
+	layer.SetDownstreamGradient(inputVec)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		layer.PropagateForward()
+		layer.PropagateBackward(true)
 	}
 }
 

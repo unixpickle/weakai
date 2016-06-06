@@ -1,10 +1,15 @@
 package neuralnet
 
-import "encoding/json"
+import (
+	"encoding/json"
 
-// BorderParams stores parameters used
+	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/num-analysis/linalg"
+)
+
+// BorderLayer stores parameters used
 // to configure a BorderLayer.
-type BorderParams struct {
+type BorderLayer struct {
 	InputWidth  int
 	InputHeight int
 	InputDepth  int
@@ -15,121 +20,128 @@ type BorderParams struct {
 	BottomBorder int
 }
 
-// Make creates a new BorderLayer using
-// the params defined by p.
-// This is equivalent to NewBorderLayer(p).
-func (p *BorderParams) Make() Layer {
-	return NewBorderLayer(p)
-}
-
-// A BorderLayer takes a 3D tensor as
-// input and adds horizontal and vertical
-// padding to its edges.
-type BorderLayer struct {
-	tensorLayer
-
-	leftBorder int
-	topBorder  int
-}
-
-func NewBorderLayer(params *BorderParams) *BorderLayer {
-	outWidth := params.InputWidth + params.LeftBorder + params.RightBorder
-	outHeight := params.InputHeight + params.TopBorder + params.BottomBorder
-	return &BorderLayer{
-		tensorLayer: tensorLayer{
-			output: NewTensor3(outWidth, outHeight, params.InputDepth),
-			upstreamGradient: NewTensor3(params.InputWidth, params.InputHeight,
-				params.InputDepth),
-		},
-		leftBorder: params.LeftBorder,
-		topBorder:  params.TopBorder,
-	}
-}
-
 func DeserializeBorderLayer(data []byte) (*BorderLayer, error) {
-	var s serializedBorderLayer
+	var s BorderLayer
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, err
 	}
-	return &BorderLayer{
-		tensorLayer: tensorLayer{
-			output:           NewTensor3(s.OutWidth, s.OutHeight, s.Depth),
-			upstreamGradient: NewTensor3(s.InWidth, s.InHeight, s.Depth),
-		},
-		leftBorder: s.LeftBorder,
-		topBorder:  s.TopBorder,
-	}, nil
+	return &s, nil
 }
 
-func (b *BorderLayer) Randomize() {
-}
-
-func (b *BorderLayer) PropagateForward() {
-	for y := 0; y < b.input.Height; y++ {
-		for x := 0; x < b.input.Width; x++ {
-			for z := 0; z < b.input.Depth; z++ {
-				num := b.input.Get(x, y, z)
-				b.output.Set(x+b.leftBorder, y+b.topBorder, z, num)
-			}
-		}
+func (b *BorderLayer) Apply(in autofunc.Result) autofunc.Result {
+	return &borderResult{
+		OutputVec: b.addBorder(in.Output()),
+		Input:     in,
+		Info:      *b,
 	}
 }
 
-func (b *BorderLayer) PropagateBackward(upstream bool) {
-	for y := 0; y < b.input.Height; y++ {
-		for x := 0; x < b.input.Width; x++ {
-			for z := 0; z < b.input.Depth; z++ {
-				num := b.downstreamGradient.Get(x+b.leftBorder, y+b.topBorder, z)
-				b.upstreamGradient.Set(x, y, z, num)
-			}
-		}
-	}
-}
-
-func (b *BorderLayer) GradientMagSquared() float64 {
-	return 0
-}
-
-func (b *BorderLayer) StepGradient(f float64) {
-}
-
-func (b *BorderLayer) Alias() Layer {
-	return &BorderLayer{
-		tensorLayer: tensorLayer{
-			output: NewTensor3(b.output.Width, b.output.Height, b.output.Depth),
-			upstreamGradient: NewTensor3(b.upstreamGradient.Width, b.upstreamGradient.Height,
-				b.upstreamGradient.Depth),
-		},
-		leftBorder: b.leftBorder,
-		topBorder:  b.topBorder,
+func (b *BorderLayer) ApplyR(in autofunc.RResult) autofunc.RResult {
+	return &borderRResult{
+		OutputVec:  b.addBorder(in.Output()),
+		ROutputVec: b.addBorder(in.ROutput()),
+		Input:      in,
+		Info:       *b,
 	}
 }
 
 func (b *BorderLayer) Serialize() ([]byte, error) {
-	s := serializedBorderLayer{
-		Depth:      b.output.Depth,
-		InWidth:    b.upstreamGradient.Width,
-		InHeight:   b.upstreamGradient.Height,
-		OutWidth:   b.output.Width,
-		OutHeight:  b.output.Height,
-		LeftBorder: b.leftBorder,
-		TopBorder:  b.topBorder,
-	}
-	return json.Marshal(&s)
+	return json.Marshal(b)
 }
 
 func (b *BorderLayer) SerializerType() string {
 	return serializerTypeBorderLayer
 }
 
-type serializedBorderLayer struct {
-	Depth int
+func (b *BorderLayer) addBorder(tensorVec linalg.Vector) linalg.Vector {
+	inTensor := &Tensor3{
+		Width:  b.InputWidth,
+		Height: b.InputHeight,
+		Depth:  b.InputDepth,
+		Data:   tensorVec,
+	}
+	outTensor := NewTensor3(b.InputWidth+b.LeftBorder+b.RightBorder,
+		b.InputHeight+b.TopBorder+b.BottomBorder,
+		b.InputDepth)
+	for y := 0; y < inTensor.Height; y++ {
+		insetY := y + b.TopBorder
+		for x := 0; x < inTensor.Width; x++ {
+			insetX := x + b.LeftBorder
+			for z := 0; z < inTensor.Depth; z++ {
+				inVal := inTensor.Get(x, y, z)
+				outTensor.Set(insetX, insetY, z, inVal)
+			}
+		}
+	}
+	return outTensor.Data
+}
 
-	InWidth   int
-	InHeight  int
-	OutWidth  int
-	OutHeight int
+func (b *BorderLayer) removeBorder(tensorVec linalg.Vector) linalg.Vector {
+	outTensor := NewTensor3(b.InputWidth, b.InputHeight, b.InputDepth)
+	inTensor := &Tensor3{
+		Width:  b.InputWidth + b.LeftBorder + b.RightBorder,
+		Height: b.InputHeight + b.TopBorder + b.BottomBorder,
+		Depth:  b.InputDepth,
+		Data:   tensorVec,
+	}
+	for y := 0; y < outTensor.Height; y++ {
+		insetY := y + b.TopBorder
+		for x := 0; x < outTensor.Width; x++ {
+			insetX := x + b.LeftBorder
+			for z := 0; z < outTensor.Depth; z++ {
+				inVal := inTensor.Get(insetX, insetY, z)
+				outTensor.Set(x, y, z, inVal)
+			}
+		}
+	}
+	return outTensor.Data
+}
 
-	LeftBorder int
-	TopBorder  int
+type borderResult struct {
+	OutputVec linalg.Vector
+	Input     autofunc.Result
+	Info      BorderLayer
+}
+
+func (b *borderResult) Output() linalg.Vector {
+	return b.OutputVec
+}
+
+func (b *borderResult) Constant(g autofunc.Gradient) bool {
+	return b.Input.Constant(g)
+}
+
+func (b *borderResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
+	if !b.Input.Constant(grad) {
+		downstream := b.Info.removeBorder(upstream)
+		b.Input.PropagateGradient(downstream, grad)
+	}
+}
+
+type borderRResult struct {
+	OutputVec  linalg.Vector
+	ROutputVec linalg.Vector
+	Input      autofunc.RResult
+	Info       BorderLayer
+}
+
+func (b *borderRResult) Output() linalg.Vector {
+	return b.OutputVec
+}
+
+func (b *borderRResult) ROutput() linalg.Vector {
+	return b.ROutputVec
+}
+
+func (b *borderRResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) bool {
+	return b.Input.Constant(rg, g)
+}
+
+func (b *borderRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
+	rgrad autofunc.RGradient, grad autofunc.Gradient) {
+	if !b.Input.Constant(rgrad, grad) {
+		downstream := b.Info.removeBorder(upstream)
+		downstreamR := b.Info.removeBorder(upstreamR)
+		b.Input.PropagateRGradient(downstream, downstreamR, rgrad, grad)
+	}
 }

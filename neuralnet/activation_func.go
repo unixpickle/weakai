@@ -1,35 +1,20 @@
 package neuralnet
 
 import (
-	"fmt"
-	"math"
-
-	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/num-analysis/linalg"
 )
 
-// An ActivationFunc is a function designed to
-// introduce non-linearity into a neural net.
-type ActivationFunc interface {
-	serializer.Serializer
-
-	// Eval evaluates the activation function for
-	// an input x.
-	Eval(x float64) float64
-
-	// Deriv evaluates the derivative of the
-	// activation function for an input x.
-	Deriv(x float64) float64
-}
-
+// Sigmoid is a Layer which applies the
+// logistic sigmoid function.
 type Sigmoid struct{}
 
-func (_ Sigmoid) Eval(x float64) float64 {
-	return 1.0 / (1.0 + math.Exp(-x))
+func (_ Sigmoid) Apply(r autofunc.Result) autofunc.Result {
+	return autofunc.Sigmoid{}.Apply(r)
 }
 
-func (s Sigmoid) Deriv(x float64) float64 {
-	v := s.Eval(x)
-	return v * (1.0 - v)
+func (_ Sigmoid) ApplyR(v autofunc.RVector, r autofunc.RResult) autofunc.RResult {
+	return autofunc.Sigmoid{}.ApplyR(v, r)
 }
 
 func (_ Sigmoid) Serialize() ([]byte, error) {
@@ -42,19 +27,35 @@ func (_ Sigmoid) SerializerType() string {
 
 type ReLU struct{}
 
-func (_ ReLU) Eval(x float64) float64 {
-	if x < 0 {
-		return 0
-	} else {
-		return x
+func (_ ReLU) Apply(r autofunc.Result) autofunc.Result {
+	inVec := r.Output()
+	vec := make(linalg.Vector, len(inVec))
+	for i, x := range inVec {
+		if x > 0 {
+			vec[i] = x
+		}
+	}
+	return &reLUResult{
+		OutputVec: vec,
+		Input:     r,
 	}
 }
 
-func (_ ReLU) Deriv(evalOut float64) float64 {
-	if evalOut > 0 {
-		return 1
-	} else {
-		return 0
+func (_ ReLU) ApplyR(r autofunc.RResult) autofunc.RResult {
+	outVec := r.Output()
+	outVecR := r.ROutput()
+	vec := make(linalg.Vector, len(outVec))
+	vecR := make(linalg.Vector, len(outVec))
+	for i, x := range outVec {
+		if x > 0 {
+			vec[i] = x
+			vecR[i] = outVecR[i]
+		}
+	}
+	return &reLURResult{
+		OutputVec:  vec,
+		ROutputVec: vecR,
+		Input:      r,
 	}
 }
 
@@ -66,22 +67,67 @@ func (_ ReLU) SerializerType() string {
 	return serializerTypeReLU
 }
 
-type HyperbolicTangent struct{}
-
-func (_ HyperbolicTangent) Eval(x float64) float64 {
-	return math.Tanh(x)
+type reLUResult struct {
+	OutputVec linalg.Vector
+	Input     autofunc.Result
 }
 
-func (_ HyperbolicTangent) Deriv(x float64) float64 {
-	cosh := math.Cosh(x)
-	if math.IsInf(cosh, 0) {
-		return 0
+func (r *reLUResult) Output() linalg.Vector {
+	return r.OutputVec
+}
+
+func (r *reLUResult) Constant(g autofunc.Gradient) bool {
+	return r.Input.Constant(g)
+}
+
+func (r *reLUResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
+	for i, x := range r.OutputVec {
+		if x == 0 {
+			upstream[i] = 0
+		}
+		r.Input.PropagateGradient(upstream, grad)
 	}
-	coshSquared := math.Pow(cosh, 2)
-	if math.IsInf(coshSquared, 0) {
-		return 0
+}
+
+type reLURResult struct {
+	OutputVec  linalg.Vector
+	ROutputVec linalg.Vector
+	Input      autofunc.RResult
+}
+
+func (r *reLURResult) Output() linalg.Vector {
+	return r.OutputVec
+}
+
+func (r *reLURResult) ROutput() linalg.Vector {
+	return r.ROutputVec
+}
+
+func (r *reLURResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) bool {
+	return r.Input.Constant(rg, g)
+}
+
+func (r *reLURResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
+	rgrad autofunc.RGradient, grad autofunc.Gradient) {
+	for i, x := range r.OutputVec {
+		if x == 0 {
+			upstream[i] = 0
+			upstreamR[i] = 0
+		}
+		r.Input.PropagateRGradient(upstream, upstreamR, rgrad, grad)
 	}
-	return 1 / coshSquared
+}
+
+type HyperbolicTangent struct{}
+
+func (_ HyperbolicTangent) Apply(r autofunc.Result) autofunc.Result {
+	stretched := autofunc.Scale(autofunc.Sigmoid{}.Apply(autofunc.Scale(r, 2)), 2)
+	return autofunc.AddScaler(stretched, -1)
+}
+
+func (_ HyperbolicTangent) ApplyR(v autofunc.RVector, r autofunc.RResult) autofunc.RResult {
+	stretched := autofunc.ScaleR(autofunc.Sigmoid{}.ApplyR(v, autofunc.ScaleR(r, 2)), 2)
+	return autofunc.AddScalerR(stretched, -1)
 }
 
 func (_ HyperbolicTangent) Serialize() ([]byte, error) {
@@ -90,15 +136,4 @@ func (_ HyperbolicTangent) Serialize() ([]byte, error) {
 
 func (_ HyperbolicTangent) SerializerType() string {
 	return serializerTypeHyperbolicTangent
-}
-
-func deserializeActivation(data []byte) (ActivationFunc, error) {
-	activation, err := serializer.DeserializeWithType(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize activation: %s", err.Error())
-	} else if rightType, ok := activation.(ActivationFunc); !ok {
-		return nil, fmt.Errorf("expected ActivationFunc but got %T", activation)
-	} else {
-		return rightType, nil
-	}
 }

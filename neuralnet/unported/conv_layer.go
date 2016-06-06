@@ -9,10 +9,8 @@ import (
 	"github.com/unixpickle/serializer"
 )
 
-// ConvParams stores parameters that define
-// a convolutional layer in an ANN.
-// It can be used as a LayerPrototype to make
-// convolutional layers.
+// ConvLayer is a convolutional layer for
+// a neural network.
 type ConvParams struct {
 	FilterCount  int
 	FilterWidth  int
@@ -22,8 +20,6 @@ type ConvParams struct {
 	InputWidth  int
 	InputHeight int
 	InputDepth  int
-
-	Activation ActivationFunc
 }
 
 // Make creates a new *ConvLayer using the

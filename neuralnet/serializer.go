@@ -33,20 +33,22 @@ func init() {
 		func(d []byte) (serializer.Serializer, error) {
 			return HyperbolicTangent{}, nil
 		})
-	serializer.RegisterDeserializer(serializerTypeConvLayer,
+	/*serializer.RegisterDeserializer(serializerTypeConvLayer,
 		convertDeserializer(DeserializeConvLayer))
 	serializer.RegisterDeserializer(serializerTypeDenseLayer,
 		convertDeserializer(DeserializeDenseLayer))
 	serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
 		convertDeserializer(DeserializeMaxPoolingLayer))
 	serializer.RegisterDeserializer(serializerTypeNetwork,
-		convertDeserializer(DeserializeNetwork))
+		convertDeserializer(DeserializeNetwork))*/
 	serializer.RegisterDeserializer(serializerTypeBorderLayer,
 		convertDeserializer(DeserializeBorderLayer))
-	serializer.RegisterDeserializer(serializerTypeConvGrowLayer,
-		convertDeserializer(DeserializeConvGrowLayer))
-	serializer.RegisterDeserializer(serializerTypeSoftmaxLayer,
-		convertDeserializer(DeserializeSoftmaxLayer))
+	/*
+		serializer.RegisterDeserializer(serializerTypeConvGrowLayer,
+			convertDeserializer(DeserializeConvGrowLayer))
+		serializer.RegisterDeserializer(serializerTypeSoftmaxLayer,
+			convertDeserializer(DeserializeSoftmaxLayer))
+	*/
 }
 
 func convertDeserializer(f interface{}) serializer.Deserializer {

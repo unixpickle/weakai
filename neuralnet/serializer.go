@@ -35,12 +35,12 @@ func init() {
 		})
 	/*serializer.RegisterDeserializer(serializerTypeConvLayer,
 		convertDeserializer(DeserializeConvLayer))
+	serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
+		convertDeserializer(DeserializeMaxPoolingLayer))*/
 	serializer.RegisterDeserializer(serializerTypeDenseLayer,
 		convertDeserializer(DeserializeDenseLayer))
-	serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
-		convertDeserializer(DeserializeMaxPoolingLayer))
 	serializer.RegisterDeserializer(serializerTypeNetwork,
-		convertDeserializer(DeserializeNetwork))*/
+		convertDeserializer(DeserializeNetwork))
 	serializer.RegisterDeserializer(serializerTypeBorderLayer,
 		convertDeserializer(DeserializeBorderLayer))
 	/*

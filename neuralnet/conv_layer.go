@@ -362,7 +362,7 @@ func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 					biasGrad[z] += sumPartial
 				}
 				if biasGradR != nil {
-					biasGrad[z] += sumPartialR
+					biasGradR[z] += sumPartialR
 				}
 				if inputGrad != nil {
 					inputGrad.MulAdd(inputX, inputY, filter, sumPartial)

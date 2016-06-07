@@ -2,9 +2,11 @@ package neuralnet
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/functest"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
 )
@@ -99,7 +101,7 @@ func TestConvBackward(t *testing.T) {
 	}
 }
 
-func TestConvSerialize(t *testing.T) {
+func TestConvLayerSerialize(t *testing.T) {
 	layer, _, _ := convLayerTestInfo()
 	data, err := layer.Serialize()
 	if err != nil {
@@ -147,6 +149,25 @@ func TestConvSerialize(t *testing.T) {
 			t.Errorf("list %d does not match", i)
 		}
 	}
+}
+
+func TestConvLayerRProp(t *testing.T) {
+	layer, input, _ := convLayerTestInfo()
+	variables := append(layer.Parameters(), input)
+	rVector := autofunc.RVector{}
+	for _, variable := range variables {
+		rVector[variable] = make(linalg.Vector, len(variable.Vector))
+		for i := range rVector[variable] {
+			rVector[variable][i] = rand.Float64()*2 - 1
+		}
+	}
+	funcTest := &functest.RFuncTest{
+		F:     layer,
+		Vars:  variables,
+		Input: autofunc.NewRVariable(input, rVector),
+		RV:    rVector,
+	}
+	funcTest.Run(t)
 }
 
 func convLayerTestInfo() (network Network, input *autofunc.Variable, outGrad linalg.Vector) {

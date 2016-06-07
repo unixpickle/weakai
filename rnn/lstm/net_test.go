@@ -42,10 +42,6 @@ func BenchmarkRNNForwardProp(b *testing.B) {
 	for i := range samples {
 		samples[i] = make(linalg.Vector, 30)
 	}
-	outputGrads := make([]linalg.Vector, 50)
-	for i := range outputGrads {
-		outputGrads[i] = make(linalg.Vector, 10)
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, input := range samples {
@@ -63,6 +59,9 @@ func BenchmarkRNNBackProp(b *testing.B) {
 	outputGrads := make([]linalg.Vector, 50)
 	for i := range outputGrads {
 		outputGrads[i] = make(linalg.Vector, 10)
+		for j := range outputGrads[i] {
+			outputGrads[i][j] = 1
+		}
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

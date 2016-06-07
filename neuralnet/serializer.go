@@ -44,11 +44,11 @@ func init() {
 		convertDeserializer(DeserializeNetwork))
 	serializer.RegisterDeserializer(serializerTypeBorderLayer,
 		convertDeserializer(DeserializeBorderLayer))
+	serializer.RegisterDeserializer(serializerTypeSoftmaxLayer,
+		convertDeserializer(DeserializeSoftmaxLayer))
 	/*
 		serializer.RegisterDeserializer(serializerTypeConvGrowLayer,
 			convertDeserializer(DeserializeConvGrowLayer))
-		serializer.RegisterDeserializer(serializerTypeSoftmaxLayer,
-			convertDeserializer(DeserializeSoftmaxLayer))
 	*/
 }
 

@@ -2,6 +2,7 @@ package neuralnet
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/unixpickle/autofunc"
@@ -18,10 +19,18 @@ func BenchmarkDenseLayerBackProp(b *testing.B) {
 		&DenseLayer{InputCount: 512, OutputCount: 10},
 		Sigmoid{},
 	}
+	rand.Seed(123)
 	net.Randomize()
-
 	inVec := &autofunc.Variable{Vector: make(linalg.Vector, 1000)}
+	for i := range inVec.Vector {
+		inVec.Vector[i] = rand.Float64()*2 - 1
+	}
+
 	downstream := make(linalg.Vector, 10)
+	for i := range downstream {
+		downstream[i] = 1
+	}
+
 	grad := autofunc.NewGradient(net.Parameters())
 
 	b.ResetTimer()

@@ -4,11 +4,14 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/functest"
+	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
 )
 
 func TestMaxPoolingDimensions(t *testing.T) {
-	inParams := []*MaxPoolingParams{
+	layers := []*MaxPoolingLayer{
 		{3, 3, 9, 9, 5},
 		{2, 2, 9, 9, 7},
 		{4, 10, 30, 51, 2},
@@ -18,21 +21,19 @@ func TestMaxPoolingDimensions(t *testing.T) {
 		{5, 5, 7},
 		{8, 6, 2},
 	}
-	for i, params := range inParams {
-		layer := NewMaxPoolingLayer(params)
+	for i, layer := range layers {
 		expOutSize := outSizes[i]
-		if layer.output.Width != expOutSize[0] ||
-			layer.output.Height != expOutSize[1] ||
-			layer.output.Depth != expOutSize[2] {
+		if layer.OutputWidth() != expOutSize[0] ||
+			layer.OutputHeight() != expOutSize[1] {
 			t.Errorf("test %d gave downstream size %dX%dX%d (expected %dX%dX%d)",
-				i, layer.output.Width, layer.output.Height, layer.output.Depth,
+				i, layer.OutputWidth(), layer.OutputHeight(), layer.InputDepth,
 				expOutSize[0], expOutSize[1], expOutSize[2])
 		}
 	}
 }
 
 func TestMaxPoolingForward(t *testing.T) {
-	layer := NewMaxPoolingLayer(&MaxPoolingParams{3, 3, 10, 11, 2})
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
 
 	input := []float64{
 		0.5305, 0.7935, 0.3718, 0.4026, 0.8246, 0.6875, 0.6069, 0.0399, 0.4759, 0.3548, 0.8465, 0.0479, 0.4841, 0.1277, 0.2060, 0.6833, 0.0844, 0.0793, 0.1564, 0.2891,
@@ -58,20 +59,16 @@ func TestMaxPoolingForward(t *testing.T) {
 		0.7001, 0.8709, 0.7824, 0.9277, 0.7961, 0.9463, 0.8892, 0.8616,
 	}
 
-	layer.SetInput(input)
-	layer.PropagateForward()
-	if len(output) != len(layer.Output()) {
-		t.Fatal("invalid output length")
-	}
+	result := layer.Apply(&autofunc.Variable{input}).Output()
 	for i, x := range output {
-		if actual := layer.Output()[i]; actual != x {
+		if actual := result[i]; actual != x {
 			t.Errorf("expected output %d to be %f but got %f", i, x, actual)
 		}
 	}
 }
 
 func TestMaxPoolingBackward(t *testing.T) {
-	layer := NewMaxPoolingLayer(&MaxPoolingParams{3, 3, 10, 11, 2})
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
 
 	input := []float64{
 		0.5305, 0.7935, 0.3718, 0.4026, 0.8246, 0.6875, 0.6069, 0.0399, 0.4759, 0.3548, 0.8465, 0.0479, 0.4841, 0.1277, 0.2060, 0.6833, 0.0844, 0.0793, 0.1564, 0.2891,
@@ -112,26 +109,19 @@ func TestMaxPoolingBackward(t *testing.T) {
 		0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
 	}
 
-	layer.SetDownstreamGradient(downstreamGrad.Data)
-	layer.SetInput(input)
-
-	// Make sure that no gradient values are
-	// left over from previous back propagations.
-	backup := input[0]
-	input[0] = 1
-	layer.PropagateForward()
-	layer.PropagateBackward(true)
-	input[0] = backup
-
-	layer.PropagateForward()
-	layer.PropagateBackward(true)
+	inputVar := &autofunc.Variable{input}
+	g := autofunc.NewGradient([]*autofunc.Variable{inputVar})
+	downstreamCopy := make(linalg.Vector, len(downstreamGrad.Data))
+	copy(downstreamCopy, downstreamGrad.Data)
+	layer.Apply(inputVar).PropagateGradient(downstreamCopy, g)
+	actualGrad := g[inputVar]
 
 	idx := 0
 	for y := 0; y < 11; y++ {
 		for x := 0; x < 10; x++ {
 			for z := 0; z < 2; z++ {
 				isChosen := gradientMask[z+x*2+y*20] == 1
-				gradValue := layer.UpstreamGradient()[idx]
+				gradValue := actualGrad[idx]
 				outputGrad := downstreamGrad.Get(x/3, y/3, z)
 				idx++
 				if !isChosen && gradValue != 0 {
@@ -147,7 +137,7 @@ func TestMaxPoolingBackward(t *testing.T) {
 }
 
 func TestMaxPoolingSerialize(t *testing.T) {
-	layer := NewMaxPoolingLayer(&MaxPoolingParams{3, 3, 10, 11, 2})
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
 	encoded, err := layer.Serialize()
 	if err != nil {
 		t.Fatal(err)
@@ -161,10 +151,25 @@ func TestMaxPoolingSerialize(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *MaxPoolingLayer but got %T", decoded)
 	}
+}
 
-	// Make sure none of this triggers panics.
-	layer.SetDownstreamGradient(make([]float64, 4*4*2))
-	layer.SetInput(make([]float64, 20*11))
-	layer.PropagateForward()
-	layer.PropagateBackward(true)
+func TestMaxPoolingRProp(t *testing.T) {
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
+	input := make(linalg.Vector, 10*11*2)
+	inputR := make(linalg.Vector, len(input))
+	for i := range input {
+		input[i] = rand.Float64()*2 - 1
+		inputR[i] = rand.Float64()*2 - 1
+	}
+
+	inputVar := &autofunc.Variable{input}
+	rVector := autofunc.RVector{inputVar: inputR}
+
+	funcTest := &functest.RFuncTest{
+		F:     layer,
+		Vars:  []*autofunc.Variable{inputVar},
+		Input: autofunc.NewRVariable(inputVar, rVector),
+		RV:    rVector,
+	}
+	funcTest.Run(t)
 }

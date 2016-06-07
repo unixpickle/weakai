@@ -34,8 +34,7 @@ func init() {
 			return HyperbolicTangent{}, nil
 		})
 	/*
-		serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
-			convertDeserializer(DeserializeMaxPoolingLayer))*/
+	 */
 	serializer.RegisterDeserializer(serializerTypeConvLayer,
 		convertDeserializer(DeserializeConvLayer))
 	serializer.RegisterDeserializer(serializerTypeDenseLayer,
@@ -46,6 +45,8 @@ func init() {
 		convertDeserializer(DeserializeBorderLayer))
 	serializer.RegisterDeserializer(serializerTypeSoftmaxLayer,
 		convertDeserializer(DeserializeSoftmaxLayer))
+	serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
+		convertDeserializer(DeserializeMaxPoolingLayer))
 	/*
 		serializer.RegisterDeserializer(serializerTypeConvGrowLayer,
 			convertDeserializer(DeserializeConvGrowLayer))

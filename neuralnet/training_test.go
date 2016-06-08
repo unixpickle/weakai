@@ -19,6 +19,9 @@ func TestTrainingXORParallel(t *testing.T) {
 }
 
 func testTrainingXOR(t *testing.T, batchSize int) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	net := Network{
 		&DenseLayer{
 			InputCount:  2,

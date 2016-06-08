@@ -11,7 +11,7 @@ const (
 	serializerTypeHyperbolicTangent = serializerTypePrefix + "HyperbolicTangent"
 	serializerTypeSigmoid           = serializerTypePrefix + "Sigmoid"
 	serializerTypeBorderLayer       = serializerTypePrefix + "BorderLayer"
-	serializerTypeConvGrowLayer     = serializerTypePrefix + "ConvGrowLayer"
+	serializerTypeUnstackLayer      = serializerTypePrefix + "UnstackLayer"
 	serializerTypeConvLayer         = serializerTypePrefix + "ConvLayer"
 	serializerTypeDenseLayer        = serializerTypePrefix + "DenseLayer"
 	serializerTypeMaxPoolingLayer   = serializerTypePrefix + "MaxPoolingLayer"
@@ -47,6 +47,8 @@ func init() {
 		convertDeserializer(DeserializeSoftmaxLayer))
 	serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
 		convertDeserializer(DeserializeMaxPoolingLayer))
+	serializer.RegisterDeserializer(serializerTypeUnstackLayer,
+		convertDeserializer(DeserializeUnstackLayer))
 	/*
 		serializer.RegisterDeserializer(serializerTypeConvGrowLayer,
 			convertDeserializer(DeserializeConvGrowLayer))

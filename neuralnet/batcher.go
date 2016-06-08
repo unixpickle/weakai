@@ -2,6 +2,7 @@ package neuralnet
 
 import (
 	"runtime"
+	"sync"
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
@@ -17,8 +18,12 @@ type Batcher struct {
 	batchSize int
 	learner   Learner
 
+	cache    *gradientCache
 	reqChan  chan batcherRequest
 	respChan chan batcherResponse
+
+	lastGradResult  autofunc.Gradient
+	lastGradRResult autofunc.RGradient
 }
 
 type batcherRequest struct {
@@ -44,6 +49,7 @@ func NewBatcher(l Learner, costFunc CostFunc, batchSize int) *Batcher {
 		costFunc:  costFunc,
 		batchSize: batchSize,
 		learner:   l,
+		cache:     newGradientCache(l.Parameters()),
 	}
 }
 
@@ -108,6 +114,10 @@ func (b *Batcher) Stop() {
 // If the batch is larger than the batchSize passed
 // to NewBatcher(), then the gradient will still be
 // computed, but not necessarily in an efficient way.
+//
+// The resulting values are  only valid until the next
+// call to BatchGradient or BatchRGradient, when the
+// vectors may be re-used.
 func (b *Batcher) BatchGradient(s *SampleSet) autofunc.Gradient {
 	grad, _ := b.batch(nil, s)
 	return grad
@@ -115,6 +125,10 @@ func (b *Batcher) BatchGradient(s *SampleSet) autofunc.Gradient {
 
 // BatchRGradient computes the Gradient and RGradient
 // for a batch of samples.
+//
+// The resulting values are  only valid until the next
+// call to BatchGradient or BatchRGradient, when the
+// vectors may be re-used.
 func (b *Batcher) BatchRGradient(v autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	return b.batch(v, s)
@@ -122,9 +136,17 @@ func (b *Batcher) BatchRGradient(v autofunc.RVector, s *SampleSet) (autofunc.Gra
 
 func (b *Batcher) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
+	if b.lastGradResult != nil {
+		b.cache.Free(b.lastGradResult)
+	}
+	if b.lastGradRResult != nil {
+		b.cache.FreeR(b.lastGradRResult)
+	}
+
+	var gradOut autofunc.Gradient
+	var rgradOut autofunc.RGradient
+
 	if b.reqChan == nil {
-		var gradOut autofunc.Gradient
-		var rgradOut autofunc.RGradient
 		for i, input := range s.Inputs {
 			req := batcherRequest{Input: input, Expected: s.Outputs[i], RV: rv}
 			resp := b.fulfillRequest(req)
@@ -133,44 +155,45 @@ func (b *Batcher) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 				rgradOut = resp.RGrad
 			} else {
 				gradOut.Add(resp.Grad)
+				b.cache.Free(resp.Grad)
 				if rgradOut != nil {
 					rgradOut.Add(resp.RGrad)
+					b.cache.FreeR(resp.RGrad)
 				}
 			}
 		}
-		return gradOut, rgradOut
-	}
+	} else {
+		go func() {
+			for i, input := range s.Inputs {
+				b.reqChan <- batcherRequest{Input: input, Expected: s.Outputs[i], RV: rv}
+			}
+		}()
 
-	var gradOut autofunc.Gradient
-	var rgradOut autofunc.RGradient
-
-	go func() {
-		for i, input := range s.Inputs {
-			b.reqChan <- batcherRequest{Input: input, Expected: s.Outputs[i], RV: rv}
-		}
-	}()
-
-	for i := range s.Inputs {
-		resp := <-b.respChan
-		if i == 0 {
-			gradOut = resp.Grad
-			rgradOut = resp.RGrad
-		} else {
-			gradOut.Add(resp.Grad)
-			if rgradOut != nil {
-				rgradOut.Add(resp.RGrad)
+		for i := range s.Inputs {
+			resp := <-b.respChan
+			if i == 0 {
+				gradOut = resp.Grad
+				rgradOut = resp.RGrad
+			} else {
+				gradOut.Add(resp.Grad)
+				b.cache.Free(resp.Grad)
+				if rgradOut != nil {
+					rgradOut.Add(resp.RGrad)
+					b.cache.FreeR(resp.RGrad)
+				}
 			}
 		}
 	}
 
+	b.lastGradResult, b.lastGradRResult = gradOut, rgradOut
 	return gradOut, rgradOut
 }
 
 func (b *Batcher) fulfillRequest(req batcherRequest) batcherResponse {
 	inVar := &autofunc.Variable{req.Input}
-	resp := batcherResponse{Grad: autofunc.NewGradient(b.learner.Parameters())}
+	resp := batcherResponse{Grad: b.cache.Alloc()}
 	if req.RV != nil {
-		resp.RGrad = autofunc.NewRGradient(b.learner.Parameters())
+		resp.RGrad = b.cache.AllocR()
 		rVar := autofunc.NewRVariable(inVar, req.RV)
 		result := b.learner.ApplyR(req.RV, rVar)
 		cost := b.costFunc.CostR(req.RV, req.Expected, result)
@@ -182,4 +205,56 @@ func (b *Batcher) fulfillRequest(req batcherRequest) batcherResponse {
 		cost.PropagateGradient(linalg.Vector{1}, resp.Grad)
 	}
 	return resp
+}
+
+type gradientCache struct {
+	gradsLock  sync.Mutex
+	rgradsLock sync.Mutex
+	variables  []*autofunc.Variable
+	gradients  []autofunc.Gradient
+	rGradients []autofunc.RGradient
+}
+
+func newGradientCache(vars []*autofunc.Variable) *gradientCache {
+	return &gradientCache{variables: vars}
+}
+
+func (g *gradientCache) Alloc() autofunc.Gradient {
+	g.gradsLock.Lock()
+	if len(g.gradients) == 0 {
+		g.gradsLock.Unlock()
+		res := autofunc.NewGradient(g.variables)
+		return res
+	}
+	res := g.gradients[len(g.gradients)-1]
+	g.gradients = g.gradients[:len(g.gradients)-1]
+	g.gradsLock.Unlock()
+	res.Zero()
+	return res
+}
+
+func (g *gradientCache) AllocR() autofunc.RGradient {
+	g.rgradsLock.Lock()
+	if len(g.rGradients) == 0 {
+		g.rgradsLock.Unlock()
+		res := autofunc.NewRGradient(g.variables)
+		return res
+	}
+	res := g.rGradients[len(g.gradients)-1]
+	g.rGradients = g.rGradients[:len(g.rGradients)-1]
+	g.rgradsLock.Unlock()
+	res.Zero()
+	return res
+}
+
+func (g *gradientCache) Free(gr autofunc.Gradient) {
+	g.gradsLock.Lock()
+	defer g.gradsLock.Unlock()
+	g.gradients = append(g.gradients, gr)
+}
+
+func (g *gradientCache) FreeR(gr autofunc.RGradient) {
+	g.rgradsLock.Lock()
+	defer g.rgradsLock.Unlock()
+	g.rGradients = append(g.rGradients, gr)
 }

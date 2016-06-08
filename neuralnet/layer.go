@@ -23,9 +23,10 @@ type Randomizer interface {
 	Randomize()
 }
 
-// A Learner is anything with parameters that should
+// A Learner is any RFunc with parameters that should
 // be learned by gradient descent or some other means
 // of optimization.
 type Learner interface {
+	autofunc.RFunc
 	Parameters() []*autofunc.Variable
 }

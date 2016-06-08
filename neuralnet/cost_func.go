@@ -17,7 +17,20 @@ type CostFunc interface {
 		actual autofunc.RResult) autofunc.RResult
 }
 
-// MeanSquaredCost computes the cost as 1/2*||a-x||^2
+// TotalCost returns the total cost of a layer on a
+// set of samples.
+func TotalCost(c CostFunc, layer autofunc.Func, s *SampleSet) float64 {
+	var totalCost float64
+	for i, input := range s.Inputs {
+		inVar := &autofunc.Variable{input}
+		result := layer.Apply(inVar)
+		costOut := c.Cost(s.Outputs[i], result)
+		totalCost += costOut.Output()[0]
+	}
+	return totalCost
+}
+
+// MeanSquaredCost computes the cost as ||a-x||^2
 // where a is the actual output and x is the desired
 // output.
 type MeanSquaredCost struct{}

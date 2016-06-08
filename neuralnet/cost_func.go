@@ -1,6 +1,8 @@
 package neuralnet
 
 import (
+	"sync"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 )
@@ -35,9 +37,11 @@ func TotalCost(c CostFunc, layer autofunc.Func, s *SampleSet) float64 {
 // output.
 type MeanSquaredCost struct{}
 
-func (_ MeanSquaredCost) Cost(a linalg.Vector, x autofunc.Result) autofunc.Result {
-	aVar := &autofunc.Variable{a.Copy().Scale(-1)}
-	return autofunc.SquaredNorm{}.Apply(autofunc.Add(aVar, x))
+func (_ MeanSquaredCost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
+	return &meanSquaredResult{
+		Actual:   a,
+		Expected: x,
+	}
 }
 
 func (_ MeanSquaredCost) CostR(v autofunc.RVector, a linalg.Vector,
@@ -45,6 +49,51 @@ func (_ MeanSquaredCost) CostR(v autofunc.RVector, a linalg.Vector,
 	aVar := &autofunc.Variable{a.Copy().Scale(-1)}
 	aVarR := autofunc.NewRVariable(aVar, v)
 	return autofunc.SquaredNorm{}.ApplyR(v, autofunc.AddR(aVarR, x))
+}
+
+type meanSquaredResult struct {
+	OutputLock   sync.RWMutex
+	OutputVector linalg.Vector
+
+	Actual   autofunc.Result
+	Expected linalg.Vector
+}
+
+func (m *meanSquaredResult) Output() linalg.Vector {
+	m.OutputLock.RLock()
+	if m.OutputVector != nil {
+		m.OutputLock.RUnlock()
+		return m.OutputVector
+	}
+	m.OutputLock.RUnlock()
+	m.OutputLock.Lock()
+	defer m.OutputLock.Unlock()
+	if m.OutputVector != nil {
+		return m.OutputVector
+	}
+	var sum float64
+	for i, a := range m.Actual.Output() {
+		diff := a - m.Expected[i]
+		sum += diff * diff
+	}
+	m.OutputVector = linalg.Vector{sum}
+	return m.OutputVector
+}
+
+func (m *meanSquaredResult) Constant(g autofunc.Gradient) bool {
+	return m.Actual.Constant(g)
+}
+
+func (m *meanSquaredResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
+	if !m.Actual.Constant(grad) {
+		out := m.Actual.Output()
+		upstreamGrad := upstream[0]
+		downstream := make(linalg.Vector, len(out))
+		for i, a := range out {
+			downstream[i] = 2 * upstreamGrad * (a - m.Expected[i])
+		}
+		m.Actual.PropagateGradient(downstream, grad)
+	}
 }
 
 // CrossEntropyCost computes the cost using the

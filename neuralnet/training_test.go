@@ -65,18 +65,18 @@ func testTrainingXOR(t *testing.T, batchSize int) {
 func BenchmarkTrainingBigSerial(b *testing.B) {
 	n := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(1)
-	benchmarkTrainingBig(b)
+	benchmarkTrainingBig(b, 3)
 	runtime.GOMAXPROCS(n)
 }
 
 func BenchmarkTrainingBigParallel(b *testing.B) {
 	n := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(3)
-	benchmarkTrainingBig(b)
+	benchmarkTrainingBig(b, 3)
 	runtime.GOMAXPROCS(n)
 }
 
-func benchmarkTrainingBig(b *testing.B) {
+func benchmarkTrainingBig(b *testing.B, batchSize int) {
 	inputs := make([]linalg.Vector, 100)
 	outputs := make([]linalg.Vector, len(inputs))
 	for i := range inputs {
@@ -92,22 +92,20 @@ func benchmarkTrainingBig(b *testing.B) {
 	network := Network{
 		&DenseLayer{
 			InputCount:  len(inputs[0]),
-			OutputCount: 50,
+			OutputCount: 500,
 		},
 		&Sigmoid{},
 		&DenseLayer{
-			InputCount:  50,
+			InputCount:  500,
 			OutputCount: 10,
 		},
 		&Sigmoid{},
 	}
 	network.Randomize()
-	batcher := NewBatcher(network, MeanSquaredCost{}, runtime.GOMAXPROCS(0))
+	batcher := NewBatcher(network, MeanSquaredCost{}, batchSize)
 	batcher.Start()
 	defer batcher.Stop()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		SGD(batcher, samples, 0.01, 10)
-	}
+	SGD(batcher, samples, 0.01, b.N)
 }

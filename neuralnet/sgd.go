@@ -10,8 +10,10 @@ import (
 // SGD trains the Learner of a Batcher using
 // stochastic gradient descent with the provided
 // inputs and corresponding expected outputs.
-func SGD(b *Batcher, s *SampleSet, stepSize float64, epochs, batchSize int) {
+func SGD(b *Batcher, samples *SampleSet, stepSize float64, epochs, batchSize int) {
+	s := samples.Copy()
 	for i := 0; i < epochs; i++ {
+		s.Shuffle()
 		for j := 0; j < len(s.Inputs); j += batchSize {
 			count := batchSize
 			if count > len(s.Inputs)-j {

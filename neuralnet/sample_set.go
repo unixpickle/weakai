@@ -13,6 +13,20 @@ type SampleSet struct {
 	Outputs []linalg.Vector
 }
 
+// Copy creates a shallow copy of this set.
+// The copy will have new input and output
+// slices, but the vectors within the slices
+// will be the same.
+func (s *SampleSet) Copy() *SampleSet {
+	res := &SampleSet{
+		Inputs:  make([]linalg.Vector, len(s.Inputs)),
+		Outputs: make([]linalg.Vector, len(s.Outputs)),
+	}
+	copy(res.Inputs, s.Inputs)
+	copy(res.Outputs, s.Outputs)
+	return res
+}
+
 // Shuffle randomly re-orders the set of samples.
 func (s *SampleSet) Shuffle() {
 	oldInputs := make([]linalg.Vector, len(s.Inputs))

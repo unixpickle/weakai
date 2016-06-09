@@ -13,8 +13,8 @@ import (
 
 func TestConvDimensions(t *testing.T) {
 	layers := []*ConvLayer{
-		{1, 3, 3, 1, 9, 9, 1, nil, nil, nil},
-		{5, 4, 7, 2, 17, 56, 18, nil, nil, nil},
+		{1, 3, 3, 1, 9, 9, 1, nil, nil, nil, nil},
+		{5, 4, 7, 2, 17, 56, 18, nil, nil, nil, nil},
 	}
 
 	outputDims := [][]int{
@@ -180,7 +180,7 @@ func convLayerTestInfo() (network Network, input *autofunc.Variable, outGrad lin
 		InputHeight:  7,
 		InputDepth:   2,
 	}
-	network = Network{layer, Sigmoid{}}
+	network = Network{layer, &Sigmoid{}}
 	network.Randomize()
 
 	input = &autofunc.Variable{

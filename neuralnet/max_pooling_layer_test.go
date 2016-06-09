@@ -12,9 +12,9 @@ import (
 
 func TestMaxPoolingDimensions(t *testing.T) {
 	layers := []*MaxPoolingLayer{
-		{3, 3, 9, 9, 5},
-		{2, 2, 9, 9, 7},
-		{4, 10, 30, 51, 2},
+		{3, 3, 9, 9, 5, nil},
+		{2, 2, 9, 9, 7, nil},
+		{4, 10, 30, 51, 2, nil},
 	}
 	outSizes := [][3]int{
 		{3, 3, 5},
@@ -33,7 +33,7 @@ func TestMaxPoolingDimensions(t *testing.T) {
 }
 
 func TestMaxPoolingForward(t *testing.T) {
-	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2, nil}
 
 	input := []float64{
 		0.5305, 0.7935, 0.3718, 0.4026, 0.8246, 0.6875, 0.6069, 0.0399, 0.4759, 0.3548, 0.8465, 0.0479, 0.4841, 0.1277, 0.2060, 0.6833, 0.0844, 0.0793, 0.1564, 0.2891,
@@ -68,7 +68,7 @@ func TestMaxPoolingForward(t *testing.T) {
 }
 
 func TestMaxPoolingBackward(t *testing.T) {
-	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2, nil}
 
 	input := []float64{
 		0.5305, 0.7935, 0.3718, 0.4026, 0.8246, 0.6875, 0.6069, 0.0399, 0.4759, 0.3548, 0.8465, 0.0479, 0.4841, 0.1277, 0.2060, 0.6833, 0.0844, 0.0793, 0.1564, 0.2891,
@@ -137,7 +137,7 @@ func TestMaxPoolingBackward(t *testing.T) {
 }
 
 func TestMaxPoolingSerialize(t *testing.T) {
-	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2, nil}
 	encoded, err := layer.Serialize()
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestMaxPoolingSerialize(t *testing.T) {
 }
 
 func TestMaxPoolingRProp(t *testing.T) {
-	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
+	layer := &MaxPoolingLayer{3, 3, 10, 11, 2, nil}
 	input := make(linalg.Vector, 10*11*2)
 	inputR := make(linalg.Vector, len(input))
 	for i := range input {

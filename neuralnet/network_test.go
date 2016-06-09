@@ -9,7 +9,7 @@ import (
 func TestNetworkSerialize(t *testing.T) {
 	network := Network{
 		&DenseLayer{InputCount: 3, OutputCount: 2},
-		Sigmoid{},
+		&Sigmoid{},
 	}
 	network.Randomize()
 
@@ -38,7 +38,7 @@ func TestNetworkSerialize(t *testing.T) {
 		t.Fatalf("expected *DenseLayer but got %T", decodedNet[0])
 	}
 
-	_, ok = decodedNet[1].(Sigmoid)
+	_, ok = decodedNet[1].(*Sigmoid)
 	if !ok {
 		t.Fatalf("expected Sigmoid but got %T", decodedNet[1])
 	}

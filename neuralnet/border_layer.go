@@ -18,6 +18,8 @@ type BorderLayer struct {
 	RightBorder  int
 	TopBorder    int
 	BottomBorder int
+
+	Cache *autofunc.VectorCache
 }
 
 func DeserializeBorderLayer(data []byte) (*BorderLayer, error) {
@@ -32,7 +34,7 @@ func (b *BorderLayer) Apply(in autofunc.Result) autofunc.Result {
 	return &borderResult{
 		OutputVec: b.addBorder(in.Output()),
 		Input:     in,
-		Info:      *b,
+		Info:      b,
 	}
 }
 
@@ -41,8 +43,12 @@ func (b *BorderLayer) ApplyR(in autofunc.RResult) autofunc.RResult {
 		OutputVec:  b.addBorder(in.Output()),
 		ROutputVec: b.addBorder(in.ROutput()),
 		Input:      in,
-		Info:       *b,
+		Info:       b,
 	}
+}
+
+func (b *BorderLayer) SetCache(c *autofunc.VectorCache) {
+	b.Cache = c
 }
 
 func (b *BorderLayer) Serialize() ([]byte, error) {
@@ -60,9 +66,8 @@ func (b *BorderLayer) addBorder(tensorVec linalg.Vector) linalg.Vector {
 		Depth:  b.InputDepth,
 		Data:   tensorVec,
 	}
-	outTensor := NewTensor3(b.InputWidth+b.LeftBorder+b.RightBorder,
-		b.InputHeight+b.TopBorder+b.BottomBorder,
-		b.InputDepth)
+	outTensor := NewTensor3Cache(b.Cache, b.InputWidth+b.LeftBorder+b.RightBorder,
+		b.InputHeight+b.TopBorder+b.BottomBorder, b.InputDepth)
 	for y := 0; y < inTensor.Height; y++ {
 		insetY := y + b.TopBorder
 		for x := 0; x < inTensor.Width; x++ {
@@ -77,7 +82,7 @@ func (b *BorderLayer) addBorder(tensorVec linalg.Vector) linalg.Vector {
 }
 
 func (b *BorderLayer) removeBorder(tensorVec linalg.Vector) linalg.Vector {
-	outTensor := NewTensor3(b.InputWidth, b.InputHeight, b.InputDepth)
+	outTensor := NewTensor3Cache(b.Cache, b.InputWidth, b.InputHeight, b.InputDepth)
 	inTensor := &Tensor3{
 		Width:  b.InputWidth + b.LeftBorder + b.RightBorder,
 		Height: b.InputHeight + b.TopBorder + b.BottomBorder,
@@ -100,7 +105,7 @@ func (b *BorderLayer) removeBorder(tensorVec linalg.Vector) linalg.Vector {
 type borderResult struct {
 	OutputVec linalg.Vector
 	Input     autofunc.Result
-	Info      BorderLayer
+	Info      *BorderLayer
 }
 
 func (b *borderResult) Output() linalg.Vector {
@@ -118,11 +123,17 @@ func (b *borderResult) PropagateGradient(upstream linalg.Vector, grad autofunc.G
 	}
 }
 
+func (b *borderResult) Release() {
+	b.Info.Cache.Free(b.OutputVec)
+	b.OutputVec = nil
+	b.Input.Release()
+}
+
 type borderRResult struct {
 	OutputVec  linalg.Vector
 	ROutputVec linalg.Vector
 	Input      autofunc.RResult
-	Info       BorderLayer
+	Info       *BorderLayer
 }
 
 func (b *borderRResult) Output() linalg.Vector {
@@ -144,4 +155,12 @@ func (b *borderRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 		downstreamR := b.Info.removeBorder(upstreamR)
 		b.Input.PropagateRGradient(downstream, downstreamR, rgrad, grad)
 	}
+}
+
+func (b *borderRResult) Release() {
+	b.Info.Cache.Free(b.OutputVec)
+	b.Info.Cache.Free(b.ROutputVec)
+	b.OutputVec = nil
+	b.ROutputVec = nil
+	b.Input.Release()
 }

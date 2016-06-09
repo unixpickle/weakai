@@ -26,6 +26,11 @@ func (s *SoftmaxLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.
 	return soft.ApplyR(v, in)
 }
 
+func (s *SoftmaxLayer) SetCache(c *autofunc.VectorCache) {
+	soft := (*autofunc.Softmax)(s)
+	soft.Cache = c
+}
+
 func (s *SoftmaxLayer) Serialize() ([]byte, error) {
 	return json.Marshal(s)
 }

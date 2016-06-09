@@ -69,6 +69,12 @@ func (n Network) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResul
 	return in
 }
 
+func (n Network) SetCache(c *autofunc.VectorCache) {
+	for _, layer := range n {
+		layer.SetCache(c)
+	}
+}
+
 func (n Network) Serialize() ([]byte, error) {
 	serializers := make([]serializer.Serializer, len(n))
 	for i, x := range n {

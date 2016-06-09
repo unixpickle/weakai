@@ -20,6 +20,8 @@ type ConvLayer struct {
 	InputHeight int
 	InputDepth  int
 
+	Cache *autofunc.VectorCache
+
 	Filters    []*Tensor3
 	FilterVars []*autofunc.Variable `json:"-"`
 	Biases     *autofunc.Variable
@@ -111,6 +113,10 @@ func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RRe
 	}
 }
 
+func (c *ConvLayer) SetCache(cache *autofunc.VectorCache) {
+	c.Cache = cache
+}
+
 func (c *ConvLayer) Serialize() ([]byte, error) {
 	return json.Marshal(c)
 }
@@ -121,7 +127,7 @@ func (c *ConvLayer) SerializerType() string {
 
 func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
-	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.InputDepth)
+	outTensor := NewTensor3Cache(c.Cache, c.OutputWidth(), c.OutputHeight(), c.InputDepth)
 
 	for y := 0; y < outTensor.Height; y++ {
 		inputY := y * c.Stride
@@ -141,13 +147,10 @@ func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
 	inTensorR := c.inputToTensor(inputR)
-	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.InputDepth)
+	outTensor := NewTensor3Cache(c.Cache, c.OutputWidth(), c.OutputHeight(), c.InputDepth)
 
 	filtersR := c.filtersR(v)
 	biasR := v[c.Biases]
-	if biasR == nil {
-		biasR = make(linalg.Vector, len(c.Biases.Vector))
-	}
 
 	for y := 0; y < outTensor.Height; y++ {
 		inputY := y * c.Stride
@@ -155,8 +158,12 @@ func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *
 			inputX := x * c.Stride
 			for z, filter := range c.Filters {
 				convolution := filter.Convolve(inputX, inputY, inTensorR)
-				convolution += filtersR[z].Convolve(inputX, inputY, inTensor)
-				convolution += biasR[z]
+				if rfilter := filtersR[z]; rfilter != nil {
+					convolution += rfilter.Convolve(inputX, inputY, inTensor)
+				}
+				if biasR != nil {
+					convolution += biasR[z]
+				}
 				outTensor.Set(x, y, z, convolution)
 			}
 		}
@@ -192,9 +199,10 @@ func (c *ConvLayer) filtersR(v autofunc.RVector) []*Tensor3 {
 	for _, filterVar := range c.FilterVars {
 		data := v[filterVar]
 		if data == nil {
-			data = make(linalg.Vector, len(filterVar.Vector))
+			filtersR = append(filtersR, nil)
+		} else {
+			filtersR = append(filtersR, c.filterToTensor(data))
 		}
-		filtersR = append(filtersR, c.filterToTensor(data))
 	}
 	return filtersR
 }
@@ -259,7 +267,8 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 
 	var inputGrad *Tensor3
 	if !c.Input.Constant(grad) {
-		inputGrad = NewTensor3(c.Layer.InputWidth, c.Layer.InputHeight, c.Layer.InputDepth)
+		inputGrad = NewTensor3Cache(c.Layer.Cache, c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth)
 	}
 
 	for y := 0; y < c.OutputTensor.Height; y++ {
@@ -283,7 +292,14 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 
 	if inputGrad != nil {
 		c.Input.PropagateGradient(inputGrad.Data, grad)
+		c.Layer.Cache.Free(inputGrad.Data)
 	}
+}
+
+func (c *convLayerResult) Release() {
+	c.Layer.Cache.Free(c.OutputTensor.Data)
+	c.OutputTensor.Data = nil
+	c.Input.Release()
 }
 
 type convLayerRResult struct {
@@ -338,8 +354,10 @@ func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 	var inputGradR *Tensor3
 
 	if !c.Input.Constant(rgrad, grad) {
-		inputGrad = NewTensor3(c.Layer.InputWidth, c.Layer.InputHeight, c.Layer.InputDepth)
-		inputGradR = NewTensor3(c.Layer.InputWidth, c.Layer.InputHeight, c.Layer.InputDepth)
+		inputGrad = NewTensor3Cache(c.Layer.Cache, c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth)
+		inputGradR = NewTensor3Cache(c.Layer.Cache, c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth)
 	}
 
 	filtersR := c.Layer.filtersR(c.RV)
@@ -367,7 +385,9 @@ func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 				if inputGrad != nil {
 					inputGrad.MulAdd(inputX, inputY, filter, sumPartial)
 					inputGradR.MulAdd(inputX, inputY, filter, sumPartialR)
-					inputGradR.MulAdd(inputX, inputY, filtersR[z], sumPartial)
+					if rfilter := filtersR[z]; rfilter != nil {
+						inputGradR.MulAdd(inputX, inputY, rfilter, sumPartial)
+					}
 				}
 			}
 		}
@@ -375,5 +395,15 @@ func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 
 	if inputGrad != nil {
 		c.Input.PropagateRGradient(inputGrad.Data, inputGradR.Data, rgrad, grad)
+		c.Layer.Cache.Free(inputGrad.Data)
+		c.Layer.Cache.Free(inputGradR.Data)
 	}
+}
+
+func (c *convLayerRResult) Release() {
+	c.Layer.Cache.Free(c.OutputTensor.Data)
+	c.Layer.Cache.Free(c.ROutputTensor.Data)
+	c.OutputTensor.Data = nil
+	c.ROutputTensor.Data = nil
+	c.Input.Release()
 }

@@ -27,12 +27,12 @@ func testTrainingXOR(t *testing.T, batchSize int) {
 			InputCount:  2,
 			OutputCount: 4,
 		},
-		Sigmoid{},
+		&Sigmoid{},
 		&DenseLayer{
 			InputCount:  4,
 			OutputCount: 1,
 		},
-		Sigmoid{},
+		&Sigmoid{},
 	}
 	rand.Seed(123123)
 	net.Randomize()
@@ -94,12 +94,12 @@ func benchmarkTrainingBig(b *testing.B) {
 			InputCount:  len(inputs[0]),
 			OutputCount: 50,
 		},
-		Sigmoid{},
+		&Sigmoid{},
 		&DenseLayer{
 			InputCount:  50,
 			OutputCount: 10,
 		},
-		Sigmoid{},
+		&Sigmoid{},
 	}
 	network.Randomize()
 	batcher := NewBatcher(network, MeanSquaredCost{}, runtime.GOMAXPROCS(0))

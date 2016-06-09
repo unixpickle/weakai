@@ -80,6 +80,17 @@ func (d *DenseLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RR
 	return d.Biases.ApplyR(v, d.Weights.ApplyR(v, in))
 }
 
+// SetCache sets the cache of the weights and biases,
+// if they are not nil.
+func (d *DenseLayer) SetCache(c *autofunc.VectorCache) {
+	if d.Weights != nil {
+		d.Weights.Cache = c
+	}
+	if d.Biases != nil {
+		d.Biases.Cache = c
+	}
+}
+
 func (d *DenseLayer) Serialize() ([]byte, error) {
 	return json.Marshal(d)
 }

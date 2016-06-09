@@ -10,9 +10,28 @@ import (
 //
 // Layers must be serializable, evaluatable, and
 // differentiable.
+//
+// The autofunc.Results and autofunc.RResults from
+// a Layer are only valid so long as the Layer is
+// not modified (e.g. by SetCache, by changing
+// a struct field, etc.).
+//
+// Layers must support concurrent calls to their
+// autofunc.RFunc methods.
+// However, serialization methods and SetCache()
+// needn't be concurrency-safe--they will only
+// be called if no other Layer methods are being
+// called simultaneously.
 type Layer interface {
 	serializer.Serializer
 	autofunc.RFunc
+
+	// SetCache changes the cache that this Layer
+	// will use.
+	// After SetCache() is called on a layer, any of
+	// the layer's previous output should be considered
+	// invalid and should not be used in any way.
+	SetCache(c *autofunc.VectorCache)
 }
 
 // A Randomizer is anything which can be reset to

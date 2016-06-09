@@ -13,11 +13,11 @@ import (
 func BenchmarkDenseLayerBackProp(b *testing.B) {
 	net := Network{
 		&DenseLayer{InputCount: 1000, OutputCount: 2000},
-		Sigmoid{},
+		&Sigmoid{},
 		&DenseLayer{InputCount: 2000, OutputCount: 512},
-		Sigmoid{},
+		&Sigmoid{},
 		&DenseLayer{InputCount: 512, OutputCount: 10},
-		Sigmoid{},
+		&Sigmoid{},
 	}
 	rand.Seed(123)
 	net.Randomize()
@@ -151,7 +151,7 @@ func denseTestInfo() (network Network, input *autofunc.Variable, grad linalg.Vec
 		OutputCount: 2,
 	}
 	denseLayer.Randomize()
-	network = Network{denseLayer, Sigmoid{}}
+	network = Network{denseLayer, &Sigmoid{}}
 
 	grad = linalg.Vector([]float64{0.5, -0.3})
 	input = &autofunc.Variable{Vector: linalg.Vector([]float64{1, -1, 2})}

@@ -25,6 +25,8 @@ type UnstackLayer struct {
 	// unstacking input tensors.
 	// The square of this value must divide InputDepth.
 	InverseStride int
+
+	Cache *autofunc.VectorCache
 }
 
 func DeserializeUnstackLayer(d []byte) (*UnstackLayer, error) {
@@ -71,7 +73,8 @@ func (u *UnstackLayer) unstack(inVec linalg.Vector) linalg.Vector {
 		Depth:  u.InputDepth,
 		Data:   inVec,
 	}
-	output := NewTensor3(u.InputWidth*u.InverseStride, u.InputHeight*u.InverseStride,
+	output := NewTensor3Cache(u.Cache, u.InputWidth*u.InverseStride,
+		u.InputHeight*u.InverseStride,
 		u.InputDepth/(u.InverseStride*u.InverseStride))
 
 	for y := 0; y < output.Height; y++ {
@@ -98,7 +101,7 @@ func (u *UnstackLayer) stack(inVec linalg.Vector) linalg.Vector {
 		Data:   inVec,
 	}
 
-	stacked := NewTensor3(u.InputWidth, u.InputHeight, u.InputDepth)
+	stacked := NewTensor3Cache(u.Cache, u.InputWidth, u.InputHeight, u.InputDepth)
 
 	for y := 0; y < stacked.Height; y++ {
 		unstackedY := y * u.InverseStride
@@ -135,8 +138,16 @@ func (u *unstackLayerResult) Constant(g autofunc.Gradient) bool {
 
 func (u *unstackLayerResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
 	if !u.Input.Constant(grad) {
-		u.Input.PropagateGradient(u.Layer.stack(upstream), grad)
+		downstream := u.Layer.stack(upstream)
+		u.Input.PropagateGradient(downstream, grad)
+		u.Layer.Cache.Free(downstream)
 	}
+}
+
+func (u *unstackLayerResult) Release() {
+	u.Layer.Cache.Free(u.OutputVector)
+	u.OutputVector = nil
+	u.Input.Release()
 }
 
 type unstackLayerRResult struct {
@@ -161,7 +172,18 @@ func (u *unstackLayerRResult) Constant(rg autofunc.RGradient, g autofunc.Gradien
 func (u *unstackLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 	rgrad autofunc.RGradient, grad autofunc.Gradient) {
 	if !u.Input.Constant(rgrad, grad) {
-		u.Input.PropagateRGradient(u.Layer.stack(upstream), u.Layer.stack(upstreamR),
-			rgrad, grad)
+		downstream := u.Layer.stack(upstream)
+		downstreamR := u.Layer.stack(upstreamR)
+		u.Input.PropagateRGradient(downstream, downstreamR, rgrad, grad)
+		u.Layer.Cache.Free(downstream)
+		u.Layer.Cache.Free(downstreamR)
 	}
+}
+
+func (u *unstackLayerRResult) Release() {
+	u.Layer.Cache.Free(u.OutputVector)
+	u.Layer.Cache.Free(u.ROutputVector)
+	u.OutputVector = nil
+	u.ROutputVector = nil
+	u.Input.Release()
 }

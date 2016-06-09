@@ -23,15 +23,15 @@ const (
 func init() {
 	serializer.RegisterDeserializer(serializerTypeSigmoid,
 		func(d []byte) (serializer.Serializer, error) {
-			return Sigmoid{}, nil
+			return &Sigmoid{}, nil
 		})
 	serializer.RegisterDeserializer(serializerTypeReLU,
 		func(d []byte) (serializer.Serializer, error) {
-			return ReLU{}, nil
+			return &ReLU{}, nil
 		})
 	serializer.RegisterDeserializer(serializerTypeHyperbolicTangent,
 		func(d []byte) (serializer.Serializer, error) {
-			return HyperbolicTangent{}, nil
+			return &HyperbolicTangent{}, nil
 		})
 	serializer.RegisterDeserializer(serializerTypeConvLayer,
 		convertDeserializer(DeserializeConvLayer))

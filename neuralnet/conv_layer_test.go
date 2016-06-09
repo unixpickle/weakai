@@ -152,8 +152,24 @@ func TestConvLayerSerialize(t *testing.T) {
 }
 
 func TestConvLayerRProp(t *testing.T) {
-	layer, input, _ := convLayerTestInfo()
-	variables := append(layer.Parameters(), input)
+	layer := &ConvLayer{
+		FilterCount:  4,
+		FilterWidth:  2,
+		FilterHeight: 3,
+		Stride:       2,
+		InputWidth:   5,
+		InputHeight:  7,
+		InputDepth:   2,
+	}
+	layer.Randomize()
+
+	input := make(linalg.Vector, 5*7*2)
+	for i := range input {
+		input[i] = rand.Float64()*2 - 1
+	}
+	inVar := &autofunc.Variable{input}
+
+	variables := append(layer.Parameters(), inVar)
 	rVector := autofunc.RVector{}
 	for _, variable := range variables {
 		rVector[variable] = make(linalg.Vector, len(variable.Vector))
@@ -164,7 +180,7 @@ func TestConvLayerRProp(t *testing.T) {
 	funcTest := &functest.RFuncTest{
 		F:     layer,
 		Vars:  variables,
-		Input: autofunc.NewRVariable(input, rVector),
+		Input: autofunc.NewRVariable(inVar, rVector),
 		RV:    rVector,
 	}
 	funcTest.Run(t)

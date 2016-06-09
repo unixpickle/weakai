@@ -59,6 +59,11 @@ func (c *ConvLayer) OutputHeight() int {
 	return h
 }
 
+// OutputDepth returns the depth of the output tensor.
+func (c *ConvLayer) OutputDepth() int {
+	return c.FilterCount
+}
+
 // Randomize randomly initializes the layer's
 // filters and biases.
 // This will allocate c.Filters, c.Biases,
@@ -127,7 +132,7 @@ func (c *ConvLayer) SerializerType() string {
 
 func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
-	outTensor := NewTensor3Cache(c.Cache, c.OutputWidth(), c.OutputHeight(), c.InputDepth)
+	outTensor := NewTensor3Cache(c.Cache, c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
 
 	for y := 0; y < outTensor.Height; y++ {
 		inputY := y * c.Stride
@@ -147,7 +152,7 @@ func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
 	inTensorR := c.inputToTensor(inputR)
-	outTensor := NewTensor3Cache(c.Cache, c.OutputWidth(), c.OutputHeight(), c.InputDepth)
+	outTensor := NewTensor3Cache(c.Cache, c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
 
 	filtersR := c.filtersR(v)
 	biasR := v[c.Biases]
@@ -220,7 +225,7 @@ func (c *ConvLayer) outputToTensor(out linalg.Vector) *Tensor3 {
 	return &Tensor3{
 		Width:  c.OutputWidth(),
 		Height: c.OutputHeight(),
-		Depth:  c.InputDepth,
+		Depth:  c.OutputDepth(),
 		Data:   out,
 	}
 }

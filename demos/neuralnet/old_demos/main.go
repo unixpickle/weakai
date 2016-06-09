@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -32,40 +34,36 @@ func main() {
 // - output 0 for inputs starting with a 1
 // - output 1 for inputs starting with a 0.
 func firstBitTest() {
-	trainingSamples := make([][]float64, FirstBitTrainingSize)
-	trainingOutputs := make([][]float64, FirstBitTrainingSize)
+	trainingSamples := make([]linalg.Vector, FirstBitTrainingSize)
+	trainingOutputs := make([]linalg.Vector, FirstBitTrainingSize)
 	for i := range trainingSamples {
-		trainingSamples[i] = make([]float64, FirstBitInputSize)
+		trainingSamples[i] = make(linalg.Vector, FirstBitInputSize)
 		for j := range trainingSamples[i] {
 			trainingSamples[i][j] = float64(rand.Intn(2))
 		}
 		trainingOutputs[i] = []float64{1 - trainingSamples[i][0]}
 	}
+	samples := &neuralnet.SampleSet{
+		Inputs:  trainingSamples,
+		Outputs: trainingOutputs,
+	}
 
-	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+	network := neuralnet.Network{
+		&neuralnet.DenseLayer{
 			InputCount:  FirstBitInputSize,
 			OutputCount: FirstBitHiddenSize,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		&neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
 			InputCount:  FirstBitHiddenSize,
 			OutputCount: 1,
 		},
-	})
-
-	trainer := neuralnet.SGD{
-		CostFunc:         neuralnet.MeanSquaredCost{},
-		Inputs:           trainingSamples,
-		Outputs:          trainingOutputs,
-		StepSize:         0.1,
-		StepDecreaseRate: 0,
-		Epochs:           5000,
+		&neuralnet.Sigmoid{},
 	}
-
 	network.Randomize()
-	trainer.Train(network)
+
+	batcher := neuralnet.NewBatcher(network, neuralnet.MeanSquaredCost{}, 1)
+	neuralnet.SGD(batcher, samples, 0.2, 100000, 1)
 
 	var totalError float64
 	var maxPossibleError float64
@@ -74,9 +72,9 @@ func firstBitTest() {
 		for j := range sample {
 			sample[j] = float64(rand.Intn(2))
 		}
-		network.SetInput(sample)
-		network.PropagateForward()
-		output := network.Output()[0]
+		result := network.Apply(&autofunc.Variable{sample})
+		output := result.Output()[0]
+		result.Release()
 		amountError := math.Abs(output - (1 - sample[0]))
 		totalError += amountError
 		maxPossibleError += 1.0
@@ -88,18 +86,18 @@ func firstBitTest() {
 // horizontalLineTest builds a neural network
 // to accept bitmaps with horizontal lines.
 func horizontalLineTest() {
-	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+	network := neuralnet.Network{
+		&neuralnet.DenseLayer{
 			InputCount:  GridInputSide * GridInputSide,
 			OutputCount: GridHiddenSize,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		&neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
 			InputCount:  GridHiddenSize,
 			OutputCount: 1,
 		},
-	})
+		&neuralnet.Sigmoid{},
+	}
 	runHorizontalLineTest("horizontalLineTest", network)
 }
 
@@ -107,9 +105,8 @@ func horizontalLineTest() {
 // horizontalLineTest, but it uses
 // a convolutional layer.
 func horizontalLineConvTest() {
-	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
-		&neuralnet.ConvParams{
-			Activation:   neuralnet.Sigmoid{},
+	network := neuralnet.Network{
+		&neuralnet.ConvLayer{
 			FilterCount:  4,
 			FilterWidth:  2,
 			FilterHeight: 2,
@@ -118,23 +115,24 @@ func horizontalLineConvTest() {
 			InputHeight:  4,
 			InputDepth:   1,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		&neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
 			InputCount:  3 * 3 * 4,
 			OutputCount: 4,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		&neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
 			InputCount:  4,
 			OutputCount: 1,
 		},
-	})
+		&neuralnet.Sigmoid{},
+	}
 	runHorizontalLineTest("horizontalLineConvTest", network)
 }
 
-func runHorizontalLineTest(name string, network *neuralnet.Network) {
-	trainingSamples := make([][]float64, GridTrainingSize)
-	trainingOutputs := make([][]float64, GridTrainingSize)
+func runHorizontalLineTest(name string, network neuralnet.Network) {
+	trainingSamples := make([]linalg.Vector, GridTrainingSize)
+	trainingOutputs := make([]linalg.Vector, GridTrainingSize)
 	for i := range trainingSamples {
 		trainingSamples[i] = randomBitmap()
 		if bitmapHasHorizontal(trainingSamples[i]) {
@@ -143,25 +141,21 @@ func runHorizontalLineTest(name string, network *neuralnet.Network) {
 			trainingOutputs[i] = []float64{0}
 		}
 	}
-
-	trainer := neuralnet.SGD{
-		CostFunc:         neuralnet.MeanSquaredCost{},
-		Inputs:           trainingSamples,
-		Outputs:          trainingOutputs,
-		StepSize:         0.1,
-		StepDecreaseRate: 1e-4,
-		Epochs:           1000,
+	samples := &neuralnet.SampleSet{
+		Inputs:  trainingSamples,
+		Outputs: trainingOutputs,
 	}
 
 	network.Randomize()
-	trainer.Train(network)
+	batcher := neuralnet.NewBatcher(network, neuralnet.MeanSquaredCost{}, 1)
+	neuralnet.SGD(batcher, samples, 0.1, 1000, 100)
 
 	var trainingError float64
 	var maxTrainingError float64
 	for i, sample := range trainingSamples {
-		network.SetInput(sample)
-		network.PropagateForward()
-		output := network.Output()[0]
+		result := network.Apply(&autofunc.Variable{sample})
+		output := result.Output()[0]
+		result.Release()
 		amountError := math.Abs(output - trainingOutputs[i][0])
 		trainingError += amountError
 		maxTrainingError += 1.0
@@ -175,9 +169,9 @@ func runHorizontalLineTest(name string, network *neuralnet.Network) {
 		if bitmapHasHorizontal(sample) {
 			expected = 1
 		}
-		network.SetInput(sample)
-		network.PropagateForward()
-		output := network.Output()[0]
+		result := network.Apply(&autofunc.Variable{sample})
+		output := result.Output()[0]
+		result.Release()
 		amountError := math.Abs(output - expected)
 		totalError += amountError
 		maxPossibleError += 1.0

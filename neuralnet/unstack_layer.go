@@ -54,6 +54,10 @@ func (u *UnstackLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.
 	}
 }
 
+func (u *UnstackLayer) SetCache(c *autofunc.VectorCache) {
+	u.Cache = c
+}
+
 func (u *UnstackLayer) Serialize() ([]byte, error) {
 	return json.Marshal(u)
 }

@@ -14,50 +14,35 @@ import (
 // It is not safe to call a Batcher's methods
 // from multiple Goroutines concurrently.
 type Batcher struct {
-	costFunc  CostFunc
-	batchSize int
-	learner   Learner
+	costFunc   CostFunc
+	maxThreads int
+	learner    Learner
 
-	cache    *gradientCache
-	reqChan  chan batcherRequest
-	respChan chan batcherResponse
-
+	cache           *gradientCache
 	lastGradResult  autofunc.Gradient
 	lastGradRResult autofunc.RGradient
 }
 
-type batcherRequest struct {
-	RV       autofunc.RVector
-	Input    linalg.Vector
-	Expected linalg.Vector
-}
-
-type batcherResponse struct {
-	RGrad autofunc.RGradient
-	Grad  autofunc.Gradient
-}
-
 // NewBatcher creates a Batcher that runs the given
 // Learner with the given cost function.
-// The Batcher will be optimized for the given
-// batchSize, although it will work for other batch
-// sizes as well.
-// The Batcher will not be running after it is made,
-// so you will need to call Start() on ib.
-func NewBatcher(l Learner, costFunc CostFunc, batchSize int) *Batcher {
+// If maxThreads is 0, GOMAXPROCS threads may be used.
+func NewBatcher(l Learner, costFunc CostFunc, maxThreads int) *Batcher {
 	return &Batcher{
-		costFunc:  costFunc,
-		batchSize: batchSize,
-		learner:   l,
-		cache:     newGradientCache(l.Parameters()),
+		costFunc:   costFunc,
+		maxThreads: maxThreads,
+		learner:    l,
+		cache:      newGradientCache(l.Parameters()),
 	}
 }
 
-// BatchSize returns the optimal batch size for this
-// Batcher.
-// This is the batch size that was passed to NewBatcher().
-func (b *Batcher) BatchSize() int {
-	return b.batchSize
+// MaxThreads returns the maximum number of threads this
+// Batcher may use.
+// This is GOMAXPROCS if 0 was passed to NewBatcher().
+func (b *Batcher) MaxThreads() int {
+	if b.maxThreads == 0 {
+		return runtime.GOMAXPROCS(0)
+	}
+	return b.maxThreads
 }
 
 // Learner returns the learner for which this Batcher
@@ -70,43 +55,6 @@ func (b *Batcher) Learner() Learner {
 // uses to compute gradients.
 func (b *Batcher) CostFunc() CostFunc {
 	return b.costFunc
-}
-
-// Start gets the Batcher ready to compute gradients.
-// This is necessary because the Batcher may need to
-// launch Goroutines, etc.
-func (b *Batcher) Start() {
-	routineCount := b.batchSize
-	if routineCount > runtime.GOMAXPROCS(0) {
-		routineCount = runtime.GOMAXPROCS(0)
-	}
-	if routineCount < 2 {
-		return
-	}
-
-	reqChan := make(chan batcherRequest)
-	respChan := make(chan batcherResponse, routineCount)
-	for i := 0; i < routineCount; i++ {
-		go func() {
-			for req := range reqChan {
-				respChan <- b.fulfillRequest(req)
-			}
-		}()
-	}
-	b.reqChan = reqChan
-	b.respChan = respChan
-}
-
-// Stop shuts down any Goroutines that Start() may
-// have started.
-// You should always call Stop() on a Batcher once
-// you are done using ib.
-func (b *Batcher) Stop() {
-	if b.reqChan != nil {
-		close(b.reqChan)
-		b.reqChan = nil
-		b.respChan = nil
-	}
 }
 
 // BatchGradient computes the error gradient for a
@@ -143,70 +91,85 @@ func (b *Batcher) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 		b.cache.FreeR(b.lastGradRResult)
 	}
 
-	var gradOut autofunc.Gradient
-	var rgradOut autofunc.RGradient
+	sampleIdxChan := make(chan int, len(s.Inputs))
+	for i := range s.Inputs {
+		sampleIdxChan <- i
+	}
+	close(sampleIdxChan)
 
-	if b.reqChan == nil {
-		for i, input := range s.Inputs {
-			req := batcherRequest{Input: input, Expected: s.Outputs[i], RV: rv}
-			resp := b.fulfillRequest(req)
-			if i == 0 {
-				gradOut = resp.Grad
-				rgradOut = resp.RGrad
-			} else {
-				gradOut.Add(resp.Grad)
-				b.cache.Free(resp.Grad)
-				if rgradOut != nil {
-					rgradOut.Add(resp.RGrad)
-					b.cache.FreeR(resp.RGrad)
+	var wg sync.WaitGroup
+	var grads []autofunc.Gradient
+	var rgrads []autofunc.RGradient
+
+	routineCount := b.MaxThreads()
+	if len(s.Inputs) < routineCount {
+		routineCount = len(s.Inputs)
+	}
+
+	for i := 0; i < routineCount; i++ {
+		grad := b.cache.Alloc()
+		var rgrad autofunc.RGradient
+		if rv != nil {
+			rgrad = b.cache.AllocR()
+		}
+		if routineCount > 1 {
+			wg.Add(1)
+			go func(grad autofunc.Gradient, rgrad autofunc.RGradient) {
+				defer wg.Done()
+				for sampleIdx := range sampleIdxChan {
+					input, output := s.Inputs[sampleIdx], s.Outputs[sampleIdx]
+					b.addGrads(grad, rgrad, rv, input, output)
 				}
+			}(grad, rgrad)
+		} else {
+			for sampleIdx := range sampleIdxChan {
+				input, output := s.Inputs[sampleIdx], s.Outputs[sampleIdx]
+				b.addGrads(grad, rgrad, rv, input, output)
 			}
 		}
-	} else {
-		go func() {
-			for i, input := range s.Inputs {
-				b.reqChan <- batcherRequest{Input: input, Expected: s.Outputs[i], RV: rv}
-			}
-		}()
-
-		for i := range s.Inputs {
-			resp := <-b.respChan
-			if i == 0 {
-				gradOut = resp.Grad
-				rgradOut = resp.RGrad
-			} else {
-				gradOut.Add(resp.Grad)
-				b.cache.Free(resp.Grad)
-				if rgradOut != nil {
-					rgradOut.Add(resp.RGrad)
-					b.cache.FreeR(resp.RGrad)
-				}
-			}
+		grads = append(grads, grad)
+		if rv != nil {
+			rgrads = append(rgrads, rgrad)
 		}
 	}
 
-	b.lastGradResult, b.lastGradRResult = gradOut, rgradOut
-	return gradOut, rgradOut
+	if routineCount > 1 {
+		wg.Wait()
+	}
+
+	for i := 1; i < len(grads); i++ {
+		grads[0].Add(grads[i])
+		b.cache.Free(grads[i])
+	}
+	for i := 1; i < len(rgrads); i++ {
+		rgrads[0].Add(rgrads[i])
+		b.cache.FreeR(rgrads[i])
+	}
+
+	b.lastGradResult = grads[0]
+	if rgrads != nil {
+		b.lastGradRResult = rgrads[0]
+	}
+
+	return b.lastGradResult, b.lastGradRResult
 }
 
-func (b *Batcher) fulfillRequest(req batcherRequest) batcherResponse {
-	inVar := &autofunc.Variable{req.Input}
-	resp := batcherResponse{Grad: b.cache.Alloc()}
-	if req.RV != nil {
-		resp.RGrad = b.cache.AllocR()
-		rVar := autofunc.NewRVariable(inVar, req.RV)
-		result := b.learner.ApplyR(req.RV, rVar)
-		cost := b.costFunc.CostR(req.RV, req.Expected, result)
+func (b *Batcher) addGrads(grad autofunc.Gradient, rgrad autofunc.RGradient,
+	rv autofunc.RVector, input, expected linalg.Vector) {
+	inVar := &autofunc.Variable{input}
+	if rgrad != nil {
+		rVar := autofunc.NewRVariable(inVar, rv)
+		result := b.learner.ApplyR(rv, rVar)
+		cost := b.costFunc.CostR(rv, expected, result)
 		cost.PropagateRGradient(linalg.Vector{1}, linalg.Vector{0},
-			resp.RGrad, resp.Grad)
+			rgrad, grad)
 		cost.Release()
 	} else {
 		result := b.learner.Apply(inVar)
-		cost := b.costFunc.Cost(req.Expected, result)
-		cost.PropagateGradient(linalg.Vector{1}, resp.Grad)
+		cost := b.costFunc.Cost(expected, result)
+		cost.PropagateGradient(linalg.Vector{1}, grad)
 		cost.Release()
 	}
-	return resp
 }
 
 type gradientCache struct {

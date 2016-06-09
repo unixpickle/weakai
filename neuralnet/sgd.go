@@ -10,8 +10,7 @@ import (
 // SGD trains the Learner of a Batcher using
 // stochastic gradient descent with the provided
 // inputs and corresponding expected outputs.
-func SGD(b *Batcher, s *SampleSet, stepSize float64, epochs int) {
-	batchSize := b.BatchSize()
+func SGD(b *Batcher, s *SampleSet, stepSize float64, epochs, batchSize int) {
 	for i := 0; i < epochs; i++ {
 		for j := 0; j < len(s.Inputs); j += batchSize {
 			count := batchSize
@@ -28,7 +27,7 @@ func SGD(b *Batcher, s *SampleSet, stepSize float64, epochs int) {
 // SGDInteractive is like SGD, but it calls a
 // function before every epoch and stops when
 // the user sends a kill signal.
-func SGDInteractive(b *Batcher, s *SampleSet, stepSize float64, sf func()) {
+func SGDInteractive(b *Batcher, s *SampleSet, stepSize float64, batchSize int, sf func()) {
 	var killed uint32
 	go func() {
 		c := make(chan os.Signal, 1)
@@ -46,6 +45,6 @@ func SGDInteractive(b *Batcher, s *SampleSet, stepSize float64, sf func()) {
 		if atomic.LoadUint32(&killed) != 0 {
 			break
 		}
-		SGD(b, s, stepSize, 1)
+		SGD(b, s, stepSize, 1, batchSize)
 	}
 }

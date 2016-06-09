@@ -48,9 +48,7 @@ func testTrainingXOR(t *testing.T, batchSize int) {
 	}
 
 	batcher := NewBatcher(net, MeanSquaredCost{}, batchSize)
-	batcher.Start()
-	SGD(batcher, samples, 0.9, 100000)
-	batcher.Stop()
+	SGD(batcher, samples, 0.9, 100000, batchSize)
 
 	for i, sample := range samples.Inputs {
 		output := net.Apply(&autofunc.Variable{sample}).Output()
@@ -62,21 +60,52 @@ func testTrainingXOR(t *testing.T, batchSize int) {
 	}
 }
 
-func BenchmarkTrainingBigSerial(b *testing.B) {
+func BenchmarkTrainingBigSerial50(b *testing.B) {
 	n := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(1)
-	benchmarkTrainingBig(b, 3)
+	benchmarkTrainingBig(b, 50, 100)
 	runtime.GOMAXPROCS(n)
 }
 
-func BenchmarkTrainingBigParallel(b *testing.B) {
+func BenchmarkTrainingBigParallel50(b *testing.B) {
 	n := runtime.GOMAXPROCS(0)
-	runtime.GOMAXPROCS(3)
-	benchmarkTrainingBig(b, 3)
+	runtime.GOMAXPROCS(2)
+	benchmarkTrainingBig(b, 50, 100)
 	runtime.GOMAXPROCS(n)
 }
 
-func benchmarkTrainingBig(b *testing.B, batchSize int) {
+func BenchmarkTrainingBigSerial500(b *testing.B) {
+	n := runtime.GOMAXPROCS(0)
+	runtime.GOMAXPROCS(1)
+	benchmarkTrainingBig(b, 500, 100)
+	runtime.GOMAXPROCS(n)
+}
+
+func BenchmarkTrainingBigParallel500(b *testing.B) {
+	n := runtime.GOMAXPROCS(0)
+	runtime.GOMAXPROCS(2)
+	benchmarkTrainingBig(b, 500, 100)
+	runtime.GOMAXPROCS(n)
+}
+
+func BenchmarkTrainingBigSerial1000(b *testing.B) {
+	n := runtime.GOMAXPROCS(0)
+	runtime.GOMAXPROCS(1)
+	benchmarkTrainingBig(b, 1000, 100)
+	runtime.GOMAXPROCS(n)
+}
+
+func BenchmarkTrainingBigParallel1000(b *testing.B) {
+	n := runtime.GOMAXPROCS(0)
+	runtime.GOMAXPROCS(2)
+	benchmarkTrainingBig(b, 1000, 100)
+	runtime.GOMAXPROCS(n)
+}
+
+func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
+	autofunc.DefaultVectorCache.Clear()
+	runtime.GC()
+
 	inputs := make([]linalg.Vector, 100)
 	outputs := make([]linalg.Vector, len(inputs))
 	for i := range inputs {
@@ -92,20 +121,18 @@ func benchmarkTrainingBig(b *testing.B, batchSize int) {
 	network := Network{
 		&DenseLayer{
 			InputCount:  len(inputs[0]),
-			OutputCount: 500,
+			OutputCount: hiddenSize,
 		},
 		&Sigmoid{},
 		&DenseLayer{
-			InputCount:  500,
+			InputCount:  hiddenSize,
 			OutputCount: 10,
 		},
 		&Sigmoid{},
 	}
 	network.Randomize()
-	batcher := NewBatcher(network, MeanSquaredCost{}, batchSize)
-	batcher.Start()
-	defer batcher.Stop()
+	batcher := NewBatcher(network, MeanSquaredCost{}, 0)
 
 	b.ResetTimer()
-	SGD(batcher, samples, 0.01, b.N)
+	SGD(batcher, samples, 0.01, b.N, batchSize)
 }

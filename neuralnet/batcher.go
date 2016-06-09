@@ -86,7 +86,7 @@ func (b *Batcher) Start() {
 
 	reqChan := make(chan batcherRequest)
 	respChan := make(chan batcherResponse, routineCount)
-	for i := 0; i < b.batchSize; i++ {
+	for i := 0; i < routineCount; i++ {
 		go func() {
 			for req := range reqChan {
 				respChan <- b.fulfillRequest(req)

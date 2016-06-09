@@ -199,10 +199,12 @@ func (b *Batcher) fulfillRequest(req batcherRequest) batcherResponse {
 		cost := b.costFunc.CostR(req.RV, req.Expected, result)
 		cost.PropagateRGradient(linalg.Vector{1}, linalg.Vector{0},
 			resp.RGrad, resp.Grad)
+		cost.Release()
 	} else {
 		result := b.learner.Apply(inVar)
 		cost := b.costFunc.Cost(req.Expected, result)
 		cost.PropagateGradient(linalg.Vector{1}, resp.Grad)
+		cost.Release()
 	}
 	return resp
 }

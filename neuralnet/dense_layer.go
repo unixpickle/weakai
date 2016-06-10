@@ -20,6 +20,7 @@ type DenseLayer struct {
 
 	Weights *autofunc.LinTran
 	Biases  *autofunc.LinAdd
+	Cache   *autofunc.VectorCache
 }
 
 func DeserializeDenseLayer(data []byte) (*DenseLayer, error) {
@@ -42,6 +43,7 @@ func (d *DenseLayer) Randomize() {
 			Var: &autofunc.Variable{
 				Vector: make(linalg.Vector, d.OutputCount),
 			},
+			Cache: d.Cache,
 		}
 	}
 	if d.Weights == nil {
@@ -51,6 +53,7 @@ func (d *DenseLayer) Randomize() {
 			Data: &autofunc.Variable{
 				Vector: make(linalg.Vector, d.OutputCount*d.InputCount),
 			},
+			Cache: d.Cache,
 		}
 	}
 
@@ -80,9 +83,18 @@ func (d *DenseLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RR
 	return d.Biases.ApplyR(v, d.Weights.ApplyR(v, in))
 }
 
-// SetCache sets the cache of the weights and biases,
-// if they are not nil.
+func (d *DenseLayer) Batch(v autofunc.Result, n int) autofunc.Result {
+	biasBatcher := &autofunc.FuncBatcher{F: d.Biases, Cache: d.Cache}
+	return biasBatcher.Batch(d.Weights.Batch(v, n), n)
+}
+
+func (d *DenseLayer) BatchR(rv autofunc.RVector, v autofunc.RResult, n int) autofunc.RResult {
+	biasBatcher := &autofunc.RFuncBatcher{F: d.Biases, Cache: d.Cache}
+	return biasBatcher.BatchR(rv, d.Weights.BatchR(rv, v, n), n)
+}
+
 func (d *DenseLayer) SetCache(c *autofunc.VectorCache) {
+	d.Cache = c
 	if d.Weights != nil {
 		d.Weights.Cache = c
 	}

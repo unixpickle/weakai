@@ -99,7 +99,7 @@ func (n Network) MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
 			if len(currentFunc) != 0 {
 				fb := &autofunc.FuncBatcher{F: currentFunc, Cache: c}
 				result = append(result, fb)
-				fb = nil
+				currentFunc = nil
 			}
 			result = append(result, b)
 		} else {
@@ -122,7 +122,7 @@ func (n Network) MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
 			if len(currentFunc) != 0 {
 				fb := &autofunc.RFuncBatcher{F: currentFunc, Cache: c}
 				result = append(result, fb)
-				fb = nil
+				currentFunc = nil
 			}
 			result = append(result, b)
 		} else {

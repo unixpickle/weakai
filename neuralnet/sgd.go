@@ -28,8 +28,9 @@ func SGD(g Gradienter, samples *SampleSet, stepSize float64, epochs, batchSize i
 
 // SGDInteractive is like SGD, but it calls a
 // function before every epoch and stops when
-// the user sends a kill signal.
-func SGDInteractive(g Gradienter, s *SampleSet, stepSize float64, batchSize int, sf func()) {
+// said function returns false, or when the
+// user sends a kill signal.
+func SGDInteractive(g Gradienter, s *SampleSet, stepSize float64, batchSize int, sf func() bool) {
 	var killed uint32
 	go func() {
 		c := make(chan os.Signal, 1)
@@ -42,10 +43,12 @@ func SGDInteractive(g Gradienter, s *SampleSet, stepSize float64, batchSize int,
 
 	for atomic.LoadUint32(&killed) == 0 {
 		if sf != nil {
-			sf()
+			if !sf() {
+				return
+			}
 		}
 		if atomic.LoadUint32(&killed) != 0 {
-			break
+			return
 		}
 		SGD(g, s, stepSize, 1, batchSize)
 	}

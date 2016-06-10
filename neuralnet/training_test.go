@@ -61,13 +61,13 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int) {
 		MaxGoroutines: maxGos,
 		MaxBatchSize:  maxBatch,
 	}
-	SGD(batcher, samples, 0.9, 100000, batchSize)
+	SGD(batcher, samples, 0.9, 1000, batchSize)
 
 	for i, sample := range samples.Inputs {
 		output := net.Apply(&autofunc.Variable{sample}).Output()
 		expected := samples.Outputs[i][0]
 		actual := output[0]
-		if math.Abs(expected-actual) > 2e-2 {
+		if math.Abs(expected-actual) > 0.08 {
 			t.Errorf("expected %f for input %v but got %f", expected, sample, actual)
 		}
 	}

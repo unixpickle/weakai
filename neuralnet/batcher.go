@@ -18,7 +18,7 @@ type Batcher struct {
 	maxThreads int
 	learner    Learner
 
-	cache           *gradientCache
+	cache           gradientCache
 	lastGradResult  autofunc.Gradient
 	lastGradRResult autofunc.RGradient
 }
@@ -31,7 +31,7 @@ func NewBatcher(l Learner, costFunc CostFunc, maxThreads int) *Batcher {
 		costFunc:   costFunc,
 		maxThreads: maxThreads,
 		learner:    l,
-		cache:      newGradientCache(l.Parameters()),
+		cache:      gradientCache{variables: l.Parameters()},
 	}
 }
 
@@ -173,53 +173,37 @@ func (b *Batcher) addGrads(grad autofunc.Gradient, rgrad autofunc.RGradient,
 }
 
 type gradientCache struct {
-	gradsLock  sync.Mutex
-	rgradsLock sync.Mutex
 	variables  []*autofunc.Variable
 	gradients  []autofunc.Gradient
 	rGradients []autofunc.RGradient
 }
 
-func newGradientCache(vars []*autofunc.Variable) *gradientCache {
-	return &gradientCache{variables: vars}
-}
-
 func (g *gradientCache) Alloc() autofunc.Gradient {
-	g.gradsLock.Lock()
 	if len(g.gradients) == 0 {
-		g.gradsLock.Unlock()
 		res := autofunc.NewGradient(g.variables)
 		return res
 	}
 	res := g.gradients[len(g.gradients)-1]
 	g.gradients = g.gradients[:len(g.gradients)-1]
-	g.gradsLock.Unlock()
 	res.Zero()
 	return res
 }
 
 func (g *gradientCache) AllocR() autofunc.RGradient {
-	g.rgradsLock.Lock()
 	if len(g.rGradients) == 0 {
-		g.rgradsLock.Unlock()
 		res := autofunc.NewRGradient(g.variables)
 		return res
 	}
 	res := g.rGradients[len(g.gradients)-1]
 	g.rGradients = g.rGradients[:len(g.rGradients)-1]
-	g.rgradsLock.Unlock()
 	res.Zero()
 	return res
 }
 
 func (g *gradientCache) Free(gr autofunc.Gradient) {
-	g.gradsLock.Lock()
-	defer g.gradsLock.Unlock()
 	g.gradients = append(g.gradients, gr)
 }
 
 func (g *gradientCache) FreeR(gr autofunc.RGradient) {
-	g.rgradsLock.Lock()
-	defer g.rgradsLock.Unlock()
 	g.rGradients = append(g.rGradients, gr)
 }

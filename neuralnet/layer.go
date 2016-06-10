@@ -42,10 +42,15 @@ type Randomizer interface {
 	Randomize()
 }
 
-// A Learner is any RFunc with parameters that should
-// be learned by gradient descent or some other means
-// of optimization.
+// A Learner is anything with some parameters.
 type Learner interface {
-	autofunc.RFunc
 	Parameters() []*autofunc.Variable
+}
+
+// A LearnBatcher is a Learner that can be evaluated
+// in batch.
+type LearnBatcher interface {
+	Learner
+	MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher
+	MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher
 }

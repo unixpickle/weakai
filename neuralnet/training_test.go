@@ -11,14 +11,22 @@ import (
 )
 
 func TestTrainingXORSerial(t *testing.T) {
-	testTrainingXOR(t, 1)
+	testTrainingXOR(t, 1, 1, 1)
 }
 
 func TestTrainingXORParallel(t *testing.T) {
-	testTrainingXOR(t, 3)
+	testTrainingXOR(t, 1, 3, 3)
 }
 
-func testTrainingXOR(t *testing.T, batchSize int) {
+func TestTrainingXORBatched(t *testing.T) {
+	testTrainingXOR(t, 3, 1, 3)
+}
+
+func TestTrainingUneven(t *testing.T) {
+	testTrainingXOR(t, 2, 2, 3)
+}
+
+func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -47,7 +55,12 @@ func testTrainingXOR(t *testing.T, batchSize int) {
 		Outputs: []linalg.Vector{{0}, {1}, {1}, {0}},
 	}
 
-	batcher := NewBatcher(net, MeanSquaredCost{}, batchSize)
+	batcher := &GradBatcher{
+		Learner:       net,
+		CostFunc:      MeanSquaredCost{},
+		MaxGoroutines: maxGos,
+		MaxBatchSize:  maxBatch,
+	}
 	SGD(batcher, samples, 0.9, 100000, batchSize)
 
 	for i, sample := range samples.Inputs {
@@ -131,7 +144,10 @@ func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
 		&Sigmoid{},
 	}
 	network.Randomize()
-	batcher := NewBatcher(network, MeanSquaredCost{}, 0)
+	batcher := &GradBatcher{
+		Learner:  network,
+		CostFunc: MeanSquaredCost{},
+	}
 
 	b.ResetTimer()
 	SGD(batcher, samples, 0.01, b.N, batchSize)

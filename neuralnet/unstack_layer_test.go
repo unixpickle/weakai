@@ -78,7 +78,7 @@ func TestUnstackLayerRProp(t *testing.T) {
 	funcTest := &functest.RFuncTest{
 		F:     layer,
 		Vars:  []*autofunc.Variable{variable},
-		Input: autofunc.NewRVariable(variable, rVec),
+		Input: variable,
 		RV:    rVec,
 	}
 	funcTest.Run(t)

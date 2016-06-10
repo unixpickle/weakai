@@ -48,7 +48,7 @@ func TestMeanSquaredCostRGradient(t *testing.T) {
 	funcTest := &functest.RFuncTest{
 		F:     meanSquaredTestFunc{expected},
 		Vars:  []*autofunc.Variable{actual},
-		Input: autofunc.NewRVariable(actual, rVector),
+		Input: actual,
 		RV:    rVector,
 	}
 	funcTest.Run(t)

@@ -168,7 +168,7 @@ func (m *maxPoolingResult) PropagateGradient(upstream linalg.Vector, grad autofu
 
 func (m *maxPoolingResult) Release() {
 	m.Layer.Cache.Free(m.OutputTensor.Data)
-	m.OutputTensor = nil
+	m.OutputTensor.Data = nil
 	m.Input.Release()
 }
 
@@ -211,8 +211,8 @@ func (m *maxPoolingRResult) PropagateRGradient(upstream, upstreamR linalg.Vector
 func (m *maxPoolingRResult) Release() {
 	m.Layer.Cache.Free(m.OutputTensor.Data)
 	m.Layer.Cache.Free(m.ROutputTensor.Data)
-	m.OutputTensor = nil
-	m.ROutputTensor = nil
+	m.OutputTensor.Data = nil
+	m.ROutputTensor.Data = nil
 	m.Input.Release()
 }
 

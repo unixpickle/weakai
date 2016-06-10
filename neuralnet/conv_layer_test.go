@@ -180,7 +180,7 @@ func TestConvLayerRProp(t *testing.T) {
 	funcTest := &functest.RFuncTest{
 		F:     layer,
 		Vars:  variables,
-		Input: autofunc.NewRVariable(inVar, rVector),
+		Input: inVar,
 		RV:    rVector,
 	}
 	funcTest.Run(t)

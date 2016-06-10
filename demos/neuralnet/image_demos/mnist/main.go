@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 
+	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/mnist"
+	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -11,6 +13,7 @@ const (
 	HiddenSize = 300
 	LabelCount = 10
 	StepSize   = 1e-2
+	BatchSize  = 20
 
 	FilterSize   = 3
 	FilterCount  = 5
@@ -23,19 +26,23 @@ func main() {
 	training := mnist.LoadTrainingDataSet()
 	crossValidation := mnist.LoadTestingDataSet()
 
-	log.Println("Printing initial scores...")
+	net := createNet(training)
 
-	net, trainer := createNetAndTrainer(training)
-	printScore("Initial training", net, training)
-	printScore("Initial cross", net, crossValidation)
-	for {
-		trainer.Train(net)
-		printScore("Training", net, training)
-		printScore("Cross", net, crossValidation)
+	trainingSamples := dataSetSamples(training)
+	gradienter := &neuralnet.BatchRGradienter{
+		Learner:  net,
+		CostFunc: neuralnet.MeanSquaredCost{},
 	}
+
+	neuralnet.SGDInteractive(gradienter, trainingSamples, StepSize, BatchSize, func() bool {
+		log.Println("Printing score...")
+		printScore("Cross", net, crossValidation)
+		log.Println("Running training round...")
+		return true
+	})
 }
 
-func createNetAndTrainer(d mnist.DataSet) (*neuralnet.Network, *neuralnet.SGD) {
+func createNet(d mnist.DataSet) neuralnet.Network {
 	convOutWidth := (d.Width-FilterSize)/FilterStride + 1
 	convOutHeight := (d.Height-FilterSize)/FilterStride + 1
 
@@ -48,9 +55,8 @@ func createNetAndTrainer(d mnist.DataSet) (*neuralnet.Network, *neuralnet.SGD) {
 		poolOutHeight++
 	}
 
-	net, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
-		&neuralnet.ConvParams{
-			Activation:   neuralnet.Sigmoid{},
+	net := neuralnet.Network{
+		&neuralnet.ConvLayer{
 			FilterCount:  FilterCount,
 			FilterWidth:  FilterSize,
 			FilterHeight: FilterSize,
@@ -59,50 +65,43 @@ func createNetAndTrainer(d mnist.DataSet) (*neuralnet.Network, *neuralnet.SGD) {
 			InputHeight:  d.Height,
 			InputDepth:   1,
 		},
-		&neuralnet.MaxPoolingParams{
+		&neuralnet.Sigmoid{},
+		&neuralnet.MaxPoolingLayer{
 			XSpan:       MaxPoolingSpan,
 			YSpan:       MaxPoolingSpan,
 			InputWidth:  convOutWidth,
 			InputHeight: convOutHeight,
 			InputDepth:  FilterCount,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
 			InputCount:  poolOutWidth * poolOutHeight * FilterCount,
 			OutputCount: HiddenSize,
 		},
-		&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		&neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
 			InputCount:  HiddenSize,
 			OutputCount: LabelCount,
 		},
-	})
+		&neuralnet.Sigmoid{},
+	}
 	net.Randomize()
 
-	trainer := &neuralnet.SGD{
-		CostFunc: neuralnet.MeanSquaredCost{},
-		Inputs:   d.IntensityVectors(),
-		Outputs:  d.LabelVectors(),
-		StepSize: StepSize,
-		Epochs:   1,
-	}
-
-	return net, trainer
+	return net
 }
 
-func printScore(prefix string, n *neuralnet.Network, d mnist.DataSet) {
+func printScore(prefix string, n neuralnet.Network, d mnist.DataSet) {
 	classifier := func(v []float64) int {
-		n.SetInput(v)
-		n.PropagateForward()
-		return networkOutput(n)
+		result := n.Apply(&autofunc.Variable{v})
+		defer result.Release()
+		return outputIdx(result)
 	}
 	correctCount := d.NumCorrect(classifier)
 	histogram := d.CorrectnessHistogram(classifier)
 	log.Printf("%s: %d/%d - %s", prefix, correctCount, len(d.Samples), histogram)
 }
 
-func networkOutput(n *neuralnet.Network) int {
-	out := n.Output()
+func outputIdx(r autofunc.Result) int {
+	out := r.Output()
 	var maxIdx int
 	var max float64
 	for i, x := range out {
@@ -112,4 +111,21 @@ func networkOutput(n *neuralnet.Network) int {
 		}
 	}
 	return maxIdx
+}
+
+func dataSetSamples(d mnist.DataSet) *neuralnet.SampleSet {
+	labelVecs := d.LabelVectors()
+	inputVecs := d.IntensityVectors()
+	return &neuralnet.SampleSet{
+		Inputs:  vecVec(inputVecs),
+		Outputs: vecVec(labelVecs),
+	}
+}
+
+func vecVec(f [][]float64) []linalg.Vector {
+	res := make([]linalg.Vector, len(f))
+	for i, x := range f {
+		res[i] = x
+	}
+	return res
 }

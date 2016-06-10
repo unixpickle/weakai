@@ -86,3 +86,52 @@ func (n Network) Serialize() ([]byte, error) {
 func (n Network) SerializerType() string {
 	return serializerTypeNetwork
 }
+
+// MakeBatcher creates a batched version of this network.
+// Any layers which implement the Batcher interface will
+// be utilized appropriately, while all other layers are
+// naively converted to Batchers.
+func (n Network) MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
+	var currentFunc autofunc.ComposedFunc
+	var result autofunc.ComposedBatcher
+	for _, layer := range n {
+		if b, ok := layer.(autofunc.Batcher); ok {
+			if len(currentFunc) != 0 {
+				fb := &autofunc.FuncBatcher{F: currentFunc, Cache: c}
+				result = append(result, fb)
+				fb = nil
+			}
+			result = append(result, b)
+		} else {
+			currentFunc = append(currentFunc, layer)
+		}
+	}
+	if len(currentFunc) != 0 {
+		fb := &autofunc.FuncBatcher{F: currentFunc, Cache: c}
+		result = append(result, fb)
+	}
+	return result
+}
+
+// MakeRBatcher is like MakeBatcher, but for an RBatcher.
+func (n Network) MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
+	var currentFunc autofunc.ComposedRFunc
+	var result autofunc.ComposedRBatcher
+	for _, layer := range n {
+		if b, ok := layer.(autofunc.RBatcher); ok {
+			if len(currentFunc) != 0 {
+				fb := &autofunc.RFuncBatcher{F: currentFunc, Cache: c}
+				result = append(result, fb)
+				fb = nil
+			}
+			result = append(result, b)
+		} else {
+			currentFunc = append(currentFunc, layer)
+		}
+	}
+	if len(currentFunc) != 0 {
+		fb := &autofunc.RFuncBatcher{F: currentFunc, Cache: c}
+		result = append(result, fb)
+	}
+	return result
+}

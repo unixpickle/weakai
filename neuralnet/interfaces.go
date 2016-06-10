@@ -49,8 +49,28 @@ type Learner interface {
 
 // A LearnBatcher is a Learner that can be evaluated
 // in batch.
-type LearnBatcher interface {
+type BatchLearner interface {
 	Learner
 	MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher
 	MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher
+}
+
+// A SingleLearner is a Learner that can evaluate a
+// single input at once.
+type SingleLearner interface {
+	Learner
+	autofunc.RFunc
+}
+
+// A Gradienter is anything which can compute a
+// gradient for a set of inputs.
+type Gradienter interface {
+	Gradient(*SampleSet) autofunc.Gradient
+}
+
+// An RGradienter is anything which can compute
+// a gradient and r-gradient for a set of inputs.
+type RGradienter interface {
+	Gradienter
+	RGradient(autofunc.RVector, *SampleSet) (autofunc.Gradient, autofunc.RGradient)
 }

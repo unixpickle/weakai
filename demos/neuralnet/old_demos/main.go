@@ -62,7 +62,11 @@ func firstBitTest() {
 	}
 	network.Randomize()
 
-	batcher := neuralnet.NewBatcher(network, neuralnet.MeanSquaredCost{}, 1)
+	batcher := &neuralnet.GradBatcher{
+		Learner:       network,
+		CostFunc:      neuralnet.MeanSquaredCost{},
+		MaxGoroutines: 1,
+	}
 	neuralnet.SGD(batcher, samples, 0.2, 100000, 1)
 
 	var totalError float64
@@ -147,7 +151,11 @@ func runHorizontalLineTest(name string, network neuralnet.Network) {
 	}
 
 	network.Randomize()
-	batcher := neuralnet.NewBatcher(network, neuralnet.MeanSquaredCost{}, 1)
+	batcher := &neuralnet.GradBatcher{
+		Learner:       network,
+		CostFunc:      neuralnet.MeanSquaredCost{},
+		MaxGoroutines: 1,
+	}
 	neuralnet.SGD(batcher, samples, 0.1, 1000, 100)
 
 	var trainingError float64

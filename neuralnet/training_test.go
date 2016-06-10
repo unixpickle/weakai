@@ -55,7 +55,7 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int) {
 		Outputs: []linalg.Vector{{0}, {1}, {1}, {0}},
 	}
 
-	batcher := &GradBatcher{
+	batcher := &BatchRGradienter{
 		Learner:       net,
 		CostFunc:      MeanSquaredCost{},
 		MaxGoroutines: maxGos,
@@ -144,7 +144,7 @@ func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
 		&Sigmoid{},
 	}
 	network.Randomize()
-	batcher := &GradBatcher{
+	batcher := &BatchRGradienter{
 		Learner:  network,
 		CostFunc: MeanSquaredCost{},
 	}

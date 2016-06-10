@@ -15,29 +15,35 @@ type gradResult struct {
 	RGrad autofunc.RGradient
 }
 
-// GradBatcher computes the gradients of Learners
-// for batches of training samples.
+// BatchRGradienter is an RGradienter that computes
+// the gradients of BatchLearners.
+// It is not safe to call its methods concurrently
+// from multiple Goroutines at once.
 //
-// It is not safe to call a Batcher's methods
-// from multiple Goroutines concurrently.
+// A BatchRGradienter is suitable for training tasks
+// with lots of learnable parameters.
+// Such tasks can benefit from parallelism, both
+// from using the BatchLearner's batching features
+// and from Goroutine-level concurrency.
 //
-// After you use a GradBatcher with a given Learner,
-// you should never use the same GradBatcher for
-// a Learner with different parameters.
-type GradBatcher struct {
-	Learner LearnBatcher
+// After you use a BatchRGradienter with a given
+// BatchLearner, you should never use the same
+// BatchRGradienter for any BatchLearner with
+// different parameters.
+type BatchRGradienter struct {
+	Learner BatchLearner
 
 	// CostFunc is the cost function used to compute
 	// error values and the gradients of said values.
 	CostFunc CostFunc
 
 	// MaxGoroutines is the maximum number of Goroutines
-	// the GradBatcher will use simultaneously.
+	// the BatchRGradienter will use simultaneously.
 	// If this is 0, a reasonable default is used.
 	MaxGoroutines int
 
 	// MaxBatchSize is the maximum number of samples the
-	// GradBatcher will pass to the learner at once.
+	// BatchRGradienter will pass to the learner at once.
 	// If this is 0, a reasonable default is used.
 	MaxBatchSize int
 
@@ -55,7 +61,7 @@ type GradBatcher struct {
 // are only valid until the next call to BatchGradient
 // or BatchRGradient, at which point the vectors may
 // be re-used or overwritten.
-func (b *GradBatcher) BatchGradient(s *SampleSet) autofunc.Gradient {
+func (b *BatchRGradienter) Gradient(s *SampleSet) autofunc.Gradient {
 	grad, _ := b.batch(nil, s)
 	return grad
 }
@@ -66,12 +72,12 @@ func (b *GradBatcher) BatchGradient(s *SampleSet) autofunc.Gradient {
 // The resulting values are  only valid until the next
 // call to BatchGradient or BatchRGradient, when the
 // vectors may be re-used.
-func (b *GradBatcher) BatchRGradient(v autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) RGradient(v autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	return b.batch(v, s)
 }
 
-func (b *GradBatcher) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	if b.gradCache.variables == nil {
 		b.gradCache.variables = b.Learner.Parameters()
@@ -132,7 +138,7 @@ func (b *GradBatcher) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradien
 	return b.lastGradResult, b.lastGradRResult
 }
 
-func (b *GradBatcher) runBatches(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) runBatches(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	grad := b.gradCache.Alloc()
 	var rgrad autofunc.RGradient
@@ -152,7 +158,7 @@ func (b *GradBatcher) runBatches(rv autofunc.RVector, s *SampleSet) (autofunc.Gr
 	return grad, rgrad
 }
 
-func (b *GradBatcher) launchGoroutines(rv autofunc.RVector,
+func (b *BatchRGradienter) launchGoroutines(rv autofunc.RVector,
 	in <-chan *SampleSet, goCount int) <-chan gradResult {
 	resChan := make(chan gradResult)
 	var wg sync.WaitGroup
@@ -178,7 +184,7 @@ func (b *GradBatcher) launchGoroutines(rv autofunc.RVector,
 	return resChan
 }
 
-func (b *GradBatcher) runBatch(rv autofunc.RVector, s *SampleSet, grad autofunc.Gradient,
+func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s *SampleSet, grad autofunc.Gradient,
 	rgrad autofunc.RGradient) {
 	if len(s.Inputs) == 0 {
 		return
@@ -214,7 +220,7 @@ func (b *GradBatcher) runBatch(rv autofunc.RVector, s *SampleSet, grad autofunc.
 	}
 }
 
-func (b *GradBatcher) goroutineCount() int {
+func (b *BatchRGradienter) goroutineCount() int {
 	max := runtime.GOMAXPROCS(0)
 	if b.MaxGoroutines == 0 || b.MaxGoroutines > max {
 		return max
@@ -223,7 +229,7 @@ func (b *GradBatcher) goroutineCount() int {
 	}
 }
 
-func (b *GradBatcher) batchSize() int {
+func (b *BatchRGradienter) batchSize() int {
 	if b.MaxBatchSize != 0 {
 		return b.MaxBatchSize
 	} else {

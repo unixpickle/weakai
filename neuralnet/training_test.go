@@ -11,22 +11,26 @@ import (
 )
 
 func TestTrainingXORSerial(t *testing.T) {
-	testTrainingXOR(t, 1, 1, 1)
+	testTrainingXOR(t, 1, 1, 1, false)
 }
 
 func TestTrainingXORParallel(t *testing.T) {
-	testTrainingXOR(t, 1, 3, 3)
+	testTrainingXOR(t, 1, 3, 3, false)
 }
 
 func TestTrainingXORBatched(t *testing.T) {
-	testTrainingXOR(t, 3, 1, 3)
+	testTrainingXOR(t, 3, 1, 3, false)
 }
 
 func TestTrainingUneven(t *testing.T) {
-	testTrainingXOR(t, 2, 2, 3)
+	testTrainingXOR(t, 2, 2, 3, false)
 }
 
-func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int) {
+func TestTrainingSingle(t *testing.T) {
+	testTrainingXOR(t, 0, 0, 1, true)
+}
+
+func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -55,13 +59,21 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int) {
 		Outputs: []linalg.Vector{{0}, {1}, {1}, {0}},
 	}
 
-	batcher := &BatchRGradienter{
-		Learner:       net,
-		CostFunc:      MeanSquaredCost{},
-		MaxGoroutines: maxGos,
-		MaxBatchSize:  maxBatch,
+	var gradienter Gradienter
+	if single {
+		gradienter = &SingleRGradienter{
+			Learner:  net,
+			CostFunc: MeanSquaredCost{},
+		}
+	} else {
+		gradienter = &BatchRGradienter{
+			Learner:       net,
+			CostFunc:      MeanSquaredCost{},
+			MaxGoroutines: maxGos,
+			MaxBatchSize:  maxBatch,
+		}
 	}
-	SGD(batcher, samples, 0.9, 1000, batchSize)
+	SGD(gradienter, samples, 0.9, 1000, batchSize)
 
 	for i, sample := range samples.Inputs {
 		output := net.Apply(&autofunc.Variable{sample}).Output()

@@ -31,10 +31,7 @@ type gradResult struct {
 // BatchRGradienter for any BatchLearner with
 // different parameters.
 type BatchRGradienter struct {
-	Learner BatchLearner
-
-	// CostFunc is the cost function used to compute
-	// error values and the gradients of said values.
+	Learner  BatchLearner
 	CostFunc CostFunc
 
 	// MaxGoroutines is the maximum number of Goroutines
@@ -54,24 +51,11 @@ type BatchRGradienter struct {
 	lastGradRResult autofunc.RGradient
 }
 
-// BatchGradient computes the error gradient for a
-// batch of samples.
-//
-// The resulting gradient and its constituent vectors
-// are only valid until the next call to BatchGradient
-// or BatchRGradient, at which point the vectors may
-// be re-used or overwritten.
 func (b *BatchRGradienter) Gradient(s *SampleSet) autofunc.Gradient {
 	grad, _ := b.batch(nil, s)
 	return grad
 }
 
-// BatchRGradient computes the Gradient and RGradient
-// for a batch of samples.
-//
-// The resulting values are  only valid until the next
-// call to BatchGradient or BatchRGradient, when the
-// vectors may be re-used.
 func (b *BatchRGradienter) RGradient(v autofunc.RVector, s *SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	return b.batch(v, s)

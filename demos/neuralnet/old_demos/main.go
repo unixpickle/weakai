@@ -77,7 +77,6 @@ func firstBitTest() {
 		}
 		result := network.Apply(&autofunc.Variable{sample})
 		output := result.Output()[0]
-		result.Release()
 		amountError := math.Abs(output - (1 - sample[0]))
 		totalError += amountError
 		maxPossibleError += 1.0
@@ -161,7 +160,6 @@ func runHorizontalLineTest(name string, network neuralnet.Network) {
 	for i, sample := range trainingSamples {
 		result := network.Apply(&autofunc.Variable{sample})
 		output := result.Output()[0]
-		result.Release()
 		amountError := math.Abs(output - trainingOutputs[i][0])
 		trainingError += amountError
 		maxTrainingError += 1.0
@@ -177,7 +175,6 @@ func runHorizontalLineTest(name string, network neuralnet.Network) {
 		}
 		result := network.Apply(&autofunc.Variable{sample})
 		output := result.Output()[0]
-		result.Release()
 		amountError := math.Abs(output - expected)
 		totalError += amountError
 		maxPossibleError += 1.0

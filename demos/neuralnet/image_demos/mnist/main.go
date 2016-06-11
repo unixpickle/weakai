@@ -33,8 +33,9 @@ func main() {
 		Learner:  net.BatchLearner(),
 		CostFunc: neuralnet.MeanSquaredCost{},
 	}
+	rmsGrad := &neuralnet.RMSProp{Gradienter: gradienter}
 
-	neuralnet.SGDInteractive(gradienter, trainingSamples, StepSize, BatchSize, func() bool {
+	neuralnet.SGDInteractive(rmsGrad, trainingSamples, StepSize, BatchSize, func() bool {
 		log.Println("Printing score...")
 		printScore("Cross", net, crossValidation)
 		log.Println("Running training round...")
@@ -82,7 +83,7 @@ func createNet(d mnist.DataSet) neuralnet.Network {
 			InputCount:  HiddenSize,
 			OutputCount: LabelCount,
 		},
-		&neuralnet.Sigmoid{},
+		&neuralnet.SoftmaxLayer{},
 	}
 	net.Randomize()
 

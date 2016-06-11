@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/kahan"
 )
 
@@ -25,17 +24,6 @@ func NewTensor3(width, height, depth int) *Tensor3 {
 		Height: height,
 		Depth:  depth,
 		Data:   make([]float64, width*height*depth),
-	}
-}
-
-// NewTensor3Cache is like NewTensor3, but it
-// creates the Tensor3 using a vector cache.
-func NewTensor3Cache(c *autofunc.VectorCache, width, height, depth int) *Tensor3 {
-	return &Tensor3{
-		Width:  width,
-		Height: height,
-		Depth:  depth,
-		Data:   c.Alloc(width * height * depth),
 	}
 }
 

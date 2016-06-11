@@ -69,12 +69,6 @@ func (n Network) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResul
 	return in
 }
 
-func (n Network) SetCache(c *autofunc.VectorCache) {
-	for _, layer := range n {
-		layer.SetCache(c)
-	}
-}
-
 func (n Network) Serialize() ([]byte, error) {
 	serializers := make([]serializer.Serializer, len(n))
 	for i, x := range n {
@@ -91,21 +85,21 @@ func (n Network) SerializerType() string {
 // based on n.
 // If you modify the network, all BatchLearners made
 // from it should be considered invalid.
-func (n Network) BatchLearner(c *autofunc.VectorCache) BatchLearner {
+func (n Network) BatchLearner() BatchLearner {
 	return &networkBatchLearner{
-		Batcher:  n.makeBatcher(c),
-		RBatcher: n.makeRBatcher(c),
+		Batcher:  n.makeBatcher(),
+		RBatcher: n.makeRBatcher(),
 		Network:  n,
 	}
 }
 
-func (n Network) makeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
+func (n Network) makeBatcher() autofunc.Batcher {
 	var currentFunc autofunc.ComposedFunc
 	var result autofunc.ComposedBatcher
 	for _, layer := range n {
 		if b, ok := layer.(autofunc.Batcher); ok {
 			if len(currentFunc) != 0 {
-				fb := &autofunc.FuncBatcher{F: currentFunc, Cache: c}
+				fb := &autofunc.FuncBatcher{F: currentFunc}
 				result = append(result, fb)
 				currentFunc = nil
 			}
@@ -115,19 +109,19 @@ func (n Network) makeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
 		}
 	}
 	if len(currentFunc) != 0 {
-		fb := &autofunc.FuncBatcher{F: currentFunc, Cache: c}
+		fb := &autofunc.FuncBatcher{F: currentFunc}
 		result = append(result, fb)
 	}
 	return result
 }
 
-func (n Network) makeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
+func (n Network) makeRBatcher() autofunc.RBatcher {
 	var currentFunc autofunc.ComposedRFunc
 	var result autofunc.ComposedRBatcher
 	for _, layer := range n {
 		if b, ok := layer.(autofunc.RBatcher); ok {
 			if len(currentFunc) != 0 {
-				fb := &autofunc.RFuncBatcher{F: currentFunc, Cache: c}
+				fb := &autofunc.RFuncBatcher{F: currentFunc}
 				result = append(result, fb)
 				currentFunc = nil
 			}
@@ -137,7 +131,7 @@ func (n Network) makeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
 		}
 	}
 	if len(currentFunc) != 0 {
-		fb := &autofunc.RFuncBatcher{F: currentFunc, Cache: c}
+		fb := &autofunc.RFuncBatcher{F: currentFunc}
 		result = append(result, fb)
 	}
 	return result

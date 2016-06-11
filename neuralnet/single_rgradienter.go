@@ -36,7 +36,6 @@ func (b *SingleRGradienter) Gradient(s *SampleSet) autofunc.Gradient {
 		result := b.Learner.Apply(inVar)
 		cost := b.CostFunc.Cost(output, result)
 		cost.PropagateGradient(linalg.Vector{1}, b.gradCache)
-		cost.Release()
 	}
 
 	return b.gradCache
@@ -63,7 +62,6 @@ func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s *SampleSet) (autofu
 		cost := b.CostFunc.CostR(rv, output, result)
 		cost.PropagateRGradient(linalg.Vector{1}, linalg.Vector{0},
 			b.rgradCache, b.gradCache)
-		cost.Release()
 	}
 
 	return b.gradCache, b.rgradCache

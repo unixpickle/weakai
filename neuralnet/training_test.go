@@ -67,7 +67,7 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 		}
 	} else {
 		gradienter = &BatchRGradienter{
-			Learner:       net.BatchLearner(nil),
+			Learner:       net.BatchLearner(),
 			CostFunc:      MeanSquaredCost{},
 			MaxGoroutines: maxGos,
 			MaxBatchSize:  maxBatch,
@@ -128,7 +128,6 @@ func BenchmarkTrainingBigParallel1000(b *testing.B) {
 }
 
 func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
-	autofunc.DefaultVectorCache.Clear()
 	runtime.GC()
 
 	inputs := make([]linalg.Vector, 100)
@@ -157,7 +156,7 @@ func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
 	}
 	network.Randomize()
 	batcher := &BatchRGradienter{
-		Learner:  network.BatchLearner(nil),
+		Learner:  network.BatchLearner(),
 		CostFunc: MeanSquaredCost{},
 	}
 

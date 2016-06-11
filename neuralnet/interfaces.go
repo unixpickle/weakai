@@ -18,20 +18,11 @@ import (
 //
 // Layers must support concurrent calls to their
 // autofunc.RFunc methods.
-// However, serialization methods and SetCache()
-// needn't be concurrency-safe--they will only
-// be called if no other Layer methods are being
-// called simultaneously.
+// However, serialization methods needn't be safe
+// for concurrency.
 type Layer interface {
 	serializer.Serializer
 	autofunc.RFunc
-
-	// SetCache changes the cache that this Layer
-	// will use.
-	// After SetCache() is called on a layer, any of
-	// the layer's previous output should be considered
-	// invalid and should not be used in any way.
-	SetCache(c *autofunc.VectorCache)
 }
 
 // A Randomizer is anything which can be reset to

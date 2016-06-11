@@ -32,8 +32,6 @@ type MaxPoolingLayer struct {
 	// InputDepth indicates the depth of the
 	// layer's input tensor.
 	InputDepth int
-
-	Cache *autofunc.VectorCache
 }
 
 func DeserializeMaxPoolingLayer(d []byte) (*MaxPoolingLayer, error) {
@@ -75,7 +73,7 @@ func (m *MaxPoolingLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofu
 	inTensor := m.inputTensor(in.Output())
 	inTensorR := m.inputTensor(in.ROutput())
 	out, choices := m.evaluate(inTensor)
-	outR := choices.ForwardPropagate(m.Cache, inTensorR)
+	outR := choices.ForwardPropagate(inTensorR)
 	return &maxPoolingRResult{
 		OutputTensor:  out,
 		ROutputTensor: outR,
@@ -83,10 +81,6 @@ func (m *MaxPoolingLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofu
 		Input:         in,
 		Layer:         m,
 	}
-}
-
-func (m *MaxPoolingLayer) SetCache(c *autofunc.VectorCache) {
-	m.Cache = c
 }
 
 func (m *MaxPoolingLayer) Serialize() ([]byte, error) {
@@ -98,7 +92,7 @@ func (m *MaxPoolingLayer) SerializerType() string {
 }
 
 func (m *MaxPoolingLayer) evaluate(inTensor *Tensor3) (*Tensor3, poolChoiceMap) {
-	outTensor := NewTensor3Cache(m.Cache, m.OutputWidth(), m.OutputHeight(), m.InputDepth)
+	outTensor := NewTensor3(m.OutputWidth(), m.OutputHeight(), m.InputDepth)
 	choices := newPoolChoiceMap(m.OutputWidth(), m.OutputHeight(), m.InputDepth)
 	for y := 0; y < outTensor.Height; y++ {
 		poolY := y * m.YSpan
@@ -160,16 +154,9 @@ func (m *maxPoolingResult) PropagateGradient(upstream linalg.Vector, grad autofu
 		return
 	}
 	ut := m.Layer.outputTensor(upstream)
-	downstream := m.Choices.BackPropagate(m.Layer.Cache, ut, m.Layer.InputWidth,
+	downstream := m.Choices.BackPropagate(ut, m.Layer.InputWidth,
 		m.Layer.InputHeight)
 	m.Input.PropagateGradient(downstream.Data, grad)
-	m.Layer.Cache.Free(downstream.Data)
-}
-
-func (m *maxPoolingResult) Release() {
-	m.Layer.Cache.Free(m.OutputTensor.Data)
-	m.OutputTensor.Data = nil
-	m.Input.Release()
 }
 
 type maxPoolingRResult struct {
@@ -199,21 +186,9 @@ func (m *maxPoolingRResult) PropagateRGradient(upstream, upstreamR linalg.Vector
 	}
 	ut := m.Layer.outputTensor(upstream)
 	utR := m.Layer.outputTensor(upstreamR)
-	downstream := m.Choices.BackPropagate(m.Layer.Cache, ut, m.Layer.InputWidth,
-		m.Layer.InputHeight)
-	downstreamR := m.Choices.BackPropagate(m.Layer.Cache, utR, m.Layer.InputWidth,
-		m.Layer.InputHeight)
+	downstream := m.Choices.BackPropagate(ut, m.Layer.InputWidth, m.Layer.InputHeight)
+	downstreamR := m.Choices.BackPropagate(utR, m.Layer.InputWidth, m.Layer.InputHeight)
 	m.Input.PropagateRGradient(downstream.Data, downstreamR.Data, rgrad, grad)
-	m.Layer.Cache.Free(downstream.Data)
-	m.Layer.Cache.Free(downstreamR.Data)
-}
-
-func (m *maxPoolingRResult) Release() {
-	m.Layer.Cache.Free(m.OutputTensor.Data)
-	m.Layer.Cache.Free(m.ROutputTensor.Data)
-	m.OutputTensor.Data = nil
-	m.ROutputTensor.Data = nil
-	m.Input.Release()
 }
 
 func maxInput(t *Tensor3, x1, x2, y1, y2, z int) (value float64, bestX, bestY int) {
@@ -246,8 +221,8 @@ func newPoolChoiceMap(width, height, depth int) poolChoiceMap {
 	return res
 }
 
-func (p poolChoiceMap) ForwardPropagate(c *autofunc.VectorCache, in *Tensor3) *Tensor3 {
-	output := NewTensor3Cache(c, p.Width(), p.Height(), in.Depth)
+func (p poolChoiceMap) ForwardPropagate(in *Tensor3) *Tensor3 {
+	output := NewTensor3(p.Width(), p.Height(), in.Depth)
 	for y, list := range p {
 		for x, list1 := range list {
 			for z, point := range list1 {
@@ -259,9 +234,8 @@ func (p poolChoiceMap) ForwardPropagate(c *autofunc.VectorCache, in *Tensor3) *T
 	return output
 }
 
-func (p poolChoiceMap) BackPropagate(c *autofunc.VectorCache, in *Tensor3,
-	outWidth, outHeight int) *Tensor3 {
-	output := NewTensor3Cache(c, outWidth, outHeight, in.Depth)
+func (p poolChoiceMap) BackPropagate(in *Tensor3, outWidth, outHeight int) *Tensor3 {
+	output := NewTensor3(outWidth, outHeight, in.Depth)
 	for y, list := range p {
 		for x, list1 := range list {
 			for z, point := range list1 {

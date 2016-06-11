@@ -44,8 +44,6 @@ type BatchRGradienter struct {
 	// If this is 0, a reasonable default is used.
 	MaxBatchSize int
 
-	Cache *autofunc.VectorCache
-
 	gradCache       gradientCache
 	lastGradResult  autofunc.Gradient
 	lastGradRResult autofunc.RGradient
@@ -176,10 +174,8 @@ func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s *SampleSet, grad auto
 	sampleCount := len(s.Inputs)
 	inputSize := len(s.Inputs[0])
 	outputSize := len(s.Outputs[0])
-	inVec := b.Cache.Alloc(sampleCount * inputSize)
-	outVec := b.Cache.Alloc(sampleCount * outputSize)
-	defer b.Cache.Free(inVec)
-	defer b.Cache.Free(outVec)
+	inVec := make(linalg.Vector, sampleCount*inputSize)
+	outVec := make(linalg.Vector, sampleCount*outputSize)
 
 	for i, in := range s.Inputs {
 		copy(inVec[i*inputSize:], in)
@@ -195,12 +191,10 @@ func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s *SampleSet, grad auto
 		cost := b.CostFunc.CostR(rv, outVec, result)
 		cost.PropagateRGradient(linalg.Vector{1}, linalg.Vector{0},
 			rgrad, grad)
-		cost.Release()
 	} else {
 		result := b.Learner.Batch(inVar, sampleCount)
 		cost := b.CostFunc.Cost(outVec, result)
 		cost.PropagateGradient(linalg.Vector{1}, grad)
-		cost.Release()
 	}
 }
 

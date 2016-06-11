@@ -35,32 +35,23 @@ func TotalCost(c CostFunc, layer autofunc.Func, s *SampleSet) float64 {
 // MeanSquaredCost computes the cost as ||a-x||^2
 // where a is the actual output and x is the desired
 // output.
-type MeanSquaredCost struct {
-	Cache *autofunc.VectorCache
-}
+type MeanSquaredCost struct{}
 
-func (m MeanSquaredCost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
+func (_ MeanSquaredCost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
 	return &meanSquaredResult{
-		Cache:    m.Cache,
 		Actual:   a,
 		Expected: x,
 	}
 }
 
-func (m MeanSquaredCost) CostR(v autofunc.RVector, a linalg.Vector,
+func (_ MeanSquaredCost) CostR(v autofunc.RVector, a linalg.Vector,
 	x autofunc.RResult) autofunc.RResult {
-	arith := autofunc.Arithmetic{m.Cache}
-
-	// TODO: avoid the .Copy() call.
 	aVar := &autofunc.Variable{a.Copy().Scale(-1)}
-
-	aVarR := autofunc.NewRVariableCache(aVar, v, m.Cache)
-	return autofunc.SquaredNorm{m.Cache}.ApplyR(v, arith.AddR(aVarR, x))
+	aVarR := autofunc.NewRVariable(aVar, v)
+	return autofunc.SquaredNorm{}.ApplyR(v, autofunc.AddR(aVarR, x))
 }
 
 type meanSquaredResult struct {
-	Cache *autofunc.VectorCache
-
 	OutputLock   sync.RWMutex
 	OutputVector linalg.Vector
 
@@ -97,55 +88,44 @@ func (m *meanSquaredResult) PropagateGradient(upstream linalg.Vector, grad autof
 	if !m.Actual.Constant(grad) {
 		out := m.Actual.Output()
 		upstreamGrad := upstream[0]
-		downstream := m.Cache.Alloc(len(out))
+		downstream := make(linalg.Vector, len(out))
 		for i, a := range out {
 			downstream[i] = 2 * upstreamGrad * (a - m.Expected[i])
 		}
 		m.Actual.PropagateGradient(downstream, grad)
-		m.Cache.Free(downstream)
 	}
-}
-
-func (m *meanSquaredResult) Release() {
-	m.Actual.Release()
 }
 
 // CrossEntropyCost computes the cost using the
 // definition of cross entropy.
-type CrossEntropyCost struct {
-	Cache *autofunc.VectorCache
-}
+type CrossEntropyCost struct{}
 
-func (c CrossEntropyCost) Cost(a linalg.Vector, inX autofunc.Result) autofunc.Result {
+func (_ CrossEntropyCost) Cost(a linalg.Vector, inX autofunc.Result) autofunc.Result {
 	return autofunc.Pool(inX, func(x autofunc.Result) autofunc.Result {
-		arith := autofunc.Arithmetic{c.Cache}
-
 		aVar := &autofunc.Variable{a}
-		logA := autofunc.Log{c.Cache}.Apply(aVar)
-		oneMinusA := arith.AddScaler(arith.Scale(aVar, -1), 1)
-		oneMinusX := arith.AddScaler(arith.Scale(x, -1), 1)
-		log1A := autofunc.Log{c.Cache}.Apply(oneMinusA)
+		logA := autofunc.Log{}.Apply(aVar)
+		oneMinusA := autofunc.AddScaler(autofunc.Scale(aVar, -1), 1)
+		oneMinusX := autofunc.AddScaler(autofunc.Scale(x, -1), 1)
+		log1A := autofunc.Log{}.Apply(oneMinusA)
 
-		errorVec := arith.Add(arith.Mul(aVar, logA),
-			arith.Mul(oneMinusX, log1A))
-		return arith.Scale(arith.SumAll(errorVec), -1)
+		errorVec := autofunc.Add(autofunc.Mul(aVar, logA),
+			autofunc.Mul(oneMinusX, log1A))
+		return autofunc.Scale(autofunc.SumAll(errorVec), -1)
 	})
 }
 
-func (c CrossEntropyCost) CostR(v autofunc.RVector, a linalg.Vector,
+func (_ CrossEntropyCost) CostR(v autofunc.RVector, a linalg.Vector,
 	inX autofunc.RResult) autofunc.RResult {
 	return autofunc.PoolR(inX, func(x autofunc.RResult) autofunc.RResult {
-		arith := autofunc.Arithmetic{c.Cache}
+		aVar := autofunc.NewRVariable(&autofunc.Variable{a}, autofunc.RVector{})
+		logA := autofunc.Log{}.ApplyR(v, aVar)
+		oneMinusA := autofunc.AddScalerR(autofunc.ScaleR(aVar, -1), 1)
+		oneMinusX := autofunc.AddScalerR(autofunc.ScaleR(x, -1), 1)
+		log1A := autofunc.Log{}.ApplyR(v, oneMinusA)
 
-		aVar := autofunc.NewRVariableCache(&autofunc.Variable{a}, autofunc.RVector{}, c.Cache)
-		logA := autofunc.Log{c.Cache}.ApplyR(v, aVar)
-		oneMinusA := arith.AddScalerR(arith.ScaleR(aVar, -1), 1)
-		oneMinusX := arith.AddScalerR(arith.ScaleR(x, -1), 1)
-		log1A := autofunc.Log{c.Cache}.ApplyR(v, oneMinusA)
-
-		errorVec := arith.AddR(arith.MulR(aVar, logA),
-			arith.MulR(oneMinusX, log1A))
-		return arith.ScaleR(arith.SumAllR(errorVec), -1)
+		errorVec := autofunc.AddR(autofunc.MulR(aVar, logA),
+			autofunc.MulR(oneMinusX, log1A))
+		return autofunc.ScaleR(autofunc.SumAllR(errorVec), -1)
 	})
 }
 
@@ -159,30 +139,25 @@ type RegularizingCost struct {
 	Penalty float64
 
 	CostFunc CostFunc
-
-	Cache *autofunc.VectorCache
 }
 
 func (r *RegularizingCost) Cost(a linalg.Vector, x autofunc.Result) autofunc.Result {
-	arith := autofunc.Arithmetic{r.Cache}
-	regFunc := autofunc.SquaredNorm{r.Cache}
+	regFunc := autofunc.SquaredNorm{}
 	cost := r.CostFunc.Cost(a, x)
 	for _, variable := range r.Variables {
 		norm := regFunc.Apply(variable)
-		cost = arith.Add(cost, arith.Scale(norm, r.Penalty))
+		cost = autofunc.Add(cost, autofunc.Scale(norm, r.Penalty))
 	}
 	return cost
 }
 
 func (r *RegularizingCost) CostR(v autofunc.RVector, a linalg.Vector,
 	x autofunc.RResult) autofunc.RResult {
-	arith := autofunc.Arithmetic{r.Cache}
-	regFunc := autofunc.SquaredNorm{r.Cache}
+	regFunc := autofunc.SquaredNorm{}
 	cost := r.CostFunc.CostR(v, a, x)
 	for _, variable := range r.Variables {
-		rVar := autofunc.NewRVariableCache(variable, v, r.Cache)
-		norm := regFunc.ApplyR(v, rVar)
-		cost = arith.AddR(cost, arith.ScaleR(norm, r.Penalty))
+		norm := regFunc.ApplyR(v, autofunc.NewRVariable(variable, v))
+		cost = autofunc.AddR(cost, autofunc.ScaleR(norm, r.Penalty))
 	}
 	return cost
 }

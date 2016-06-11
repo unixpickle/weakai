@@ -51,8 +51,7 @@ type Learner interface {
 // in batch.
 type BatchLearner interface {
 	Learner
-	MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher
-	MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher
+	autofunc.RBatcher
 }
 
 // A SingleLearner is a Learner that can evaluate a

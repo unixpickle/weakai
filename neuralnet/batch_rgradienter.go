@@ -191,13 +191,13 @@ func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s *SampleSet, grad auto
 	inVar := &autofunc.Variable{inVec}
 	if rgrad != nil {
 		rVar := autofunc.NewRVariable(inVar, rv)
-		result := b.Learner.MakeRBatcher(b.Cache).BatchR(rv, rVar, sampleCount)
+		result := b.Learner.BatchR(rv, rVar, sampleCount)
 		cost := b.CostFunc.CostR(rv, outVec, result)
 		cost.PropagateRGradient(linalg.Vector{1}, linalg.Vector{0},
 			rgrad, grad)
 		cost.Release()
 	} else {
-		result := b.Learner.MakeBatcher(b.Cache).Batch(inVar, sampleCount)
+		result := b.Learner.Batch(inVar, sampleCount)
 		cost := b.CostFunc.Cost(outVec, result)
 		cost.PropagateGradient(linalg.Vector{1}, grad)
 		cost.Release()

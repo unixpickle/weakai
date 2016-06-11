@@ -58,7 +58,7 @@ func testBatchRGradienter(t *testing.T, batchSize int, b *BatchRGradienter) {
 		&Sigmoid{},
 	}
 	net.Randomize()
-	b.Learner = net
+	b.Learner = net.BatchLearner(nil)
 
 	samples := &SampleSet{}
 	samples.Inputs = make([]linalg.Vector, batchSize)

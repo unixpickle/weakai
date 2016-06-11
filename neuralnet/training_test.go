@@ -67,7 +67,7 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 		}
 	} else {
 		gradienter = &BatchRGradienter{
-			Learner:       net,
+			Learner:       net.BatchLearner(nil),
 			CostFunc:      MeanSquaredCost{},
 			MaxGoroutines: maxGos,
 			MaxBatchSize:  maxBatch,
@@ -157,7 +157,7 @@ func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
 	}
 	network.Randomize()
 	batcher := &BatchRGradienter{
-		Learner:  network,
+		Learner:  network.BatchLearner(nil),
 		CostFunc: MeanSquaredCost{},
 	}
 

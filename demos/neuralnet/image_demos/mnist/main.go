@@ -30,7 +30,7 @@ func main() {
 
 	trainingSamples := dataSetSamples(training)
 	gradienter := &neuralnet.BatchRGradienter{
-		Learner:  net,
+		Learner:  net.BatchLearner(nil),
 		CostFunc: neuralnet.MeanSquaredCost{},
 	}
 

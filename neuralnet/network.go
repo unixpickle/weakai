@@ -87,11 +87,19 @@ func (n Network) SerializerType() string {
 	return serializerTypeNetwork
 }
 
-// MakeBatcher creates a batched version of this network.
-// Any layers which implement the Batcher interface will
-// be utilized appropriately, while all other layers are
-// naively converted to Batchers.
-func (n Network) MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
+// BatchLearner creates a new BatchLearner that is
+// based on n.
+// If you modify the network, all BatchLearners made
+// from it should be considered invalid.
+func (n Network) BatchLearner(c *autofunc.VectorCache) BatchLearner {
+	return &networkBatchLearner{
+		Batcher:  n.makeBatcher(c),
+		RBatcher: n.makeRBatcher(c),
+		Network:  n,
+	}
+}
+
+func (n Network) makeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
 	var currentFunc autofunc.ComposedFunc
 	var result autofunc.ComposedBatcher
 	for _, layer := range n {
@@ -113,8 +121,7 @@ func (n Network) MakeBatcher(c *autofunc.VectorCache) autofunc.Batcher {
 	return result
 }
 
-// MakeRBatcher is like MakeBatcher, but for an RBatcher.
-func (n Network) MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
+func (n Network) makeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
 	var currentFunc autofunc.ComposedRFunc
 	var result autofunc.ComposedRBatcher
 	for _, layer := range n {
@@ -134,4 +141,23 @@ func (n Network) MakeRBatcher(c *autofunc.VectorCache) autofunc.RBatcher {
 		result = append(result, fb)
 	}
 	return result
+}
+
+type networkBatchLearner struct {
+	Batcher  autofunc.Batcher
+	RBatcher autofunc.RBatcher
+	Network  Network
+}
+
+func (n *networkBatchLearner) Batch(in autofunc.Result, m int) autofunc.Result {
+	return n.Batcher.Batch(in, m)
+}
+
+func (n *networkBatchLearner) BatchR(v autofunc.RVector, in autofunc.RResult,
+	m int) autofunc.RResult {
+	return n.RBatcher.BatchR(v, in, m)
+}
+
+func (n *networkBatchLearner) Parameters() []*autofunc.Variable {
+	return n.Network.Parameters()
 }

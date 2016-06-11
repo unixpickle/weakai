@@ -8,7 +8,9 @@ import (
 	"os/signal"
 	"runtime"
 
+	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/mnist"
+	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rbm"
 )
@@ -23,6 +25,7 @@ const (
 
 	ClassifierStepSize  = 1e-2
 	ClassifierMaxEpochs = 10000
+	ClassifierBatchSize = 10
 	DigitCount          = 10
 )
 
@@ -40,7 +43,7 @@ func main() {
 	classifier := pretrainedClassifier(binSamples)
 
 	trainClassifier(classifier, training)
-	data := classifier.Serialize()
+	data, _ := classifier.Serialize()
 
 	if err := ioutil.WriteFile(outputFile, data, 0755); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -48,7 +51,7 @@ func main() {
 	}
 }
 
-func pretrainedClassifier(d [][]bool) *neuralnet.Network {
+func pretrainedClassifier(d [][]bool) neuralnet.Network {
 	log.Println("Pre-training with DBN...")
 
 	trainer := rbm.Trainer{
@@ -61,18 +64,17 @@ func pretrainedClassifier(d [][]bool) *neuralnet.Network {
 	trainer.TrainDeep(layers, d[:BoltzmannSamples])
 
 	classifier := layers.BuildANN()
-	outputLayer := neuralnet.NewDenseLayer(&neuralnet.DenseParams{
-		Activation:  neuralnet.Sigmoid{},
+	outputLayer := &neuralnet.DenseLayer{
 		InputCount:  LayerSizes[len(LayerSizes)-1],
 		OutputCount: DigitCount,
-	})
+	}
 	outputLayer.Randomize()
-	classifier.AddLayer(outputLayer)
+	classifier = append(classifier, outputLayer, neuralnet.Sigmoid{})
 
 	return classifier
 }
 
-func trainClassifier(n *neuralnet.Network, d mnist.DataSet) {
+func trainClassifier(n neuralnet.Network, d mnist.DataSet) {
 	log.Println("Training classifier (ctrl+C to finish)...")
 
 	killChan := make(chan struct{})
@@ -86,29 +88,29 @@ func trainClassifier(n *neuralnet.Network, d mnist.DataSet) {
 		close(killChan)
 	}()
 
-	trainer := &neuralnet.SGD{
+	samples := &neuralnet.SampleSet{
+		Inputs:  make([]linalg.Vector, len(d.Samples)),
+		Outputs: make([]linalg.Vector, len(d.Samples)),
+	}
+	for i, x := range d.IntensityVectors() {
+		samples.Inputs[i] = x
+	}
+	for i, x := range d.LabelVectors() {
+		samples.Outputs[i] = x
+	}
+	batcher := &neuralnet.BatchRGradienter{
+		Learner:  n.BatchLearner(),
 		CostFunc: neuralnet.MeanSquaredCost{},
-		Inputs:   d.IntensityVectors(),
-		Outputs:  d.LabelVectors(),
-		StepSize: ClassifierStepSize,
-		Epochs:   1,
 	}
 
 	crossValidation := mnist.LoadTestingDataSet()
 
-	printScore("Initial training", n, d)
-	printScore("Initial cross", n, crossValidation)
-
-	for {
-		select {
-		case <-killChan:
-			return
-		default:
-		}
-		trainer.Train(n)
-		printScore("Training", n, d)
-		printScore("Cross", n, crossValidation)
-	}
+	neuralnet.SGDInteractive(batcher, samples, ClassifierStepSize,
+		ClassifierBatchSize, func() bool {
+			printScore("Training", n, d)
+			printScore("Cross", n, crossValidation)
+			return true
+		})
 }
 
 func createDBN() rbm.DBN {
@@ -132,19 +134,18 @@ func binarySamples(tsamp []mnist.Sample) [][]bool {
 	return samples
 }
 
-func printScore(prefix string, n *neuralnet.Network, d mnist.DataSet) {
+func printScore(prefix string, n neuralnet.Network, d mnist.DataSet) {
 	classifier := func(v []float64) int {
-		n.SetInput(v)
-		n.PropagateForward()
-		return networkOutput(n)
+		r := n.Apply(&autofunc.Variable{v})
+		return networkOutput(r)
 	}
 	correctCount := d.NumCorrect(classifier)
 	histogram := d.CorrectnessHistogram(classifier)
 	log.Printf("%s: %d/%d - %s", prefix, correctCount, len(d.Samples), histogram)
 }
 
-func networkOutput(n *neuralnet.Network) int {
-	out := n.Output()
+func networkOutput(r autofunc.Result) int {
+	out := r.Output()
 	var maxIdx int
 	var max float64
 	for i, x := range out {

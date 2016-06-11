@@ -42,25 +42,20 @@ func (d DBN) SampleInput(r *rand.Rand, output []bool) []bool {
 // BuildANN builds a feed-forward neural network
 // that is based off of the weights and biases in
 // this DBN.
-func (d DBN) BuildANN() *neuralnet.Network {
-	network := &neuralnet.Network{}
+func (d DBN) BuildANN() neuralnet.Network {
+	network := neuralnet.Network{}
 	for _, x := range d {
 		inputSize := len(x.VisibleBiases)
 		outputSize := len(x.HiddenBiases)
-		layer := neuralnet.NewDenseLayer(&neuralnet.DenseParams{
-			Activation:  neuralnet.Sigmoid{},
+		layer := &neuralnet.DenseLayer{
 			InputCount:  inputSize,
 			OutputCount: outputSize,
-		})
-		weights := layer.Weights()
-		for i, output := range weights {
-			for j := range output {
-				output[j] = x.Weights.Get(i, j)
-			}
 		}
-		biases := layer.Biases()
-		copy(biases, x.HiddenBiases)
-		network.AddLayer(layer)
+		layer.Randomize()
+		copy(layer.Weights.Data.Vector, x.Weights.Data)
+		copy(layer.Biases.Var.Vector, x.HiddenBiases)
+		network = append(network, layer)
+		network = append(network, neuralnet.Sigmoid{})
 	}
 	return network
 }

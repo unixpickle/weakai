@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -40,19 +41,14 @@ func Run() {
 		os.Exit(1)
 	}
 
-	if !network.SetInput(ImageTensor(inputImage).Data) {
-		fmt.Fprintln(os.Stderr, "Bad image dimensions.")
-		os.Exit(1)
-	}
-
-	network.PropagateForward()
+	res := network.Apply(&autofunc.Variable{ImageTensor(inputImage).Data})
 
 	tensor := &neuralnet.Tensor3{
 		Width:  inputImage.Bounds().Dx(),
 		Height: inputImage.Bounds().Dy(),
 		Depth:  3,
+		Data:   res.Output(),
 	}
-	tensor.Data = network.Output()
 
 	image := ImageFromTensor(tensor)
 	outFile, err := os.Create(outputPath)

@@ -4,20 +4,20 @@ import (
 	"errors"
 	"image"
 	"log"
-	"math"
 
+	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
 const (
-	FilterSize   = 4
-	FilterCount  = 4
-	FilterStride = 2
-	StepSize     = 1e-6
-	MaxEpochs    = 100000
+	HiddenSize = 50
+	BatchSize  = 30
+	MaxEpochs  = 100000
 )
 
-func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
+var StepSizes = []float64{1e-3, 1e-4, 1e-5, 1e-6}
+
+func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	firstImage := <-images
 	if firstImage == nil {
 		return nil, errors.New("no readable images")
@@ -40,85 +40,41 @@ func Autoencode(images <-chan image.Image) (*neuralnet.Network, error) {
 	}
 
 	log.Print("Training network...")
-	log.Print("Press ctrl+c to stop on next iteration.")
+	log.Print("Press ctrl+c to move on to the next step size.")
 
-	convOutWidth := (width-FilterSize)/FilterStride + 1
-	convOutHeight := (height-FilterSize)/FilterStride + 1
+	network := neuralnet.Network{
+		&neuralnet.DenseLayer{
+			InputCount:  width * height * 3,
+			OutputCount: HiddenSize,
+		},
+		neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
+			InputCount:  HiddenSize,
+			OutputCount: width * height * 3,
+		},
+	}
+	network.Randomize()
 
-	borderTargetWidth := (width/FilterStride + FilterSize) - 1
-	borderTargetHeight := (height/FilterStride + FilterSize) - 1
-	widthPadding := borderTargetWidth - convOutWidth
-	heightPadding := borderTargetHeight - convOutHeight
-
-	network, _ := neuralnet.NewNetwork([]neuralnet.LayerPrototype{
-		&neuralnet.ConvParams{
-			Activation:   neuralnet.Sigmoid{},
-			FilterCount:  FilterCount,
-			FilterWidth:  FilterSize,
-			FilterHeight: FilterSize,
-			Stride:       FilterStride,
-			InputWidth:   width,
-			InputHeight:  height,
-			InputDepth:   3,
-		},
-		&neuralnet.BorderParams{
-			InputWidth:   convOutWidth,
-			InputHeight:  convOutHeight,
-			InputDepth:   FilterCount,
-			LeftBorder:   widthPadding / 2,
-			RightBorder:  widthPadding - (widthPadding / 2),
-			TopBorder:    heightPadding / 2,
-			BottomBorder: heightPadding - (heightPadding / 2),
-		},
-		&neuralnet.ConvGrowParams{
-			ConvParams: neuralnet.ConvParams{
-				Activation:   neuralnet.Sigmoid{},
-				FilterCount:  3,
-				FilterWidth:  FilterSize,
-				FilterHeight: FilterSize,
-				Stride:       1,
-				InputWidth:   borderTargetWidth,
-				InputHeight:  borderTargetHeight,
-				InputDepth:   FilterCount,
-			},
-			InverseStride: FilterStride,
-		},
-		&neuralnet.BorderParams{
-			InputWidth:  width - (width % FilterStride),
-			InputHeight: height - (height % FilterStride),
-			InputDepth:  3,
-			LeftBorder:  width % FilterStride,
-			TopBorder:   height % FilterStride,
-		},
-	})
-
-	tensorSlices := make([][]float64, len(tensors))
+	tensorSlices := make([]linalg.Vector, len(tensors))
 	for i, tensor := range tensors {
 		tensorSlices[i] = tensor.Data
 	}
+	samples := &neuralnet.SampleSet{Inputs: tensorSlices, Outputs: tensorSlices}
 
-	trainer := neuralnet.SGD{
+	batcher := &neuralnet.BatchRGradienter{
+		Learner:  network.BatchLearner(),
 		CostFunc: neuralnet.MeanSquaredCost{},
-		Inputs:   tensorSlices,
-		Outputs:  tensorSlices,
-		StepSize: StepSize,
-		Epochs:   100000,
 	}
+	rms := &neuralnet.RMSProp{Gradienter: batcher}
 
-	network.Randomize()
-	trainer.TrainInteractive(network)
+	for i, stepSize := range StepSizes {
+		log.Printf("Using step size %f (%d out of %d)", stepSize, i+1, len(StepSizes))
+		neuralnet.SGDInteractive(rms, samples, stepSize, BatchSize, func() bool {
+			cost := neuralnet.TotalCost(batcher.CostFunc, network, samples)
+			log.Println("Current cost is", cost)
+			return true
+		})
+	}
 
 	return network, nil
-}
-
-func trainerError(n *neuralnet.Network, t *neuralnet.SGD) float64 {
-	var e float64
-	for _, sample := range t.Inputs {
-		n.SetInput(sample)
-		n.PropagateForward()
-		for i, x := range n.Output() {
-			e += math.Pow(x-sample[i], 2)
-		}
-	}
-	return e
 }

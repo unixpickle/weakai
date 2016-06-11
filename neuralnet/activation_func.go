@@ -41,7 +41,7 @@ func (_ ReLU) Apply(r autofunc.Result) autofunc.Result {
 	}
 }
 
-func (_ ReLU) ApplyR(r autofunc.RResult) autofunc.RResult {
+func (_ ReLU) ApplyR(v autofunc.RVector, r autofunc.RResult) autofunc.RResult {
 	outVec := r.Output()
 	outVecR := r.ROutput()
 	vec := make(linalg.Vector, len(outVec))
@@ -81,12 +81,15 @@ func (r *reLUResult) Constant(g autofunc.Gradient) bool {
 }
 
 func (r *reLUResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
+	if r.Input.Constant(grad) {
+		return
+	}
 	for i, x := range r.OutputVec {
 		if x == 0 {
 			upstream[i] = 0
 		}
-		r.Input.PropagateGradient(upstream, grad)
 	}
+	r.Input.PropagateGradient(upstream, grad)
 }
 
 type reLURResult struct {
@@ -109,13 +112,16 @@ func (r *reLURResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) bool 
 
 func (r *reLURResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 	rgrad autofunc.RGradient, grad autofunc.Gradient) {
+	if r.Input.Constant(rgrad, grad) {
+		return
+	}
 	for i, x := range r.OutputVec {
 		if x == 0 {
 			upstream[i] = 0
 			upstreamR[i] = 0
 		}
-		r.Input.PropagateRGradient(upstream, upstreamR, rgrad, grad)
 	}
+	r.Input.PropagateRGradient(upstream, upstreamR, rgrad, grad)
 }
 
 type HyperbolicTangent struct{}

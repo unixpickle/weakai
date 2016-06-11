@@ -30,7 +30,7 @@ func main() {
 
 	trainingSamples := dataSetSamples(training)
 	gradienter := &neuralnet.BatchRGradienter{
-		Learner:  net.BatchLearner(nil),
+		Learner:  net.BatchLearner(),
 		CostFunc: neuralnet.MeanSquaredCost{},
 	}
 
@@ -92,7 +92,6 @@ func createNet(d mnist.DataSet) neuralnet.Network {
 func printScore(prefix string, n neuralnet.Network, d mnist.DataSet) {
 	classifier := func(v []float64) int {
 		result := n.Apply(&autofunc.Variable{v})
-		defer result.Release()
 		return outputIdx(result)
 	}
 	correctCount := d.NumCorrect(classifier)

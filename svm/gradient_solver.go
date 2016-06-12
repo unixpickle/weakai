@@ -35,29 +35,16 @@ func (c *GradientDescentSolver) Solve(p *Problem) *CombinationClassifier {
 	maxCoefficient := 1 / (2 * c.Tradeoff * sampleCount)
 	iter := newGradientIterator(p, maxCoefficient)
 
-	var timeout <-chan time.Time
-	if c.Timeout != 0 {
-		timeout = time.After(c.Timeout)
-	}
-
+	endTime := time.Now().Add(c.Timeout)
 	lastValue := iter.QuadraticValue()
 
-StepLoop:
-	for {
+	for !time.Now().After(endTime) {
 		iter.StepGradient()
 		newVal := iter.QuadraticValue()
 		if iter.ShouldTerminate() || (newVal >= lastValue && !iter.ConstraintsChanged()) {
 			break
 		}
 		lastValue = newVal
-
-		if timeout != nil {
-			select {
-			case <-timeout:
-				break StepLoop
-			default:
-			}
-		}
 	}
 
 	return iter.Solution(p)

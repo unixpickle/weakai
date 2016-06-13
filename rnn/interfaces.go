@@ -31,16 +31,15 @@ type BlockOutput interface {
 
 	// Gradient updates the gradients in g given the
 	// upstream gradient from this BlockOutput.
-	Gradient(g autofunc.Gradient, u *UpstreamGradient)
+	Gradient(u *UpstreamGradient, g autofunc.Gradient)
 }
 
 // An RBlockInput is like a BlockInput, but includes
 // derivatives of all the inputs and states with
 // respect to some variable R.
 type RBlockInput struct {
-	BlockInput
-	RStates []linalg.Vector
-	RInputs []linalg.Vector
+	States []*autofunc.RVariable
+	Inputs []*autofunc.RVariable
 }
 
 // An RBlockOutput is like a BlockOutput, but includes
@@ -55,20 +54,24 @@ type RBlockOutput interface {
 	// r-gradients in rg given the upstream gradient
 	// u and the derivative of u with respect to R,
 	// stored in ru.
-	RGradient(g autofunc.Gradient, rg autofunc.RGradient, u, ru *UpstreamGradient)
+	RGradient(u, ru *UpstreamGradient, g autofunc.Gradient, rg autofunc.RGradient)
 }
 
 // A Block is a unit in a Recurrent Neural Network that
 // transforms input-state pairs into output/state pairs.
 type Block interface {
-	// Forward applies forward propagation to a BlockInput.
-	Batch(in BlockInput) BlockOutput
+	// StateSize returns the number of values in each
+	// state of the Block.
+	StateSize() int
 
-	// ForwardR is like Forward, but for an RBlockInput.
+	// Batch applies forward propagation to a BlockInput.
+	Batch(in *BlockInput) BlockOutput
+
+	// BatchR is like Batch, but for an RBlockInput.
 	// It is necessary to provide an RVector so that the
 	// block knows how much each of its hidden parameters
 	// changes with respect to R.
-	BatchR(v autofunc.RVector, in RBlockInput) RBlockOutput
+	BatchR(v autofunc.RVector, in *RBlockInput) RBlockOutput
 }
 
 // A Learner has parameters which can be trained using

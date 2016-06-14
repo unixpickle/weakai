@@ -29,6 +29,7 @@ func (d StackedBlock) Batch(in *BlockInput) BlockOutput {
 		StackedBlock: d,
 		InStates:     in.States,
 		Inputs:       in.Inputs,
+		StatesVec:    make([]linalg.Vector, len(in.Inputs)),
 	}
 	for subBlockIdx, subBlock := range d {
 		input := &BlockInput{States: vecsToVars(states[subBlockIdx])}
@@ -40,7 +41,9 @@ func (d StackedBlock) Batch(in *BlockInput) BlockOutput {
 		output := subBlock.Batch(input)
 		result.BlockInputs = append(result.BlockInputs, input)
 		result.BlockOutputs = append(result.BlockOutputs, output)
-		result.StatesVec = append(result.StatesVec, output.States()...)
+		for i, x := range output.States() {
+			result.StatesVec[i] = append(result.StatesVec[i], x...)
+		}
 	}
 	return result
 }
@@ -53,6 +56,8 @@ func (d StackedBlock) BatchR(context autofunc.RVector, in *BlockRInput) BlockROu
 		StackedBlock: d,
 		InStates:     in.States,
 		Inputs:       in.Inputs,
+		StatesVec:    make([]linalg.Vector, len(in.Inputs)),
+		RStatesVec:   make([]linalg.Vector, len(in.Inputs)),
 	}
 	for subBlockIdx, subBlock := range d {
 		input := &BlockRInput{
@@ -67,8 +72,12 @@ func (d StackedBlock) BatchR(context autofunc.RVector, in *BlockRInput) BlockROu
 		output := subBlock.BatchR(context, input)
 		result.BlockInputs = append(result.BlockInputs, input)
 		result.BlockOutputs = append(result.BlockOutputs, output)
-		result.StatesVec = append(result.StatesVec, output.States()...)
-		result.RStatesVec = append(result.RStatesVec, output.RStates()...)
+		for i, x := range output.States() {
+			result.StatesVec[i] = append(result.StatesVec[i], x...)
+		}
+		for i, x := range output.RStates() {
+			result.RStatesVec[i] = append(result.RStatesVec[i], x...)
+		}
 	}
 	return result
 }
@@ -149,8 +158,9 @@ func (d *stackedBlockOutput) Gradient(u *UpstreamGradient, g autofunc.Gradient) 
 		}
 		o.Gradient(currentUpstream, g)
 		if i != 0 {
-			for i, in := range d.BlockInputs[i].Inputs {
-				currentUpstream.Outputs[i] = g[in]
+			currentUpstream.Outputs = nil
+			for _, in := range d.BlockInputs[i].Inputs {
+				currentUpstream.Outputs = append(currentUpstream.Outputs, g[in])
 				delete(g, in)
 			}
 			if upstreamStateGrads != nil {
@@ -182,8 +192,8 @@ func (d *stackedBlockOutput) joinDownstreamStateGrads(g autofunc.Gradient) {
 				substateGrad := g[s]
 				stateGrad[stateIdx : stateIdx+len(substateGrad)].Add(substateGrad)
 				delete(g, s)
+				stateIdx += len(substateGrad)
 			}
-			stateIdx += len(d.BlockInputs[0].States[lane].Vector)
 		}
 	}
 }
@@ -253,9 +263,11 @@ func (d *stackedBlockROutput) RGradient(u *UpstreamRGradient, rg autofunc.RGradi
 		}
 		o.RGradient(currentUpstream, rg, g)
 		if i != 0 {
-			for i, in := range d.BlockInputs[i].Inputs {
-				currentUpstream.Outputs[i] = g[in.Variable]
-				currentUpstream.ROutputs[i] = rg[in.Variable]
+			currentUpstream.Outputs = nil
+			currentUpstream.ROutputs = nil
+			for _, in := range d.BlockInputs[i].Inputs {
+				currentUpstream.Outputs = append(currentUpstream.Outputs, g[in.Variable])
+				currentUpstream.ROutputs = append(currentUpstream.ROutputs, rg[in.Variable])
 				delete(g, in.Variable)
 				delete(rg, in.Variable)
 			}

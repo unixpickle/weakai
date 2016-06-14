@@ -19,6 +19,12 @@ var gradientTestVariables = []*autofunc.Variable{
 	&autofunc.Variable{
 		Vector: []float64{3, 4},
 	},
+	&autofunc.Variable{
+		Vector: []float64{3, -4, -3, 2},
+	},
+	&autofunc.Variable{
+		Vector: []float64{3, 4, 1, -3},
+	},
 }
 
 func TestGradientTestIdentity(t *testing.T) {
@@ -26,7 +32,7 @@ func TestGradientTestIdentity(t *testing.T) {
 		Block:          IdentityBlock{StateSizeVal: 2},
 		GradientParams: gradientTestVariables,
 		Inputs:         gradientTestVariables[:2],
-		InStates:       gradientTestVariables[2:],
+		InStates:       gradientTestVariables[2:4],
 	}
 	test.Run(t)
 }

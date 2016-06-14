@@ -37,3 +37,15 @@ func TestStackedBlockDeepDemo(t *testing.T) {
 	}
 	test.Run(t)
 }
+
+func TestStackedBlockNested(t *testing.T) {
+	test := GradientTest{
+		Block: rnn.StackedBlock{rnn.StackedBlock{NewDemoBlock(3, 2, 3),
+			NewSquareBlock(1)}, rnn.StackedBlock{NewDemoBlock(3, 1, 5),
+			NewSquareBlock(2)}},
+		GradientParams: gradientTestVariables,
+		Inputs:         gradientTestVariables[:2],
+		InStates:       gradientTestVariables[6:8],
+	}
+	test.Run(t)
+}

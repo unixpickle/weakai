@@ -104,6 +104,17 @@ func (b *batcherBlockOutput) extractOutputs(output linalg.Vector) []linalg.Vecto
 }
 
 func (b *batcherBlockOutput) joinUpstream(states, outputs []linalg.Vector) linalg.Vector {
+	if states == nil {
+		for _ = range outputs {
+			states = append(states, make(linalg.Vector, b.StateSize))
+		}
+	} else if outputs == nil {
+		l := b.outputSize()
+		for _ = range states {
+			outputs = append(outputs, make(linalg.Vector, l))
+		}
+	}
+
 	upstreamVec := make(linalg.Vector, (len(states[0])+len(outputs[0]))*len(states))
 	var idx int
 	for i, output := range outputs {

@@ -71,36 +71,26 @@ func dividedDifference(val *float64, f func() float64) float64 {
 func approximateJacobian(f func() rnn.BlockOutput, v []*autofunc.Variable) []autofunc.Gradient {
 	var res []autofunc.Gradient
 	tmp := f()
-	for i, out := range tmp.Outputs() {
-		for j := range out {
-			grad := autofunc.Gradient{}
-			for _, variable := range v {
-				varGrad := make(linalg.Vector, len(variable.Vector))
-				for k := range variable.Vector {
-					varGrad[k] = dividedDifference(&variable.Vector[k], func() float64 {
-						x := f()
-						return x.Outputs()[i][j]
-					})
+	for partIdx, list := range [][]linalg.Vector{tmp.Outputs(), tmp.States()} {
+		for i, out := range list {
+			for j := range out {
+				grad := autofunc.Gradient{}
+				for _, variable := range v {
+					varGrad := make(linalg.Vector, len(variable.Vector))
+					for k := range variable.Vector {
+						varGrad[k] = dividedDifference(&variable.Vector[k], func() float64 {
+							x := f()
+							if partIdx == 0 {
+								return x.Outputs()[i][j]
+							} else {
+								return x.States()[i][j]
+							}
+						})
+					}
+					grad[variable] = varGrad
 				}
-				grad[variable] = varGrad
+				res = append(res, grad)
 			}
-			res = append(res, grad)
-		}
-	}
-	for i, out := range tmp.States() {
-		for j := range out {
-			grad := autofunc.Gradient{}
-			for _, variable := range v {
-				varGrad := make(linalg.Vector, len(variable.Vector))
-				for k := range variable.Vector {
-					varGrad[k] = dividedDifference(&variable.Vector[k], func() float64 {
-						x := f()
-						return x.States()[i][j]
-					})
-				}
-				grad[variable] = varGrad
-			}
-			res = append(res, grad)
 		}
 	}
 	return res
@@ -109,32 +99,27 @@ func approximateJacobian(f func() rnn.BlockOutput, v []*autofunc.Variable) []aut
 func exactJacobian(f func() rnn.BlockOutput, v []*autofunc.Variable) []autofunc.Gradient {
 	var res []autofunc.Gradient
 	tmp := f()
-	for i, out := range tmp.Outputs() {
-		for j := range out {
-			grad := autofunc.Gradient{}
-			for _, variable := range v {
-				grad[variable] = make(linalg.Vector, len(variable.Vector))
+	for partIdx, list := range [][]linalg.Vector{tmp.Outputs(), tmp.States()} {
+		for i, out := range list {
+			for j := range out {
+				grad := autofunc.Gradient{}
+				for _, variable := range v {
+					grad[variable] = make(linalg.Vector, len(variable.Vector))
+				}
+				upstreamVec := make([]linalg.Vector, len(list))
+				for k := range upstreamVec {
+					upstreamVec[k] = make(linalg.Vector, len(list[k]))
+				}
+				upstreamVec[i][j] = 1
+				var upstream *rnn.UpstreamGradient
+				if partIdx == 0 {
+					upstream = &rnn.UpstreamGradient{Outputs: upstreamVec}
+				} else {
+					upstream = &rnn.UpstreamGradient{States: upstreamVec}
+				}
+				tmp.Gradient(upstream, grad)
+				res = append(res, grad)
 			}
-			upstream := &rnn.UpstreamGradient{
-				Outputs: make([]linalg.Vector, len(tmp.Outputs())),
-			}
-			upstream.Outputs[i][j] = 1
-			tmp.Gradient(upstream, grad)
-			res = append(res, grad)
-		}
-	}
-	for i, out := range tmp.States() {
-		for j := range out {
-			grad := autofunc.Gradient{}
-			for _, variable := range v {
-				grad[variable] = make(linalg.Vector, len(variable.Vector))
-			}
-			upstream := &rnn.UpstreamGradient{
-				States: make([]linalg.Vector, len(tmp.States())),
-			}
-			upstream.States[i][j] = 1
-			tmp.Gradient(upstream, grad)
-			res = append(res, grad)
 		}
 	}
 	return res

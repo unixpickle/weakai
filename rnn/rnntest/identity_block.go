@@ -7,16 +7,22 @@ import (
 )
 
 // An IdentityBlock echos its states and inputs.
-type IdentityBlock struct{}
+type IdentityBlock struct {
+	StateSizeVal int
+}
 
-func (_ IdentityBlock) Batch(in *rnn.BlockInput) rnn.BlockOutput {
+func (i IdentityBlock) StateSize() int {
+	return i.StateSizeVal
+}
+
+func (i IdentityBlock) Batch(in *rnn.BlockInput) rnn.BlockOutput {
 	return &identityOutput{
 		Inputs:   in.Inputs,
 		InStates: in.States,
 	}
 }
 
-func (_ IdentityBlock) BatchR(v autofunc.RVector, in *rnn.BlockRInput) rnn.BlockROutput {
+func (i IdentityBlock) BatchR(v autofunc.RVector, in *rnn.BlockRInput) rnn.BlockROutput {
 	return &identityROutput{
 		Inputs:   in.Inputs,
 		InStates: in.States,

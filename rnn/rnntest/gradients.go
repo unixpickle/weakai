@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	gradientTestDelta = 1e-6
-	gradientTestPrec  = 1e-6
+	gradientTestDelta = 1e-4
+	gradientTestPrec  = 1e-4
 )
 
 // GradientTest performs gradient and r-gradient
@@ -50,8 +50,8 @@ func (g *GradientTest) checkGradient(t *testing.T) {
 
 func (g *GradientTest) checkRGradient(t *testing.T) {
 	rv := g.randomRVector()
-	actual := exactRJacobian(g.rEvaluator(rv), g.GradientParams)
 	expected := approximateRJacobian(g.rEvaluator(rv), g.GradientParams, rv)
+	actual := exactRJacobian(g.rEvaluator(rv), g.GradientParams)
 
 	var actualMaps []map[*autofunc.Variable]linalg.Vector
 	var expectedMaps []map[*autofunc.Variable]linalg.Vector
@@ -226,7 +226,7 @@ func rApproximation(rv autofunc.RVector, rAdd float64, f func() interface{}) int
 		copy(variableBackups[variable], variable.Vector)
 	}
 	for variable, rvec := range rv {
-		variable.Vector.Add(rvec.Copy().Scale(-gradientTestDelta))
+		variable.Vector.Add(rvec.Copy().Scale(rAdd))
 	}
 	res := f()
 	for variable := range rv {

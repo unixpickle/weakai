@@ -18,13 +18,13 @@ type DemoBlock struct {
 // NewDemoBlock creates a new randomized DemoBlock with
 // the given dimensions.
 func NewDemoBlock(inSize, stateSize, outSize int) *DemoBlock {
-	matData := make(linalg.Vector, inSize*stateSize*outSize)
+	matData := make(linalg.Vector, (inSize+stateSize)*(outSize+stateSize))
 	for i := range matData {
 		matData[i] = rand.NormFloat64()
 	}
 	return &DemoBlock{
 		Matrix: &autofunc.LinTran{
-			Rows: outSize,
+			Rows: outSize + stateSize,
 			Cols: inSize + stateSize,
 			Data: &autofunc.Variable{Vector: matData},
 		},

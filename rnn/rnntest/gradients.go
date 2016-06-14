@@ -3,6 +3,7 @@ package rnntest
 import (
 	"math"
 	"math/rand"
+	"strconv"
 	"testing"
 
 	"github.com/unixpickle/autofunc"
@@ -31,21 +32,32 @@ func (g *GradientTest) Run(t *testing.T) {
 }
 
 func (g *GradientTest) checkGradient(t *testing.T) {
-	actual := exactJacobian(g.evaluate, g.GradientParams)
-	expected := approximateJacobian(g.evaluate, g.GradientParams)
+	for i := 0; i < 2; i++ {
+		actual := exactJacobian(g.evaluate, g.GradientParams)
+		var expected []autofunc.Gradient
+		if i == 0 {
+			expected = approximateJacobian(g.evaluate, g.GradientParams)
+		} else {
+			ev := g.rEvaluator(g.randomRVector())
+			expected = approximateJacobian(func() rnn.BlockOutput {
+				return &rOutputToOutput{ev()}
+			}, g.GradientParams)
+		}
 
-	if len(actual) != len(expected) {
-		t.Fatal("jacobian lengths don't match")
+		if len(actual) != len(expected) {
+			t.Fatal("jacobian lengths don't match")
+		}
+
+		var actualMaps []map[*autofunc.Variable]linalg.Vector
+		var expectedMaps []map[*autofunc.Variable]linalg.Vector
+		for i, a := range actual {
+			actualMaps = append(actualMaps, a)
+			expectedMaps = append(expectedMaps, expected[i])
+		}
+
+		g.compareGradMaps(t, "checkGradient"+strconv.Itoa(i+1)+": ",
+			actualMaps, expectedMaps)
 	}
-
-	var actualMaps []map[*autofunc.Variable]linalg.Vector
-	var expectedMaps []map[*autofunc.Variable]linalg.Vector
-	for i, a := range actual {
-		actualMaps = append(actualMaps, a)
-		expectedMaps = append(expectedMaps, expected[i])
-	}
-
-	g.compareGradMaps(t, "checkGradient: ", actualMaps, expectedMaps)
 }
 
 func (g *GradientTest) checkRGradient(t *testing.T) {
@@ -83,7 +95,11 @@ func (g *GradientTest) checkROutput(t *testing.T) {
 			}
 			for k, value := range x {
 				actualVal := a[k]
-				if math.Abs(value-actualVal) > gradientTestPrec {
+				prec := gradientTestPrec
+				if math.Abs(value) > 1 {
+					prec = math.Abs(value) * gradientTestPrec
+				}
+				if math.Abs(value-actualVal) > prec {
 					t.Errorf("idx %d,%d,%d: expected %f got %f", i, j, k, value, actualVal)
 				}
 			}
@@ -138,7 +154,11 @@ func (g *GradientTest) compareGradMaps(t *testing.T, prefix string, actual,
 			}
 			for j, expVal := range expVec {
 				actVal := actVec[j]
-				if math.Abs(expVal-actVal) > gradientTestPrec {
+				prec := gradientTestPrec
+				if math.Abs(actVal) > 1 {
+					prec = gradientTestPrec * math.Abs(actVal)
+				}
+				if math.Abs(expVal-actVal) > prec {
 					t.Errorf(prefix+"output %d variable %d: expected %f got %f (idx %d)",
 						i, variableIdx, expVal, actVal, j)
 				}

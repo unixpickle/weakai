@@ -6,11 +6,15 @@ import (
 )
 
 // A StackedBlock is a Block which feeds the output
-// from each sub-blocks into the input of the next
+// from each sub-block into the input of the next
 // sub-block, essentially "stacking" blocks.
 // It can be used to form deep RNNs.
 type StackedBlock []Block
 
+// StateSize returns the sum of the state sizes of
+// all the sub-blocks, since states from a
+// StackedBlock are just concatenations of the
+// states of the sub-blocks.
 func (d StackedBlock) StateSize() int {
 	var res int
 	for _, x := range d {
@@ -20,23 +24,20 @@ func (d StackedBlock) StateSize() int {
 }
 
 func (d StackedBlock) Batch(in *BlockInput) BlockOutput {
-	states := d.splitStates(varsToVecs(in.States))
+	states := d.subBlockStates(varsToVecs(in.States))
 	result := &stackedBlockOutput{
 		StackedBlock: d,
 		InStates:     in.States,
 		Inputs:       in.Inputs,
 	}
-	for i, b := range d {
-		input := &BlockInput{States: vecsToVars(states[i])}
-		if i == 0 {
+	for subBlockIdx, subBlock := range d {
+		input := &BlockInput{States: vecsToVars(states[subBlockIdx])}
+		if subBlockIdx == 0 {
 			input.Inputs = in.Inputs
 		} else {
-			for _, x := range result.BlockOutputs[i-1].Outputs() {
-				v := &autofunc.Variable{Vector: x}
-				input.Inputs = append(input.Inputs, v)
-			}
+			input.Inputs = vecsToVars(result.BlockOutputs[subBlockIdx-1].Outputs())
 		}
-		output := b.Batch(input)
+		output := subBlock.Batch(input)
 		result.BlockInputs = append(result.BlockInputs, input)
 		result.BlockOutputs = append(result.BlockOutputs, output)
 		result.StatesVec = append(result.StatesVec, output.States()...)
@@ -46,26 +47,24 @@ func (d StackedBlock) Batch(in *BlockInput) BlockOutput {
 
 func (d StackedBlock) BatchR(context autofunc.RVector, in *BlockRInput) BlockROutput {
 	inStates, inRStates := rvarsToVecs(in.States)
-	states := d.splitStates(inStates)
-	rstates := d.splitStates(inRStates)
+	states := d.subBlockStates(inStates)
+	rstates := d.subBlockStates(inRStates)
 	result := &stackedBlockROutput{
 		StackedBlock: d,
 		InStates:     in.States,
 		Inputs:       in.Inputs,
 	}
-	for i, b := range d {
-		input := &BlockRInput{States: vecsToRVars(states[i], rstates[i])}
-		if i == 0 {
+	for subBlockIdx, subBlock := range d {
+		input := &BlockRInput{
+			States: vecsToRVars(states[subBlockIdx], rstates[subBlockIdx]),
+		}
+		if subBlockIdx == 0 {
 			input.Inputs = in.Inputs
 		} else {
-			rOuts := result.BlockOutputs[i-1].ROutputs()
-			for i, x := range result.BlockOutputs[i-1].Outputs() {
-				v := &autofunc.Variable{Vector: x}
-				rv := &autofunc.RVariable{Variable: v, ROutputVec: rOuts[i]}
-				input.Inputs = append(input.Inputs, rv)
-			}
+			lastOut := result.BlockOutputs[subBlockIdx-1]
+			input.Inputs = vecsToRVars(lastOut.Outputs(), lastOut.ROutputs())
 		}
-		output := b.BatchR(context, input)
+		output := subBlock.BatchR(context, input)
 		result.BlockInputs = append(result.BlockInputs, input)
 		result.BlockOutputs = append(result.BlockOutputs, output)
 		result.StatesVec = append(result.StatesVec, output.States()...)
@@ -86,15 +85,13 @@ func (d StackedBlock) Parameters() []*autofunc.Variable {
 	return res
 }
 
-// splitStates splits a slice of states (one per lane)
-// into a slice of slices of states, where each inner
-// slice corresponds to one block, and each vector in
-// an inner slice corresponds to the state of one lane.
-func (d StackedBlock) splitStates(states []linalg.Vector) [][]linalg.Vector {
+// subBlockStates splits a slice of packed states into
+// a slice of state slices, on per sub-block.
+func (d StackedBlock) subBlockStates(states []linalg.Vector) [][]linalg.Vector {
 	var res [][]linalg.Vector
 	var curIdx int
-	for _, b := range d {
-		stateLen := b.StateSize()
+	for _, subBlock := range d {
+		stateLen := subBlock.StateSize()
 		var batchParts []linalg.Vector
 		for _, u := range states {
 			out := u[curIdx : curIdx+stateLen]
@@ -131,23 +128,16 @@ func (d *stackedBlockOutput) Gradient(u *UpstreamGradient, g autofunc.Gradient) 
 		return
 	}
 
-	var stateGrads [][]linalg.Vector
+	var upstreamStateGrads [][]linalg.Vector
 	if u.States != nil {
-		stateGrads = d.StackedBlock.splitStates(u.States)
+		upstreamStateGrads = d.StackedBlock.subBlockStates(u.States)
 	}
 
-	for lane, inState := range d.InStates {
-		if _, ok := g[inState]; ok {
-			for _, in := range d.BlockInputs {
-				s := in.States[lane]
-				g[s] = make(linalg.Vector, len(s.Vector))
-			}
-		}
-	}
+	d.setupDownstreamStateGrads(g)
 
 	currentUpstream := &UpstreamGradient{Outputs: u.Outputs}
-	if stateGrads != nil {
-		currentUpstream.States = stateGrads[len(stateGrads)-1]
+	if upstreamStateGrads != nil {
+		currentUpstream.States = upstreamStateGrads[len(upstreamStateGrads)-1]
 	}
 
 	for i := len(d.BlockInputs) - 1; i >= 0; i-- {
@@ -163,12 +153,27 @@ func (d *stackedBlockOutput) Gradient(u *UpstreamGradient, g autofunc.Gradient) 
 				currentUpstream.Outputs[i] = g[in]
 				delete(g, in)
 			}
-			if stateGrads != nil {
-				currentUpstream.States = stateGrads[i-1]
+			if upstreamStateGrads != nil {
+				currentUpstream.States = upstreamStateGrads[i-1]
 			}
 		}
 	}
 
+	d.joinDownstreamStateGrads(g)
+}
+
+func (d *stackedBlockOutput) setupDownstreamStateGrads(g autofunc.Gradient) {
+	for lane, inState := range d.InStates {
+		if _, ok := g[inState]; ok {
+			for _, in := range d.BlockInputs {
+				s := in.States[lane]
+				g[s] = make(linalg.Vector, len(s.Vector))
+			}
+		}
+	}
+}
+
+func (d *stackedBlockOutput) joinDownstreamStateGrads(g autofunc.Gradient) {
 	for lane, inState := range d.InStates {
 		if stateGrad, ok := g[inState]; ok {
 			stateIdx := 0
@@ -219,35 +224,23 @@ func (d *stackedBlockROutput) RGradient(u *UpstreamRGradient, rg autofunc.RGradi
 		g = autofunc.Gradient{}
 	}
 
-	var stateGrads [][]linalg.Vector
-	var stateRGrads [][]linalg.Vector
+	var upstreamStateGrads [][]linalg.Vector
+	var upstreamStateRGrads [][]linalg.Vector
 	if u.States != nil {
-		stateGrads = d.StackedBlock.splitStates(u.States)
-		stateRGrads = d.StackedBlock.splitStates(u.RStates)
+		upstreamStateGrads = d.StackedBlock.subBlockStates(u.States)
+		upstreamStateRGrads = d.StackedBlock.subBlockStates(u.RStates)
 	}
 
-	for lane, inState := range d.InStates {
-		if _, ok := g[inState.Variable]; ok {
-			for _, in := range d.BlockInputs {
-				s := in.States[lane].Variable
-				g[s] = make(linalg.Vector, len(s.Vector))
-			}
-		}
-		if _, ok := rg[inState.Variable]; ok {
-			for _, in := range d.BlockInputs {
-				s := in.States[lane].Variable
-				rg[s] = make(linalg.Vector, len(s.Vector))
-			}
-		}
-	}
+	d.setupDownstreamStateGrads(g)
+	d.setupDownstreamStateGrads(rg)
 
 	currentUpstream := &UpstreamRGradient{
 		UpstreamGradient: UpstreamGradient{Outputs: u.Outputs},
 		ROutputs:         u.ROutputs,
 	}
-	if stateGrads != nil {
-		currentUpstream.States = stateGrads[len(stateGrads)-1]
-		currentUpstream.RStates = stateRGrads[len(stateRGrads)-1]
+	if upstreamStateGrads != nil {
+		currentUpstream.States = upstreamStateGrads[len(upstreamStateGrads)-1]
+		currentUpstream.RStates = upstreamStateRGrads[len(upstreamStateRGrads)-1]
 	}
 
 	for i := len(d.BlockInputs) - 1; i >= 0; i-- {
@@ -266,18 +259,29 @@ func (d *stackedBlockROutput) RGradient(u *UpstreamRGradient, rg autofunc.RGradi
 				delete(g, in.Variable)
 				delete(rg, in.Variable)
 			}
-			if stateGrads != nil {
-				currentUpstream.States = stateGrads[i-1]
-				currentUpstream.RStates = stateRGrads[i-1]
+			if upstreamStateGrads != nil {
+				currentUpstream.States = upstreamStateGrads[i-1]
+				currentUpstream.RStates = upstreamStateRGrads[i-1]
 			}
 		}
 	}
 
-	d.joinStateGrads(g)
-	d.joinStateGrads(rg)
+	d.joinDownstreamStateGrads(g)
+	d.joinDownstreamStateGrads(rg)
 }
 
-func (d *stackedBlockROutput) joinStateGrads(g map[*autofunc.Variable]linalg.Vector) {
+func (d *stackedBlockROutput) setupDownstreamStateGrads(g map[*autofunc.Variable]linalg.Vector) {
+	for lane, inState := range d.InStates {
+		if _, ok := g[inState.Variable]; ok {
+			for _, in := range d.BlockInputs {
+				s := in.States[lane].Variable
+				g[s] = make(linalg.Vector, len(s.Vector))
+			}
+		}
+	}
+}
+
+func (d *stackedBlockROutput) joinDownstreamStateGrads(g map[*autofunc.Variable]linalg.Vector) {
 	for lane, inState := range d.InStates {
 		if stateGrad, ok := g[inState.Variable]; ok {
 			stateIdx := 0

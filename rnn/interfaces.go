@@ -80,9 +80,14 @@ type Block interface {
 	StateSize() int
 
 	// Batch applies forward propagation to a BlockInput.
+	// The result is valid so long as neither the input
+	// nor the Block is changed.
 	Batch(in *BlockInput) BlockOutput
 
 	// BatchR is like Batch, but for an BlockRInput.
+	// The result is valid so long as neither the input
+	// nor the Block is changed.
+	//
 	// It is necessary to provide an RVector so that the
 	// block knows how much each of its hidden parameters
 	// changes with respect to R.

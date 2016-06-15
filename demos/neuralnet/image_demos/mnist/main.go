@@ -113,13 +113,10 @@ func outputIdx(r autofunc.Result) int {
 	return maxIdx
 }
 
-func dataSetSamples(d mnist.DataSet) *neuralnet.SampleSet {
+func dataSetSamples(d mnist.DataSet) neuralnet.SampleSet {
 	labelVecs := d.LabelVectors()
 	inputVecs := d.IntensityVectors()
-	return &neuralnet.SampleSet{
-		Inputs:  vecVec(inputVecs),
-		Outputs: vecVec(labelVecs),
-	}
+	return neuralnet.VectorSampleSet(vecVec(inputVecs), vecVec(labelVecs))
 }
 
 func vecVec(f [][]float64) []linalg.Vector {

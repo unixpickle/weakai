@@ -59,7 +59,7 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	for i, tensor := range tensors {
 		tensorSlices[i] = tensor.Data
 	}
-	samples := &neuralnet.SampleSet{Inputs: tensorSlices, Outputs: tensorSlices}
+	samples := neuralnet.VectorSampleSet(tensorSlices, tensorSlices)
 
 	batcher := &neuralnet.BatchRGradienter{
 		Learner:  network.BatchLearner(),

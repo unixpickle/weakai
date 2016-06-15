@@ -43,10 +43,7 @@ func firstBitTest() {
 		}
 		trainingOutputs[i] = []float64{1 - trainingSamples[i][0]}
 	}
-	samples := &neuralnet.SampleSet{
-		Inputs:  trainingSamples,
-		Outputs: trainingOutputs,
-	}
+	samples := neuralnet.VectorSampleSet(trainingSamples, trainingOutputs)
 
 	network := neuralnet.Network{
 		&neuralnet.DenseLayer{
@@ -143,10 +140,7 @@ func runHorizontalLineTest(name string, network neuralnet.Network) {
 			trainingOutputs[i] = []float64{0}
 		}
 	}
-	samples := &neuralnet.SampleSet{
-		Inputs:  trainingSamples,
-		Outputs: trainingOutputs,
-	}
+	samples := neuralnet.VectorSampleSet(trainingSamples, trainingOutputs)
 
 	network.Randomize()
 	batcher := &neuralnet.SingleRGradienter{

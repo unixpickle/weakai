@@ -88,16 +88,15 @@ func trainClassifier(n neuralnet.Network, d mnist.DataSet) {
 		close(killChan)
 	}()
 
-	samples := &neuralnet.SampleSet{
-		Inputs:  make([]linalg.Vector, len(d.Samples)),
-		Outputs: make([]linalg.Vector, len(d.Samples)),
-	}
+	inputs := make([]linalg.Vector, len(d.Samples))
+	outputs := make([]linalg.Vector, len(d.Samples))
 	for i, x := range d.IntensityVectors() {
-		samples.Inputs[i] = x
+		inputs[i] = x
 	}
 	for i, x := range d.LabelVectors() {
-		samples.Outputs[i] = x
+		outputs[i] = x
 	}
+	samples := neuralnet.VectorSampleSet(inputs, outputs)
 	batcher := &neuralnet.BatchRGradienter{
 		Learner:  n.BatchLearner(),
 		CostFunc: neuralnet.MeanSquaredCost{},

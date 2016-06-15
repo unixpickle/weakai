@@ -1,14 +1,16 @@
 package rnn
 
 import (
+	"errors"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
 // LSTM is a Block that implements an LSTM unit.
 type LSTM struct {
-	inputSize  int
 	hiddenSize int
 
 	inputValue   *lstmGate
@@ -21,7 +23,6 @@ type LSTM struct {
 // weights and biases.
 func NewLSTM(inputSize, hiddenSize int) *LSTM {
 	return &LSTM{
-		inputSize:  inputSize,
 		hiddenSize: hiddenSize,
 
 		inputValue:   newLSTMGate(inputSize, hiddenSize, &neuralnet.HyperbolicTangent{}),
@@ -29,6 +30,33 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 		rememberGate: newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 		outputGate:   newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 	}
+}
+
+// DeserializeLSTM creates an LSTM from some serialized
+// data about the LSTM.
+func DeserializeLSTM(d []byte) (serializer.Serializer, error) {
+	slice, err := serializer.DeserializeSlice(d)
+	if err != nil {
+		return nil, err
+	}
+	if len(slice) != 5 {
+		return nil, errors.New("invalid slice length in LSTM")
+	}
+	hiddenSize, ok := slice[0].(serializer.Int)
+	inputValue, ok1 := slice[1].(*lstmGate)
+	inputGate, ok2 := slice[1].(*lstmGate)
+	rememberGate, ok3 := slice[1].(*lstmGate)
+	outputGate, ok4 := slice[1].(*lstmGate)
+	if !ok || !ok1 || !ok2 || !ok3 || !ok4 {
+		return nil, errors.New("invalid types in LSTM slice")
+	}
+	return &LSTM{
+		hiddenSize:   int(hiddenSize),
+		inputValue:   inputValue,
+		inputGate:    inputGate,
+		rememberGate: rememberGate,
+		outputGate:   outputGate,
+	}, nil
 }
 
 // Parameters returns the LSTM's parameters in the
@@ -109,6 +137,21 @@ func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	}
 }
 
+func (l *LSTM) Serialize() ([]byte, error) {
+	slist := []serializer.Serializer{
+		serializer.Int(l.hiddenSize),
+		l.inputValue,
+		l.inputGate,
+		l.rememberGate,
+		l.outputGate,
+	}
+	return serializer.SerializeSlice(slist)
+}
+
+func (l *LSTM) SerializerType() string {
+	return serializerTypeLSTM
+}
+
 type lstmGate struct {
 	Dense      *neuralnet.DenseLayer
 	Activation neuralnet.Layer
@@ -126,12 +169,37 @@ func newLSTMGate(inputSize, hiddenSize int, activation neuralnet.Layer) *lstmGat
 	return res
 }
 
+func deserializeLSTMGate(d []byte) (serializer.Serializer, error) {
+	list, err := serializer.DeserializeSlice(d)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) != 2 {
+		return nil, errors.New("invalid slice length for LSTM gate")
+	}
+	dense, ok := list[0].(*neuralnet.DenseLayer)
+	activ, ok1 := list[1].(neuralnet.Layer)
+	if !ok || !ok1 {
+		return nil, errors.New("invalid types for list elements")
+	}
+	return &lstmGate{Dense: dense, Activation: activ}, nil
+}
+
 func (l *lstmGate) Batch(in autofunc.Result, n int) autofunc.Result {
 	return l.Activation.Apply(l.Dense.Batch(in, n))
 }
 
 func (l *lstmGate) BatchR(v autofunc.RVector, in autofunc.RResult, n int) autofunc.RResult {
 	return l.Activation.ApplyR(v, l.Dense.BatchR(v, in, n))
+}
+
+func (l *lstmGate) Serialize() ([]byte, error) {
+	slist := []serializer.Serializer{l.Dense, l.Activation}
+	return serializer.SerializeSlice(slist)
+}
+
+func (l *lstmGate) SerializerType() string {
+	return serializerTypeLSTMGate
 }
 
 type lstmOutput struct {

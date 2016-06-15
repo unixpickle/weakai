@@ -12,7 +12,6 @@ Here are the Go packages I've created for AI:
  * [idtrees](idtrees) - a general identification tree implementation with an accompanying command-line tool that parses CSV files. This includes sample data about various celebrities.
  * [boosting](boosting) - an implementation of two different boosting algorithms: AdaBoost and Gradient Boosting.
  * [rnn](rnn) - a Recurrent Neural Networks library.
-   * [rnn/lstm](rnn/lstm) - a LSTM plugin for the RNN package.
 
 Here are some demo programs I've created:
 

@@ -1,8 +1,11 @@
 package rnn
 
 import (
+	"fmt"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/serializer"
 )
 
 // A StackedBlock is a Block which feeds the output
@@ -10,6 +13,22 @@ import (
 // sub-block, essentially "stacking" blocks.
 // It can be used to form deep RNNs.
 type StackedBlock []Block
+
+func DeserializeStackedBlock(d []byte) (serializer.Serializer, error) {
+	list, err := serializer.DeserializeSlice(d)
+	if err != nil {
+		return nil, err
+	}
+	res := make(StackedBlock, len(list))
+	for i, s := range list {
+		var ok bool
+		res[i], ok = s.(Block)
+		if !ok {
+			return nil, fmt.Errorf("layer %d (%T) is not Block", i, s)
+		}
+	}
+	return res, nil
+}
 
 // StateSize returns the sum of the state sizes of
 // all the sub-blocks, since states from a
@@ -92,6 +111,24 @@ func (d StackedBlock) Parameters() []*autofunc.Variable {
 		}
 	}
 	return res
+}
+
+// Serialize attempts to serialize all of the sub-blocks
+// if they implement the Serializer interface.
+func (d StackedBlock) Serialize() ([]byte, error) {
+	serializers := make([]serializer.Serializer, len(d))
+	for i, l := range d {
+		if s, ok := l.(serializer.Serializer); ok {
+			serializers[i] = s
+		} else {
+			return nil, fmt.Errorf("layer %d (%T) is not a Serializer", i, l)
+		}
+	}
+	return serializer.SerializeSlice(serializers)
+}
+
+func (d StackedBlock) SerializerType() string {
+	return serializerTypeStackedBlock
 }
 
 // subBlockStates splits a slice of packed states into

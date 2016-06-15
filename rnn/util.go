@@ -70,7 +70,7 @@ func splitVectors(v linalg.Vector, n int) []linalg.Vector {
 	return res
 }
 
-func evalCostFuncDeriv(c neuralnet.CostFunc, expected, actual linalg.Vector) linalg.Vector {
+func costFuncDeriv(c neuralnet.CostFunc, expected, actual linalg.Vector) linalg.Vector {
 	variable := &autofunc.Variable{Vector: actual}
 	result := make(linalg.Vector, len(actual))
 	res := c.Cost(expected, variable)
@@ -78,7 +78,7 @@ func evalCostFuncDeriv(c neuralnet.CostFunc, expected, actual linalg.Vector) lin
 	return result
 }
 
-func evalCostFuncRDeriv(v autofunc.RVector, c neuralnet.CostFunc, expected, actual,
+func costFuncRDeriv(v autofunc.RVector, c neuralnet.CostFunc, expected, actual,
 	actualR linalg.Vector) (deriv, rDeriv linalg.Vector) {
 	variable := &autofunc.RVariable{
 		Variable:   &autofunc.Variable{Vector: actual},
@@ -91,4 +91,38 @@ func evalCostFuncRDeriv(v autofunc.RVector, c neuralnet.CostFunc, expected, actu
 		autofunc.RGradient{variable.Variable: rDeriv},
 		autofunc.Gradient{variable.Variable: deriv})
 	return
+}
+
+// seqHeadInput generates a BlockInput from the
+// first inputs of the input sequences, and given
+// all the current states.
+func seqHeadInput(seqs []Sequence, lastStates []linalg.Vector) *BlockInput {
+	input := &BlockInput{}
+	for lane, seq := range seqs {
+		inVar := &autofunc.Variable{Vector: seq.Inputs[0]}
+		input.Inputs = append(input.Inputs, inVar)
+		inState := &autofunc.Variable{Vector: lastStates[lane]}
+		input.States = append(input.States, inState)
+	}
+	return input
+}
+
+// seqHeadRInput is like seqHeadInput, but for
+// BlockRInputs.
+func seqHeadRInput(seqs []Sequence, states, rStates []linalg.Vector) *BlockRInput {
+	input := &BlockRInput{}
+	zeroInRVec := make(linalg.Vector, len(seqs[0].Inputs[0]))
+	for lane, seq := range seqs {
+		inVar := &autofunc.RVariable{
+			Variable:   &autofunc.Variable{Vector: seq.Inputs[0]},
+			ROutputVec: zeroInRVec,
+		}
+		input.Inputs = append(input.Inputs, inVar)
+		inState := &autofunc.RVariable{
+			Variable:   &autofunc.Variable{Vector: states[lane]},
+			ROutputVec: rStates[lane],
+		}
+		input.States = append(input.States, inState)
+	}
+	return input
 }

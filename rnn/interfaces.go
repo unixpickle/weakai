@@ -109,6 +109,11 @@ type Sequence struct {
 // A Gradienter is anything which can compute an error
 // gradient for some set of sequences.
 type Gradienter interface {
+	// SeqGradient computes the total error gradient
+	// for a batch of sequences.
+	// The result from SeqGradient is only valid until
+	// the next call to SeqGradient (or to SeqRGradient,
+	// if this is an RGradienter as well).
 	SeqGradient(seqs []Sequence) autofunc.Gradient
 }
 
@@ -116,5 +121,8 @@ type Gradienter interface {
 // RGradients.
 type RGradienter interface {
 	Gradienter
+
+	// SeqRGradient is like SeqGradient, but it computes
+	// both a Gradient and an RGradient.
 	SeqRGradient(rv autofunc.RVector, seqs []Sequence) (autofunc.Gradient, autofunc.RGradient)
 }

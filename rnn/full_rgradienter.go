@@ -146,13 +146,7 @@ func (b *FullRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
 
 func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 	lastStates []linalg.Vector) []linalg.Vector {
-	input := &BlockInput{}
-	for lane, seq := range seqs {
-		inVar := &autofunc.Variable{Vector: seq.Inputs[0]}
-		input.Inputs = append(input.Inputs, inVar)
-		inState := &autofunc.Variable{Vector: lastStates[lane]}
-		input.States = append(input.States, inState)
-	}
+	input := seqHeadInput(seqs, lastStates)
 	res := b.Learner.Batch(input)
 
 	nextSeqs := removeFirst(seqs)
@@ -164,6 +158,8 @@ func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 	}
 
 	upstream := &UpstreamGradient{}
+
+	// Compute upstream state derivatives recursively.
 	if len(nextSeqs) != 0 {
 		res := b.recursiveBatch(g, nextSeqs, nextStates)
 		var resIdx int
@@ -179,10 +175,11 @@ func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 	}
 
 	for lane, output := range res.Outputs() {
-		outGrad := evalCostFuncDeriv(b.CostFunc, seqs[lane].Outputs[0], output)
+		outGrad := costFuncDeriv(b.CostFunc, seqs[lane].Outputs[0], output)
 		upstream.Outputs = append(upstream.Outputs, outGrad)
 	}
 
+	// Compute downstream state derivatives & back propagate.
 	downstream := make([]linalg.Vector, len(input.States))
 	for i, s := range input.States {
 		downstream[i] = make(linalg.Vector, b.Learner.StateSize())
@@ -196,22 +193,9 @@ func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 }
 
 func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradient,
-	rg autofunc.RGradient, seqs []Sequence, lastStates,
-	lastRStates []linalg.Vector) (stateGrad, stateRGrad []linalg.Vector) {
-	input := &BlockRInput{}
-	zeroInRVec := make(linalg.Vector, len(seqs[0].Inputs[0]))
-	for lane, seq := range seqs {
-		inVar := &autofunc.RVariable{
-			Variable:   &autofunc.Variable{Vector: seq.Inputs[0]},
-			ROutputVec: zeroInRVec,
-		}
-		input.Inputs = append(input.Inputs, inVar)
-		inState := &autofunc.RVariable{
-			Variable:   &autofunc.Variable{Vector: lastStates[lane]},
-			ROutputVec: lastRStates[lane],
-		}
-		input.States = append(input.States, inState)
-	}
+	rg autofunc.RGradient, seqs []Sequence, states, rStates []linalg.Vector) (stateGrad,
+	stateRGrad []linalg.Vector) {
+	input := seqHeadRInput(seqs, states, rStates)
 	res := b.Learner.BatchR(v, input)
 
 	nextSeqs := removeFirst(seqs)
@@ -224,6 +208,7 @@ func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradien
 		}
 	}
 
+	// Compute upstream state derivatives recursively.
 	upstream := &UpstreamRGradient{}
 	if len(nextSeqs) != 0 {
 		states, statesR := b.recursiveRBatch(v, g, rg, nextSeqs, nextStates, nextRStates)
@@ -243,12 +228,13 @@ func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradien
 
 	for lane, output := range res.Outputs() {
 		rOutput := res.ROutputs()[lane]
-		outGrad, outRGrad := evalCostFuncRDeriv(v, b.CostFunc, seqs[lane].Outputs[0],
+		outGrad, outRGrad := costFuncRDeriv(v, b.CostFunc, seqs[lane].Outputs[0],
 			output, rOutput)
 		upstream.Outputs = append(upstream.Outputs, outGrad)
 		upstream.ROutputs = append(upstream.ROutputs, outRGrad)
 	}
 
+	// Compute downstream state derivatives & back propagate.
 	stateGrad = make([]linalg.Vector, len(input.States))
 	stateRGrad = make([]linalg.Vector, len(input.States))
 	for i, s := range input.States {

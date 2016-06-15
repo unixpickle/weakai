@@ -21,11 +21,7 @@ func (b *BatcherBlock) StateSize() int {
 }
 
 func (f *BatcherBlock) Batch(in *BlockInput) BlockOutput {
-	results := make([]autofunc.Result, 0, len(in.States)*2)
-	for i := range in.States {
-		results = append(results, in.Inputs[i], in.States[i])
-	}
-	joined := autofunc.Concat(results...)
+	joined := joinBlockInput(in)
 	output := f.F.Batch(joined, len(in.States))
 	return &batcherBlockOutput{
 		Result:    output,
@@ -35,11 +31,7 @@ func (f *BatcherBlock) Batch(in *BlockInput) BlockOutput {
 }
 
 func (f *BatcherBlock) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
-	results := make([]autofunc.RResult, 0, len(in.States)*2)
-	for i := range in.States {
-		results = append(results, in.Inputs[i], in.States[i])
-	}
-	joined := autofunc.ConcatR(results...)
+	joined := joinBlockRInput(in)
 	output := f.F.BatchR(v, joined, len(in.States))
 	return &batcherBlockOutput{
 		RResult:   output,

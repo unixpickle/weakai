@@ -95,7 +95,10 @@ func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	// Pool the new state so that we do not
 	// back propagate through it twice.
 	rawVar := &autofunc.Variable{Vector: newState.Output()}
-	newStateVar := autofunc.NewRVariable(rawVar, v)
+	newStateVar := &autofunc.RVariable{
+		Variable:   rawVar,
+		ROutputVec: newState.ROutput(),
+	}
 	gatedOutput := autofunc.MulR(outputGate, newStateVar)
 
 	return &lstmROutput{

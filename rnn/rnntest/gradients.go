@@ -100,7 +100,8 @@ func (g *GradientTest) checkROutput(t *testing.T) {
 					prec = math.Abs(value) * gradientTestPrec
 				}
 				if math.Abs(value-actualVal) > prec {
-					t.Errorf("idx %d,%d,%d: expected %f got %f", i, j, k, value, actualVal)
+					t.Errorf("checkROutput: idx %d,%d,%d: expected %f got %f",
+						i, j, k, value, actualVal)
 				}
 			}
 		}

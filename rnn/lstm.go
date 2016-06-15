@@ -49,6 +49,10 @@ func (l *LSTM) Parameters() []*autofunc.Variable {
 	}
 }
 
+func (l *LSTM) StateSize() int {
+	return l.hiddenSize
+}
+
 func (l *LSTM) Batch(in *BlockInput) BlockOutput {
 	n := len(in.Inputs)
 	input := joinBlockInput(in)

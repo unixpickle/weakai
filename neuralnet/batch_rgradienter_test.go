@@ -60,10 +60,9 @@ func testBatchRGradienter(t *testing.T, batchSize int, b *BatchRGradienter) {
 	net.Randomize()
 	b.Learner = net.BatchLearner()
 
-	samples := &SampleSet{}
-	samples.Inputs = make([]linalg.Vector, batchSize)
-	samples.Outputs = make([]linalg.Vector, batchSize)
-	for i := range samples.Inputs {
+	inputs := make([]linalg.Vector, batchSize)
+	outputs := make([]linalg.Vector, batchSize)
+	for i := range inputs {
 		inputVec := make(linalg.Vector, 10)
 		outputVec := make(linalg.Vector, 3)
 		for j := range inputVec {
@@ -72,9 +71,10 @@ func testBatchRGradienter(t *testing.T, batchSize int, b *BatchRGradienter) {
 		for j := range outputVec {
 			outputVec[j] = rand.Float64()
 		}
-		samples.Inputs[i] = inputVec
-		samples.Outputs[i] = outputVec
+		inputs[i] = inputVec
+		outputs[i] = outputVec
 	}
+	samples := VectorSampleSet(inputs, outputs)
 
 	rVector := autofunc.RVector(autofunc.NewGradient(net.Parameters()))
 	for _, vec := range rVector {

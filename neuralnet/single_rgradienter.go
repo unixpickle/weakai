@@ -6,7 +6,8 @@ import (
 )
 
 // SingleRGradienter is an RGradienter that acts
-// on an underlying SingleLearner.
+// on an underlying SingleLearner to compute
+// gradients for sets of BasicSamples.
 //
 // SingleRGradienter is good for nets with very few
 // parameters, where most of the training overhead
@@ -23,16 +24,17 @@ type SingleRGradienter struct {
 	rgradCache autofunc.RGradient
 }
 
-func (b *SingleRGradienter) Gradient(s *SampleSet) autofunc.Gradient {
+func (b *SingleRGradienter) Gradient(s SampleSet) autofunc.Gradient {
 	if b.gradCache == nil {
 		b.gradCache = autofunc.NewGradient(b.Learner.Parameters())
 	} else {
 		b.gradCache.Zero()
 	}
 
-	for i, input := range s.Inputs {
-		output := s.Outputs[i]
-		inVar := &autofunc.Variable{input}
+	for _, sample := range s {
+		vs := sample.(VectorSample)
+		output := vs.Output
+		inVar := &autofunc.Variable{vs.Input}
 		result := b.Learner.Apply(inVar)
 		cost := b.CostFunc.Cost(output, result)
 		cost.PropagateGradient(linalg.Vector{1}, b.gradCache)
@@ -41,7 +43,7 @@ func (b *SingleRGradienter) Gradient(s *SampleSet) autofunc.Gradient {
 	return b.gradCache
 }
 
-func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	if b.gradCache == nil {
 		b.gradCache = autofunc.NewGradient(b.Learner.Parameters())
@@ -54,9 +56,10 @@ func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s *SampleSet) (autofu
 		b.rgradCache.Zero()
 	}
 
-	for i, input := range s.Inputs {
-		output := s.Outputs[i]
-		inVar := &autofunc.Variable{input}
+	for _, sample := range s {
+		vs := sample.(VectorSample)
+		output := vs.Output
+		inVar := &autofunc.Variable{vs.Input}
 		rVar := autofunc.NewRVariable(inVar, rv)
 		result := b.Learner.ApplyR(rv, rVar)
 		cost := b.CostFunc.CostR(rv, output, result)

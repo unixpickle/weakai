@@ -53,18 +53,18 @@ type SingleLearner interface {
 }
 
 // A Gradienter is anything which can compute a
-// gradient for a set of inputs.
+// gradient for a set of samples.
 type Gradienter interface {
 	// Gradient returns the total error gradient for
 	// all the samples in a set.
 	// The returned result is only valid until the
 	// next call to Gradient (or to RGradient, if
 	// this is also an RGradienter)
-	Gradient(*SampleSet) autofunc.Gradient
+	Gradient(SampleSet) autofunc.Gradient
 }
 
 // An RGradienter is anything which can compute
-// a gradient and r-gradient for a set of inputs.
+// a gradient and r-gradient for a set of samples.
 type RGradienter interface {
 	Gradienter
 
@@ -72,5 +72,5 @@ type RGradienter interface {
 	// r-gradient all the samples in a set.
 	// The returned result is only valid until the
 	// next call to Gradient or RGradient.
-	RGradient(autofunc.RVector, *SampleSet) (autofunc.Gradient, autofunc.RGradient)
+	RGradient(autofunc.RVector, SampleSet) (autofunc.Gradient, autofunc.RGradient)
 }

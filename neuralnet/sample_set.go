@@ -6,56 +6,46 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
-// SampleSet is a set of input samples and their
-// corresponding expected outputs.
-type SampleSet struct {
-	Inputs  []linalg.Vector
-	Outputs []linalg.Vector
+// VectorSample represents a supervised training sample
+// for a classifier which takes input vectors and makes
+// output vectors.
+type VectorSample struct {
+	// Input is the input given to the classifier.
+	Input linalg.Vector
+
+	// Output is the desired output from the classifier.
+	Output linalg.Vector
 }
 
-// Copy creates a shallow copy of this set.
-// The copy will have new input and output
-// slices, but the vectors within the slices
-// will be the same.
-func (s *SampleSet) Copy() *SampleSet {
-	res := &SampleSet{
-		Inputs:  make([]linalg.Vector, len(s.Inputs)),
-		Outputs: make([]linalg.Vector, len(s.Outputs)),
+// VectorSampleSet creates a SampleSet of VectorSamples
+// given a slice of inputs and a slice of corresponding
+// outputs for those inputs.
+func VectorSampleSet(inputs []linalg.Vector, outputs []linalg.Vector) SampleSet {
+	if len(inputs) != len(outputs) {
+		panic("input and output counts do not match")
 	}
-	copy(res.Inputs, s.Inputs)
-	copy(res.Outputs, s.Outputs)
+	res := make(SampleSet, len(inputs))
+	for i, in := range inputs {
+		res[i] = VectorSample{Input: in, Output: outputs[i]}
+	}
 	return res
 }
 
-// Shuffle randomly re-orders the set of samples.
-func (s *SampleSet) Shuffle() {
-	oldInputs := make([]linalg.Vector, len(s.Inputs))
-	oldOutputs := make([]linalg.Vector, len(s.Outputs))
-	copy(oldInputs, s.Inputs)
-	copy(oldOutputs, s.Outputs)
+// SampleSet facilitates the manipulation of abstract
+// training samples.
+type SampleSet []interface{}
 
-	perm := rand.Perm(len(oldInputs))
-	for i, x := range perm {
-		s.Inputs[i] = oldInputs[x]
-		s.Outputs[i] = oldOutputs[x]
-	}
+// Copy performs a shallow copy of the SampleSet.
+func (s SampleSet) Copy() SampleSet {
+	res := make(SampleSet, len(s))
+	copy(res, s)
+	return s
 }
 
-// Split splits the SampleSet into two sample sets.
-// The first sample set will contain the first l
-// samples in the original sample set.
-// The l argument must not be greater than the total
-// number of samples.
-func (s *SampleSet) Split(l int) (*SampleSet, *SampleSet) {
-	return &SampleSet{s.Inputs[:l], s.Outputs[:l]},
-		&SampleSet{s.Inputs[l:], s.Outputs[l:]}
-}
-
-// Subset returns the set of samples in the range
-// between index1 (inclusive) and index2 (exclusive).
-func (s *SampleSet) Subset(index1, index2 int) *SampleSet {
-	return &SampleSet{
-		Inputs:  s.Inputs[index1:index2],
-		Outputs: s.Outputs[index1:index2],
+// Shuffle rearranges the samples in a random order.
+func (s SampleSet) Shuffle() {
+	for i := range s {
+		j := i + rand.Intn(len(s)-i)
+		s[i], s[j] = s[j], s[i]
 	}
 }

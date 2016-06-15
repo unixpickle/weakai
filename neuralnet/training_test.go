@@ -49,15 +49,12 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 	rand.Seed(123123)
 	net.Randomize()
 
-	samples := &SampleSet{
-		Inputs: []linalg.Vector{
-			{0, 0},
-			{0, 1},
-			{1, 0},
-			{1, 1},
-		},
-		Outputs: []linalg.Vector{{0}, {1}, {1}, {0}},
-	}
+	samples := VectorSampleSet([]linalg.Vector{
+		{0, 0},
+		{0, 1},
+		{1, 0},
+		{1, 1},
+	}, []linalg.Vector{{0}, {1}, {1}, {0}})
 
 	var gradienter Gradienter
 	if single {
@@ -75,9 +72,10 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 	}
 	SGD(gradienter, samples, 0.9, 1000, batchSize)
 
-	for i, sample := range samples.Inputs {
-		output := net.Apply(&autofunc.Variable{sample}).Output()
-		expected := samples.Outputs[i][0]
+	for _, sample := range samples {
+		vs := sample.(VectorSample)
+		output := net.Apply(&autofunc.Variable{vs.Input}).Output()
+		expected := vs.Output[0]
 		actual := output[0]
 		if math.Abs(expected-actual) > 0.08 {
 			t.Errorf("expected %f for input %v but got %f", expected, sample, actual)
@@ -141,7 +139,7 @@ func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
 		}
 	}
 
-	samples := &SampleSet{Inputs: inputs, Outputs: outputs}
+	samples := VectorSampleSet(inputs, outputs)
 	network := Network{
 		&DenseLayer{
 			InputCount:  len(inputs[0]),

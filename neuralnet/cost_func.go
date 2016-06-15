@@ -20,13 +20,15 @@ type CostFunc interface {
 }
 
 // TotalCost returns the total cost of a layer on a
-// set of samples.
-func TotalCost(c CostFunc, layer autofunc.Func, s *SampleSet) float64 {
+// set of VectorSamples.
+// The elements of s must be VectorSamples.
+func TotalCost(c CostFunc, layer autofunc.Func, s SampleSet) float64 {
 	var totalCost float64
-	for i, input := range s.Inputs {
-		inVar := &autofunc.Variable{input}
+	for _, sample := range s {
+		vs := sample.(VectorSample)
+		inVar := &autofunc.Variable{vs.Input}
 		result := layer.Apply(inVar)
-		costOut := c.Cost(s.Outputs[i], result)
+		costOut := c.Cost(vs.Output, result)
 		totalCost += costOut.Output()[0]
 	}
 	return totalCost

@@ -34,7 +34,7 @@ type RMSProp struct {
 	RollingAverage autofunc.Gradient
 }
 
-func (r *RMSProp) Gradient(s *SampleSet) autofunc.Gradient {
+func (r *RMSProp) Gradient(s SampleSet) autofunc.Gradient {
 	grad := r.Gradienter.Gradient(s)
 	squaredGrad := grad.Copy()
 	for _, v := range squaredGrad {

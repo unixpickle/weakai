@@ -16,7 +16,8 @@ type gradResult struct {
 }
 
 // BatchRGradienter is an RGradienter that computes
-// the gradients of BatchLearners.
+// the gradients of BatchLearners using SampleSets
+// of VectorSamples.
 // It is not safe to call its methods concurrently
 // from multiple Goroutines at once.
 //
@@ -49,17 +50,17 @@ type BatchRGradienter struct {
 	lastGradRResult autofunc.RGradient
 }
 
-func (b *BatchRGradienter) Gradient(s *SampleSet) autofunc.Gradient {
+func (b *BatchRGradienter) Gradient(s SampleSet) autofunc.Gradient {
 	grad, _ := b.batch(nil, s)
 	return grad
 }
 
-func (b *BatchRGradienter) RGradient(v autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) RGradient(v autofunc.RVector, s SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	return b.batch(v, s)
 }
 
-func (b *BatchRGradienter) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) batch(rv autofunc.RVector, s SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	if b.gradCache.variables == nil {
 		b.gradCache.variables = b.Learner.Parameters()
@@ -75,26 +76,26 @@ func (b *BatchRGradienter) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gr
 	maxGos := b.goroutineCount()
 	maxBatch := b.batchSize()
 
-	if maxGos < 2 || len(s.Inputs) <= maxBatch {
+	if maxGos < 2 || len(s) <= maxBatch {
 		b.lastGradResult, b.lastGradRResult = b.runBatches(rv, s)
 		return b.lastGradResult, b.lastGradRResult
 	}
 
-	goCount := len(s.Inputs) / maxBatch
-	if len(s.Inputs)%maxBatch != 0 {
+	goCount := len(s) / maxBatch
+	if len(s)%maxBatch != 0 {
 		goCount++
 	}
 	if goCount > maxGos {
 		goCount = maxGos
 	}
 
-	batchChan := make(chan *SampleSet, len(s.Inputs)/maxBatch+1)
-	for i := 0; i < len(s.Inputs); i += maxBatch {
+	batchChan := make(chan SampleSet, len(s)/maxBatch+1)
+	for i := 0; i < len(s); i += maxBatch {
 		bs := maxBatch
-		if bs > len(s.Inputs)-i {
-			bs = len(s.Inputs) - i
+		if bs > len(s)-i {
+			bs = len(s) - i
 		}
-		batchChan <- s.Subset(i, i+bs)
+		batchChan <- s[i : i+bs]
 	}
 	close(batchChan)
 
@@ -120,7 +121,7 @@ func (b *BatchRGradienter) batch(rv autofunc.RVector, s *SampleSet) (autofunc.Gr
 	return b.lastGradResult, b.lastGradRResult
 }
 
-func (b *BatchRGradienter) runBatches(rv autofunc.RVector, s *SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) runBatches(rv autofunc.RVector, s SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	grad := b.gradCache.Alloc()
 	var rgrad autofunc.RGradient
@@ -129,19 +130,19 @@ func (b *BatchRGradienter) runBatches(rv autofunc.RVector, s *SampleSet) (autofu
 	}
 
 	batchSize := b.batchSize()
-	for i := 0; i < len(s.Inputs); i += batchSize {
+	for i := 0; i < len(s); i += batchSize {
 		bs := batchSize
-		if bs > len(s.Inputs)-i {
-			bs = len(s.Inputs) - i
+		if bs > len(s)-i {
+			bs = len(s) - i
 		}
-		b.runBatch(rv, s.Subset(i, i+bs), grad, rgrad)
+		b.runBatch(rv, s[i:i+bs], grad, rgrad)
 	}
 
 	return grad, rgrad
 }
 
 func (b *BatchRGradienter) launchGoroutines(rv autofunc.RVector,
-	in <-chan *SampleSet, goCount int) <-chan gradResult {
+	in <-chan SampleSet, goCount int) <-chan gradResult {
 	resChan := make(chan gradResult)
 	var wg sync.WaitGroup
 	for i := 0; i < goCount; i++ {
@@ -166,22 +167,22 @@ func (b *BatchRGradienter) launchGoroutines(rv autofunc.RVector,
 	return resChan
 }
 
-func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s *SampleSet, grad autofunc.Gradient,
+func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s SampleSet, grad autofunc.Gradient,
 	rgrad autofunc.RGradient) {
-	if len(s.Inputs) == 0 {
+	if len(s) == 0 {
 		return
 	}
-	sampleCount := len(s.Inputs)
-	inputSize := len(s.Inputs[0])
-	outputSize := len(s.Outputs[0])
+	sampleCount := len(s)
+	firstSample := s[0].(VectorSample)
+	inputSize := len(firstSample.Input)
+	outputSize := len(firstSample.Output)
 	inVec := make(linalg.Vector, sampleCount*inputSize)
 	outVec := make(linalg.Vector, sampleCount*outputSize)
 
-	for i, in := range s.Inputs {
-		copy(inVec[i*inputSize:], in)
-	}
-	for i, out := range s.Outputs {
-		copy(outVec[i*outputSize:], out)
+	for i, sample := range s {
+		vs := sample.(VectorSample)
+		copy(inVec[i*inputSize:], vs.Input)
+		copy(outVec[i*outputSize:], vs.Output)
 	}
 
 	inVar := &autofunc.Variable{inVec}

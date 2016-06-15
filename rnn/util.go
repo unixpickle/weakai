@@ -3,6 +3,7 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/weakai/neuralnet"
 )
 
 func joinVectors(v []linalg.Vector) linalg.Vector {
@@ -67,4 +68,12 @@ func splitVectors(v linalg.Vector, n int) []linalg.Vector {
 		idx += partLen
 	}
 	return res
+}
+
+func evalCostFuncDeriv(c neuralnet.CostFunc, expected, actual linalg.Vector) linalg.Vector {
+	variable := &autofunc.Variable{Vector: actual}
+	result := make(linalg.Vector, len(actual))
+	res := c.Cost(expected, variable)
+	res.PropagateGradient([]float64{1}, autofunc.Gradient{variable: result})
+	return result
 }

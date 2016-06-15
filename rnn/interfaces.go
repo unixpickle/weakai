@@ -100,3 +100,21 @@ type Learner interface {
 	Block
 	Parameters() []*autofunc.Variable
 }
+
+type Sequence struct {
+	Inputs  []linalg.Vector
+	Outputs []linalg.Vector
+}
+
+// A Gradienter is anything which can compute an error
+// gradient for some set of sequences.
+type Gradienter interface {
+	SeqGradient(seqs []Sequence) autofunc.Gradient
+}
+
+// A RGradienter is a Gradienter which can also compute
+// RGradients.
+type RGradienter interface {
+	Gradienter
+	SeqRGradient(rv autofunc.RVector, seqs []Sequence) (autofunc.Gradient, autofunc.RGradient)
+}

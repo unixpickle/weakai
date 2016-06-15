@@ -126,3 +126,13 @@ func seqHeadRInput(seqs []Sequence, states, rStates []linalg.Vector) *BlockRInpu
 	}
 	return input
 }
+
+// sampleSetSequences converts a sample set into a
+// list of Sequences.
+func sampleSetSequences(s neuralnet.SampleSet) []Sequence {
+	res := make([]Sequence, len(s))
+	for i, x := range s {
+		res[i] = x.(Sequence)
+	}
+	return res
+}

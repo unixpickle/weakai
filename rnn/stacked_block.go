@@ -6,6 +6,7 @@ import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/weakai/neuralnet"
 )
 
 // A StackedBlock is a Block which feeds the output
@@ -106,7 +107,7 @@ func (d StackedBlock) BatchR(context autofunc.RVector, in *BlockRInput) BlockROu
 func (d StackedBlock) Parameters() []*autofunc.Variable {
 	var res []*autofunc.Variable
 	for _, b := range d {
-		if l, ok := b.(Learner); ok {
+		if l, ok := b.(neuralnet.Learner); ok {
 			res = append(res, l.Parameters()...)
 		}
 	}

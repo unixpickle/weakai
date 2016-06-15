@@ -10,26 +10,41 @@ import (
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
+const defaultMaxLanes = 10
+
 // FullRGradienter is an RGradienter which computes
-// untruncated gradients for batches of sequences.
+// untruncated gradients for sets of Sequences.
+//
+// After a FullRGradienter is used on a BatchLearner,
+// it should never be reused on any BatchLearner with
+// a different set of parameters.
 type FullRGradienter struct {
-	Learner       Learner
-	CostFunc      neuralnet.CostFunc
-	MaxLanes      int
+	Learner  BlockLearner
+	CostFunc neuralnet.CostFunc
+
+	// MaxLanes specifies the maximum number of lanes
+	// any BlockInput or BlockRInput may have at once
+	// while computing gradients.
+	// If this is 0, a reasonable default is used.
+	MaxLanes int
+
+	// MaxGoroutines specifies the maximum number of
+	// Goroutines on which to invoke Batch or BatchR
+	// on Learner at once.
 	MaxGoroutines int
 
 	cache       []map[*autofunc.Variable]linalg.Vector
 	lastResults []map[*autofunc.Variable]linalg.Vector
 }
 
-func (b *FullRGradienter) SeqGradient(seqs []Sequence) autofunc.Gradient {
-	res, _ := b.compute(nil, seqs)
+func (b *FullRGradienter) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
+	res, _ := b.compute(nil, sampleSetSequences(s))
 	return res
 }
 
-func (b *FullRGradienter) SeqRGradient(v autofunc.RVector, seqs []Sequence) (autofunc.Gradient,
-	autofunc.RGradient) {
-	return b.compute(v, seqs)
+func (b *FullRGradienter) RGradient(v autofunc.RVector,
+	s neuralnet.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
+	return b.compute(v, sampleSetSequences(s))
 }
 
 func (b *FullRGradienter) compute(v autofunc.RVector, seqs []Sequence) (autofunc.Gradient,
@@ -38,12 +53,12 @@ func (b *FullRGradienter) compute(v autofunc.RVector, seqs []Sequence) (autofunc
 	b.freeResults()
 
 	maxGos := b.maxGoroutines()
-	if len(seqs) < b.MaxLanes || maxGos == 1 {
+	if len(seqs) < b.maxLanes() || maxGos == 1 {
 		return b.syncGradient(v, seqs)
 	}
 
-	batchCount := len(seqs) / b.MaxLanes
-	if len(seqs)%b.MaxLanes != 0 {
+	batchCount := len(seqs) / b.maxLanes()
+	if len(seqs)%b.maxLanes() != 0 {
 		batchCount++
 	}
 
@@ -52,8 +67,8 @@ func (b *FullRGradienter) compute(v autofunc.RVector, seqs []Sequence) (autofunc
 	}
 
 	batchChan := make(chan []Sequence, batchCount)
-	for i := 0; i < len(seqs); i += b.MaxLanes {
-		batchSize := b.MaxLanes
+	for i := 0; i < len(seqs); i += b.maxLanes() {
+		batchSize := b.maxLanes()
 		if batchSize > len(seqs)-i {
 			batchSize = len(seqs) - i
 		}
@@ -110,8 +125,8 @@ func (b *FullRGradienter) syncGradient(v autofunc.RVector,
 	if v != nil {
 		rgrad = b.allocCache()
 	}
-	for i := 0; i < len(seqs); i += b.MaxLanes {
-		batchSize := b.MaxLanes
+	for i := 0; i < len(seqs); i += b.maxLanes() {
+		batchSize := b.maxLanes()
 		if batchSize > len(seqs)-i {
 			batchSize = len(seqs) - i
 		}
@@ -272,6 +287,14 @@ func (b *FullRGradienter) maxGoroutines() int {
 		return runtime.GOMAXPROCS(0)
 	} else {
 		return b.MaxGoroutines
+	}
+}
+
+func (b *FullRGradienter) maxLanes() int {
+	if b.MaxLanes == 0 {
+		return defaultMaxLanes
+	} else {
+		return b.MaxLanes
 	}
 }
 

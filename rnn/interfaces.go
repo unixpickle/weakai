@@ -3,7 +3,16 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/weakai/neuralnet"
 )
+
+// Sequence is used to create SampleSets for an RNN.
+// All RNN neuralnet.Gradienter implementations should
+// take a neuralnet.SampleSet of Sequence instances.
+type Sequence struct {
+	Inputs  []linalg.Vector
+	Outputs []linalg.Vector
+}
 
 // UpstreamGradient stores the gradients of some
 // output with respect to the outputs and output
@@ -94,35 +103,8 @@ type Block interface {
 	BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput
 }
 
-// A Learner is a Block with parameters that can be
-// learned using some variant of gradient descent.
-type Learner interface {
+// BlockLearner is any Block with learnable parameters.
+type BlockLearner interface {
 	Block
-	Parameters() []*autofunc.Variable
-}
-
-type Sequence struct {
-	Inputs  []linalg.Vector
-	Outputs []linalg.Vector
-}
-
-// A Gradienter is anything which can compute an error
-// gradient for some set of sequences.
-type Gradienter interface {
-	// SeqGradient computes the total error gradient
-	// for a batch of sequences.
-	// The result from SeqGradient is only valid until
-	// the next call to SeqGradient (or to SeqRGradient,
-	// if this is an RGradienter as well).
-	SeqGradient(seqs []Sequence) autofunc.Gradient
-}
-
-// A RGradienter is a Gradienter which can also compute
-// RGradients.
-type RGradienter interface {
-	Gradienter
-
-	// SeqRGradient is like SeqGradient, but it computes
-	// both a Gradient and an RGradient.
-	SeqRGradient(rv autofunc.RVector, seqs []Sequence) (autofunc.Gradient, autofunc.RGradient)
+	neuralnet.Learner
 }

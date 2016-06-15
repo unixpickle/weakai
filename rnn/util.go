@@ -77,3 +77,18 @@ func evalCostFuncDeriv(c neuralnet.CostFunc, expected, actual linalg.Vector) lin
 	res.PropagateGradient([]float64{1}, autofunc.Gradient{variable: result})
 	return result
 }
+
+func evalCostFuncRDeriv(v autofunc.RVector, c neuralnet.CostFunc, expected, actual,
+	actualR linalg.Vector) (deriv, rDeriv linalg.Vector) {
+	variable := &autofunc.RVariable{
+		Variable:   &autofunc.Variable{Vector: actual},
+		ROutputVec: actualR,
+	}
+	deriv = make(linalg.Vector, len(actual))
+	rDeriv = make(linalg.Vector, len(actual))
+	res := c.CostR(v, expected, variable)
+	res.PropagateRGradient([]float64{1}, []float64{0},
+		autofunc.RGradient{variable.Variable: rDeriv},
+		autofunc.Gradient{variable.Variable: deriv})
+	return
+}

@@ -39,12 +39,7 @@ func (b *FullRGradienter) compute(v autofunc.RVector, seqs []Sequence) (autofunc
 
 	maxGos := b.maxGoroutines()
 	if len(seqs) < b.MaxLanes || maxGos == 1 {
-		if v == nil {
-			return b.syncSeqGradient(seqs), nil
-		} else {
-			// TODO: this.
-			return nil, nil
-		}
+		return b.syncGradient(v, seqs)
 	}
 
 	batchCount := len(seqs) / b.MaxLanes
@@ -66,10 +61,10 @@ func (b *FullRGradienter) compute(v autofunc.RVector, seqs []Sequence) (autofunc
 	}
 	close(batchChan)
 
-	return b.runGoroutines(v, maxGos, batchChan)
+	return b.asyncGradient(v, maxGos, batchChan)
 }
 
-func (b *FullRGradienter) runGoroutines(v autofunc.RVector, count int,
+func (b *FullRGradienter) asyncGradient(v autofunc.RVector, count int,
 	batches <-chan []Sequence) (autofunc.Gradient, autofunc.RGradient) {
 	var wg sync.WaitGroup
 	var gradients []autofunc.Gradient
@@ -85,11 +80,7 @@ func (b *FullRGradienter) runGoroutines(v autofunc.RVector, count int,
 		go func(g autofunc.Gradient, rg autofunc.RGradient) {
 			wg.Done()
 			for batch := range batches {
-				if rg == nil {
-					b.runBatch(g, batch)
-				} else {
-					// TODO: this.
-				}
+				b.runBatch(v, g, rg, batch)
 			}
 		}(grad, rgrad)
 	}
@@ -103,37 +94,54 @@ func (b *FullRGradienter) runGoroutines(v autofunc.RVector, count int,
 			b.cache = append(b.cache, rgradients[i])
 		}
 	}
-	b.lastResults = append(b.lastResults, gradients[0], rgradients[0])
 
-	return gradients[0], rgradients[0]
+	b.lastResults = append(b.lastResults, gradients[0])
+	if rgradients != nil {
+		b.lastResults = append(b.lastResults, rgradients[0])
+		return gradients[0], rgradients[0]
+	} else {
+		return gradients[0], nil
+	}
 }
 
-func (b *FullRGradienter) syncSeqGradient(seqs []Sequence) autofunc.Gradient {
-	res := b.allocCache()
+func (b *FullRGradienter) syncGradient(v autofunc.RVector,
+	seqs []Sequence) (grad autofunc.Gradient, rgrad autofunc.RGradient) {
+	grad = b.allocCache()
+	if v != nil {
+		rgrad = b.allocCache()
+	}
 	for i := 0; i < len(seqs); i += b.MaxLanes {
 		batchSize := b.MaxLanes
 		if batchSize > len(seqs)-i {
 			batchSize = len(seqs) - i
 		}
-		b.runBatch(res, seqs[i:i+batchSize])
+		b.runBatch(v, grad, rgrad, seqs[i:i+batchSize])
 	}
-	b.lastResults = append(b.lastResults, res)
-	return res
+	b.lastResults = append(b.lastResults, grad)
+	if rgrad != nil {
+		b.lastResults = append(b.lastResults, rgrad)
+	}
+	return
 }
 
-func (b *FullRGradienter) runBatch(g autofunc.Gradient, seqs []Sequence) {
+func (b *FullRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
+	rg autofunc.RGradient, seqs []Sequence) {
 	seqs = removeEmpty(seqs)
 	if len(seqs) == 0 {
 		return
 	}
 
 	emptyState := make(linalg.Vector, b.Learner.StateSize())
-	lastStates := make([]linalg.Vector, len(seqs))
-	for i := range lastStates {
-		lastStates[i] = emptyState
+	zeroStates := make([]linalg.Vector, len(seqs))
+	for i := range zeroStates {
+		zeroStates[i] = emptyState
 	}
 
-	b.recursiveBatch(g, seqs, lastStates)
+	if v != nil {
+		b.recursiveRBatch(v, g, rg, seqs, zeroStates, zeroStates)
+	} else {
+		b.recursiveBatch(g, seqs, zeroStates)
+	}
 }
 
 func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
@@ -175,14 +183,86 @@ func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 		upstream.Outputs = append(upstream.Outputs, outGrad)
 	}
 
-	grad := autofunc.Gradient{}
 	downstream := make([]linalg.Vector, len(input.States))
 	for i, s := range input.States {
 		downstream[i] = make(linalg.Vector, b.Learner.StateSize())
-		grad[s] = downstream[i]
+		g[s] = downstream[i]
 	}
-	res.Gradient(upstream, grad)
+	res.Gradient(upstream, g)
+	for _, s := range input.States {
+		delete(g, s)
+	}
 	return downstream
+}
+
+func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradient,
+	rg autofunc.RGradient, seqs []Sequence, lastStates,
+	lastRStates []linalg.Vector) (stateGrad, stateRGrad []linalg.Vector) {
+	input := &BlockRInput{}
+	zeroInRVec := make(linalg.Vector, len(seqs[0].Inputs[0]))
+	for lane, seq := range seqs {
+		inVar := &autofunc.RVariable{
+			Variable:   &autofunc.Variable{Vector: seq.Inputs[0]},
+			ROutputVec: zeroInRVec,
+		}
+		input.Inputs = append(input.Inputs, inVar)
+		inState := &autofunc.RVariable{
+			Variable:   &autofunc.Variable{Vector: lastStates[lane]},
+			ROutputVec: lastRStates[lane],
+		}
+		input.States = append(input.States, inState)
+	}
+	res := b.Learner.BatchR(v, input)
+
+	nextSeqs := removeFirst(seqs)
+	var nextStates []linalg.Vector
+	var nextRStates []linalg.Vector
+	for lane, seq := range seqs {
+		if len(seq.Inputs) > 1 {
+			nextStates = append(nextStates, res.States()[lane])
+			nextRStates = append(nextStates, res.RStates()[lane])
+		}
+	}
+
+	upstream := &UpstreamRGradient{}
+	if len(nextSeqs) != 0 {
+		states, statesR := b.recursiveRBatch(v, g, rg, nextSeqs, nextStates, nextRStates)
+		var stateIdx int
+		for _, seq := range seqs {
+			if len(seq.Inputs) > 1 {
+				upstream.States = append(upstream.States, states[stateIdx])
+				upstream.RStates = append(upstream.RStates, statesR[stateIdx])
+				stateIdx++
+			} else {
+				emptyState := make(linalg.Vector, b.Learner.StateSize())
+				upstream.States = append(upstream.States, emptyState)
+				upstream.RStates = append(upstream.RStates, emptyState)
+			}
+		}
+	}
+
+	for lane, output := range res.Outputs() {
+		rOutput := res.ROutputs()[lane]
+		outGrad, outRGrad := evalCostFuncRDeriv(v, b.CostFunc, seqs[lane].Outputs[0],
+			output, rOutput)
+		upstream.Outputs = append(upstream.Outputs, outGrad)
+		upstream.ROutputs = append(upstream.ROutputs, outRGrad)
+	}
+
+	stateGrad = make([]linalg.Vector, len(input.States))
+	stateRGrad = make([]linalg.Vector, len(input.States))
+	for i, s := range input.States {
+		stateGrad[i] = make(linalg.Vector, b.Learner.StateSize())
+		stateRGrad[i] = make(linalg.Vector, b.Learner.StateSize())
+		g[s.Variable] = stateGrad[i]
+		rg[s.Variable] = stateRGrad[i]
+	}
+	res.RGradient(upstream, rg, g)
+	for _, s := range input.States {
+		delete(g, s.Variable)
+		delete(rg, s.Variable)
+	}
+	return
 }
 
 func (b *FullRGradienter) allocCache() map[*autofunc.Variable]linalg.Vector {

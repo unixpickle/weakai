@@ -66,14 +66,19 @@ func (r *Runner) recursiveRunAll(seqs [][]linalg.Vector,
 			in.Inputs = append(in.Inputs, inVar)
 		}
 	}
+	if len(in.Inputs) == 0 {
+		return make([][]linalg.Vector, len(seqs))
+	}
 	result := r.Block.Batch(in)
 
 	var newStates []linalg.Vector
 	var truncSecs [][]linalg.Vector
-	for i, seq := range seqs {
+	usedIdx := 0
+	for _, seq := range seqs {
 		if len(seq) > 0 {
-			newStates = append(newStates, result.States()[i])
+			newStates = append(newStates, result.States()[usedIdx])
 			truncSecs = append(truncSecs, seq[1:])
+			usedIdx++
 		}
 	}
 	nextOutput := r.recursiveRunAll(truncSecs, newStates)

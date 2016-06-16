@@ -35,7 +35,7 @@ func DeserializeNetworkBlock(d []byte) (serializer.Serializer, error) {
 	}
 	stateSize, ok := list[0].(serializer.Int)
 	network, ok1 := list[1].(neuralnet.Network)
-	if ok && ok1 {
+	if !ok || !ok1 {
 		return nil, errors.New("bad types in network list")
 	}
 	return NewNetworkBlock(network, int(stateSize)), nil

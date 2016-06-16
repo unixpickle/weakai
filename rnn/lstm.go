@@ -44,9 +44,9 @@ func DeserializeLSTM(d []byte) (serializer.Serializer, error) {
 	}
 	hiddenSize, ok := slice[0].(serializer.Int)
 	inputValue, ok1 := slice[1].(*lstmGate)
-	inputGate, ok2 := slice[1].(*lstmGate)
-	rememberGate, ok3 := slice[1].(*lstmGate)
-	outputGate, ok4 := slice[1].(*lstmGate)
+	inputGate, ok2 := slice[2].(*lstmGate)
+	rememberGate, ok3 := slice[3].(*lstmGate)
+	outputGate, ok4 := slice[4].(*lstmGate)
 	if !ok || !ok1 || !ok2 || !ok3 || !ok4 {
 		return nil, errors.New("invalid types in LSTM slice")
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
+const initialRememberBias = 1
+
 // LSTM is a Block that implements an LSTM unit.
 type LSTM struct {
 	hiddenSize int
@@ -22,7 +24,7 @@ type LSTM struct {
 // NewLSTM creates an LSTM with randomly initialized
 // weights and biases.
 func NewLSTM(inputSize, hiddenSize int) *LSTM {
-	return &LSTM{
+	res := &LSTM{
 		hiddenSize: hiddenSize,
 
 		inputValue:   newLSTMGate(inputSize, hiddenSize, &neuralnet.HyperbolicTangent{}),
@@ -30,6 +32,8 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 		rememberGate: newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 		outputGate:   newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 	}
+	res.prioritizeRemembering()
+	return res
 }
 
 // DeserializeLSTM creates an LSTM from some serialized
@@ -150,6 +154,13 @@ func (l *LSTM) Serialize() ([]byte, error) {
 
 func (l *LSTM) SerializerType() string {
 	return serializerTypeLSTM
+}
+
+func (l *LSTM) prioritizeRemembering() {
+	rememberBiases := l.rememberGate.Dense.Biases.Var.Vector
+	for i := range rememberBiases {
+		rememberBiases[i] = initialRememberBias
+	}
 }
 
 type lstmGate struct {

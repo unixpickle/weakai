@@ -58,7 +58,9 @@ func (r *RMSProp) Gradient(s SampleSet) autofunc.Gradient {
 	for variable, vec := range r.RollingAverage {
 		gradVec := grad[variable]
 		for i, x := range vec {
-			gradVec[i] /= math.Sqrt(x)
+			if x != 0 {
+				gradVec[i] /= math.Sqrt(x)
+			}
 		}
 	}
 

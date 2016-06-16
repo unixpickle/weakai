@@ -55,7 +55,9 @@ func (e *Equilibration) Gradient(s SampleSet) autofunc.Gradient {
 	for variable, vector := range rawGrad {
 		rMags := e.squareMags[variable]
 		for i, x := range rMags {
-			vector[i] /= math.Sqrt(x)
+			if x != 0 {
+				vector[i] /= math.Sqrt(x)
+			}
 		}
 	}
 

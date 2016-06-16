@@ -169,23 +169,9 @@ func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 	upstream := &UpstreamGradient{}
 	nextSeqs := removeFirst(seqs)
 	if len(nextSeqs) != 0 {
-		var nextStates []linalg.Vector
-		for lane, seq := range seqs {
-			if len(seq.Inputs) > 1 {
-				nextStates = append(nextStates, res.States()[lane])
-			}
-		}
+		nextStates := filterContinued(seqs, res.States())
 		res := b.recursiveBatch(g, nextSeqs, nextStates)
-		var resIdx int
-		for _, seq := range seqs {
-			if len(seq.Inputs) > 1 {
-				upstream.States = append(upstream.States, res[resIdx])
-				resIdx++
-			} else {
-				emptyState := make(linalg.Vector, b.Learner.StateSize())
-				upstream.States = append(upstream.States, emptyState)
-			}
-		}
+		upstream.States = injectDiscontinued(seqs, res, b.Learner.StateSize())
 	}
 
 	for lane, output := range res.Outputs() {
@@ -216,27 +202,11 @@ func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradien
 	upstream := &UpstreamRGradient{}
 	nextSeqs := removeFirst(seqs)
 	if len(nextSeqs) != 0 {
-		var nextStates []linalg.Vector
-		var nextRStates []linalg.Vector
-		for lane, seq := range seqs {
-			if len(seq.Inputs) > 1 {
-				nextStates = append(nextStates, res.States()[lane])
-				nextRStates = append(nextRStates, res.RStates()[lane])
-			}
-		}
+		nextStates := filterContinued(seqs, res.States())
+		nextRStates := filterContinued(seqs, res.RStates())
 		states, statesR := b.recursiveRBatch(v, g, rg, nextSeqs, nextStates, nextRStates)
-		var stateIdx int
-		for _, seq := range seqs {
-			if len(seq.Inputs) > 1 {
-				upstream.States = append(upstream.States, states[stateIdx])
-				upstream.RStates = append(upstream.RStates, statesR[stateIdx])
-				stateIdx++
-			} else {
-				emptyState := make(linalg.Vector, b.Learner.StateSize())
-				upstream.States = append(upstream.States, emptyState)
-				upstream.RStates = append(upstream.RStates, emptyState)
-			}
-		}
+		upstream.States = injectDiscontinued(seqs, states, b.Learner.StateSize())
+		upstream.RStates = injectDiscontinued(seqs, statesR, b.Learner.StateSize())
 	}
 
 	for lane, output := range res.Outputs() {
@@ -316,6 +286,40 @@ func removeFirst(seqs []Sequence) []Sequence {
 		nextSeqs = append(nextSeqs, s)
 	}
 	return nextSeqs
+}
+
+// filterContinued filters ins so that input i
+// is only kept if the i-th sequence has more
+// than one input in it.
+func filterContinued(seqs []Sequence, ins []linalg.Vector) []linalg.Vector {
+	var res []linalg.Vector
+	for i, seq := range seqs {
+		if len(seq.Inputs) > 1 {
+			res = append(res, ins[i])
+		}
+	}
+	return res
+}
+
+// injectDiscontinued injects zeroed slices in
+// a result for every element of seqs which has
+// less than two inputs.
+func injectDiscontinued(seqs []Sequence, outs []linalg.Vector, vecLen int) []linalg.Vector {
+	var zeroVec linalg.Vector
+	var res []linalg.Vector
+	var takeIdx int
+	for _, s := range seqs {
+		if len(s.Inputs) > 1 {
+			res = append(res, outs[takeIdx])
+			takeIdx++
+		} else {
+			if zeroVec == nil {
+				zeroVec = make(linalg.Vector, vecLen)
+			}
+			res = append(res, zeroVec)
+		}
+	}
+	return res
 }
 
 type seqSorter []Sequence

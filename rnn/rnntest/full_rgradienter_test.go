@@ -17,14 +17,14 @@ var (
 			Inputs:  []linalg.Vector{{1, 2, 3}, {3, 2, 1}, {1, 3, 2}},
 			Outputs: []linalg.Vector{{1, 0.5, 0.3, 0}, {0.2, 0.5, 0.4, 0.9}, {1, 0, 1, 0}},
 		},
-		/*rnn.Sequence{
+		rnn.Sequence{
 			Inputs:  []linalg.Vector{},
 			Outputs: []linalg.Vector{},
 		},
 		rnn.Sequence{
 			Inputs:  []linalg.Vector{{3, 2, 1}},
 			Outputs: []linalg.Vector{{1, 0, 0.5, 0.2}},
-		},*/
+		},
 	}
 
 	gradientTestBlock = rnn.StackedBlock{rnn.NewLSTM(3, 4), NewSquareBlock(2)}

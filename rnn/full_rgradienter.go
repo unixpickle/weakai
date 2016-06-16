@@ -85,6 +85,7 @@ func (b *FullRGradienter) asyncGradient(v autofunc.RVector, count int,
 	var gradients []autofunc.Gradient
 	var rgradients []autofunc.RGradient
 	for i := 0; i < count; i++ {
+		wg.Add(1)
 		grad := b.allocCache()
 		gradients = append(gradients, grad)
 		var rgrad autofunc.RGradient
@@ -93,10 +94,10 @@ func (b *FullRGradienter) asyncGradient(v autofunc.RVector, count int,
 			rgradients = append(rgradients, rgrad)
 		}
 		go func(g autofunc.Gradient, rg autofunc.RGradient) {
-			wg.Done()
 			for batch := range batches {
 				b.runBatch(v, g, rg, batch)
 			}
+			wg.Done()
 		}(grad, rgrad)
 	}
 	wg.Wait()
@@ -164,18 +165,16 @@ func (b *FullRGradienter) recursiveBatch(g autofunc.Gradient, seqs []Sequence,
 	input := seqHeadInput(seqs, lastStates)
 	res := b.Learner.Batch(input)
 
-	nextSeqs := removeFirst(seqs)
-	var nextStates []linalg.Vector
-	for lane, seq := range seqs {
-		if len(seq.Inputs) > 1 {
-			nextStates = append(nextStates, res.States()[lane])
-		}
-	}
-
-	upstream := &UpstreamGradient{}
-
 	// Compute upstream state derivatives recursively.
+	upstream := &UpstreamGradient{}
+	nextSeqs := removeFirst(seqs)
 	if len(nextSeqs) != 0 {
+		var nextStates []linalg.Vector
+		for lane, seq := range seqs {
+			if len(seq.Inputs) > 1 {
+				nextStates = append(nextStates, res.States()[lane])
+			}
+		}
 		res := b.recursiveBatch(g, nextSeqs, nextStates)
 		var resIdx int
 		for _, seq := range seqs {
@@ -213,19 +212,18 @@ func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradien
 	input := seqHeadRInput(seqs, states, rStates)
 	res := b.Learner.BatchR(v, input)
 
-	nextSeqs := removeFirst(seqs)
-	var nextStates []linalg.Vector
-	var nextRStates []linalg.Vector
-	for lane, seq := range seqs {
-		if len(seq.Inputs) > 1 {
-			nextStates = append(nextStates, res.States()[lane])
-			nextRStates = append(nextStates, res.RStates()[lane])
-		}
-	}
-
 	// Compute upstream state derivatives recursively.
 	upstream := &UpstreamRGradient{}
+	nextSeqs := removeFirst(seqs)
 	if len(nextSeqs) != 0 {
+		var nextStates []linalg.Vector
+		var nextRStates []linalg.Vector
+		for lane, seq := range seqs {
+			if len(seq.Inputs) > 1 {
+				nextStates = append(nextStates, res.States()[lane])
+				nextRStates = append(nextRStates, res.RStates()[lane])
+			}
+		}
 		states, statesR := b.recursiveRBatch(v, g, rg, nextSeqs, nextStates, nextRStates)
 		var stateIdx int
 		for _, seq := range seqs {

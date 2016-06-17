@@ -37,6 +37,16 @@ type Equilibration struct {
 	// If this is 0, a default value of 1 is used.
 	NumSamples int
 
+	// Damping specifies how much the equilibrated
+	// coefficients should be ignored.
+	// The higher the damping value, the less effect
+	// equilibration will have, with a damping value
+	// of 1 completely disabling equilibration.
+	// A damping factor of 0 may work for some things,
+	// but it can cause numerical problems when a
+	// parameter has a very small row in the Hessian.
+	Damping float64
+
 	lastUpdate int
 	rCache     autofunc.RVector
 	squareMags autofunc.RGradient
@@ -56,7 +66,8 @@ func (e *Equilibration) Gradient(s SampleSet) autofunc.Gradient {
 		rMags := e.squareMags[variable]
 		for i, x := range rMags {
 			if x != 0 {
-				vector[i] /= math.Sqrt(x)
+				coeff := math.Sqrt(x)
+				vector[i] /= coeff*(1-e.Damping) + e.Damping
 			}
 		}
 	}

@@ -336,7 +336,7 @@ func (s seqSorter) Len() int {
 }
 
 func (s seqSorter) Less(i, j int) bool {
-	return len(s[i].Inputs) < len(s[j].Inputs)
+	return len(s[i].Inputs) > len(s[j].Inputs)
 }
 
 func (s seqSorter) Swap(i, j int) {

@@ -102,30 +102,30 @@ func (m *meanSquaredResult) PropagateGradient(upstream linalg.Vector, grad autof
 // definition of cross entropy.
 type CrossEntropyCost struct{}
 
-func (_ CrossEntropyCost) Cost(a linalg.Vector, inX autofunc.Result) autofunc.Result {
-	return autofunc.Pool(inX, func(x autofunc.Result) autofunc.Result {
-		aVar := &autofunc.Variable{a}
-		logA := autofunc.Log{}.Apply(aVar)
-		oneMinusA := autofunc.AddScaler(autofunc.Scale(aVar, -1), 1)
-		oneMinusX := autofunc.AddScaler(autofunc.Scale(x, -1), 1)
+func (_ CrossEntropyCost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
+	return autofunc.Pool(a, func(a autofunc.Result) autofunc.Result {
+		xVar := &autofunc.Variable{x}
+		logA := autofunc.Log{}.Apply(a)
+		oneMinusA := autofunc.AddScaler(autofunc.Scale(a, -1), 1)
+		oneMinusX := autofunc.AddScaler(autofunc.Scale(xVar, -1), 1)
 		log1A := autofunc.Log{}.Apply(oneMinusA)
 
-		errorVec := autofunc.Add(autofunc.Mul(aVar, logA),
+		errorVec := autofunc.Add(autofunc.Mul(xVar, logA),
 			autofunc.Mul(oneMinusX, log1A))
 		return autofunc.Scale(autofunc.SumAll(errorVec), -1)
 	})
 }
 
-func (_ CrossEntropyCost) CostR(v autofunc.RVector, a linalg.Vector,
-	inX autofunc.RResult) autofunc.RResult {
-	return autofunc.PoolR(inX, func(x autofunc.RResult) autofunc.RResult {
-		aVar := autofunc.NewRVariable(&autofunc.Variable{a}, autofunc.RVector{})
-		logA := autofunc.Log{}.ApplyR(v, aVar)
-		oneMinusA := autofunc.AddScalerR(autofunc.ScaleR(aVar, -1), 1)
-		oneMinusX := autofunc.AddScalerR(autofunc.ScaleR(x, -1), 1)
+func (_ CrossEntropyCost) CostR(v autofunc.RVector, x linalg.Vector,
+	a autofunc.RResult) autofunc.RResult {
+	return autofunc.PoolR(a, func(a autofunc.RResult) autofunc.RResult {
+		xVar := autofunc.NewRVariable(&autofunc.Variable{x}, autofunc.RVector{})
+		logA := autofunc.Log{}.ApplyR(v, a)
+		oneMinusA := autofunc.AddScalerR(autofunc.ScaleR(a, -1), 1)
+		oneMinusX := autofunc.AddScalerR(autofunc.ScaleR(xVar, -1), 1)
 		log1A := autofunc.Log{}.ApplyR(v, oneMinusA)
 
-		errorVec := autofunc.AddR(autofunc.MulR(aVar, logA),
+		errorVec := autofunc.AddR(autofunc.MulR(xVar, logA),
 			autofunc.MulR(oneMinusX, log1A))
 		return autofunc.ScaleR(autofunc.SumAllR(errorVec), -1)
 	})

@@ -131,6 +131,23 @@ func (_ CrossEntropyCost) CostR(v autofunc.RVector, x linalg.Vector,
 	})
 }
 
+// DotCost simply computes the negative of the dot
+// product of the actual and expected vectors.
+// This is equivalent to cross entropy cost when
+// used in conjunction with a LogSoftmaxLayer.
+type DotCost struct{}
+
+func (_ DotCost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
+	xVar := &autofunc.Variable{x}
+	return autofunc.Scale(autofunc.SumAll(autofunc.Mul(xVar, a)), -1)
+}
+
+func (_ DotCost) CostR(v autofunc.RVector, x linalg.Vector,
+	a autofunc.RResult) autofunc.RResult {
+	xVar := autofunc.NewRVariable(&autofunc.Variable{x}, v)
+	return autofunc.ScaleR(autofunc.SumAllR(autofunc.MulR(xVar, a)), -1)
+}
+
 // RegularizingCost adds onto another cost function
 // the squared magnitudes of various variables.
 type RegularizingCost struct {

@@ -3,16 +3,16 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"time"
 
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
-	"github.com/unixpickle/weakai/rnn/lstm"
 )
 
 const (
-	StepSize = 0.1
-	Epochs   = 30
+	StepSize  = 0.1
+	Epochs    = 30
+	BatchSize = 10
 
 	TrainingCount = 100
 	TestingCount  = 100
@@ -23,23 +23,41 @@ const (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	//rand.Seed(time.Now().UnixNano())
+	rand.Seed(123)
 
-	trainer := rnn.RMSProp{
-		SGD: rnn.SGD{
-			CostFunc: rnn.MeanSquaredCost{},
-			StepSize: StepSize,
-			Epochs:   Epochs,
-		},
-	}
+	sampleSet := neuralnet.SampleSet{}
 	for i := 0; i < TrainingCount; i++ {
 		inSeq, outSeq := genEvenOddSeq(rand.Intn(MaxSeqLen-MinSeqLen) + MinSeqLen)
-		trainer.InSeqs = append(trainer.InSeqs, inSeq)
-		trainer.OutSeqs = append(trainer.OutSeqs, outSeq)
+		sampleSet = append(sampleSet, rnn.Sequence{
+			Inputs:  inSeq,
+			Outputs: outSeq,
+		})
 	}
-	net := lstm.NewNet(rnn.Sigmoid{}, 2, HiddenSize, 2)
-	net.Randomize()
-	trainer.Train(net)
+
+	outNet := neuralnet.Network{
+		&neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
+			InputCount:  HiddenSize,
+			OutputCount: 2,
+		},
+		&neuralnet.Sigmoid{},
+		SquishLayer{},
+	}
+	outNet.Randomize()
+	outBlock := rnn.NewNetworkBlock(outNet, 0)
+	lstm := rnn.NewLSTM(2, HiddenSize)
+	net := rnn.StackedBlock{lstm, outBlock}
+
+	gradienter := &neuralnet.RMSProp{
+		Gradienter: &rnn.FullRGradienter{
+			Learner:  net,
+			CostFunc: neuralnet.CrossEntropyCost{},
+			MaxLanes: 1,
+		},
+	}
+
+	neuralnet.SGD(gradienter, sampleSet, StepSize, Epochs, BatchSize)
 
 	var scoreSum float64
 	var scoreTotal float64
@@ -75,9 +93,10 @@ func genEvenOddSeq(size int) (ins, outs []linalg.Vector) {
 	return
 }
 
-func runTestSample(ins, outs []linalg.Vector, r *lstm.Net) float64 {
+func runTestSample(ins, outs []linalg.Vector, b rnn.Block) float64 {
 	var correct int
 	var total int
+	r := &rnn.Runner{Block: b}
 	for i, in := range ins {
 		out := r.StepTime(in)
 		if out[0] < 0.5 == (outs[i][0] < 0.5) {
@@ -88,7 +107,6 @@ func runTestSample(ins, outs []linalg.Vector, r *lstm.Net) float64 {
 		}
 		total += 2
 	}
-	r.Reset()
 
 	return float64(correct) / float64(total)
 }

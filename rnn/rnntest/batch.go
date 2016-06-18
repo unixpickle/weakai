@@ -108,6 +108,7 @@ func (b *BatchTest) checkGradient(t *testing.T) {
 			a := actVec[i]
 			if math.Abs(x-a) > batchTestPrec {
 				t.Errorf("got invalid gradient output %f (expected %f)", a, x)
+				return
 			}
 		}
 	}

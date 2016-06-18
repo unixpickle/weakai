@@ -102,6 +102,7 @@ func (g *GradientTest) checkROutput(t *testing.T) {
 				if math.Abs(value-actualVal) > prec {
 					t.Errorf("checkROutput: idx %d,%d,%d: expected %f got %f",
 						i, j, k, value, actualVal)
+					break
 				}
 			}
 		}
@@ -162,6 +163,7 @@ func (g *GradientTest) compareGradMaps(t *testing.T, prefix string, actual,
 				if math.Abs(expVal-actVal) > prec {
 					t.Errorf(prefix+"output %d variable %d: expected %f got %f (idx %d)",
 						i, variableIdx, expVal, actVal, j)
+					return
 				}
 			}
 		}

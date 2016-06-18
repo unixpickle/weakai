@@ -39,6 +39,10 @@ func (s *SoftmaxLayer) SerializerType() string {
 // of the softmax function (with temperature = 1).
 type LogSoftmaxLayer struct{}
 
+func DeserializeLogSoftmaxLayer(d []byte) (*LogSoftmaxLayer, error) {
+	return &LogSoftmaxLayer{}, nil
+}
+
 func (s *LogSoftmaxLayer) Apply(in autofunc.Result) autofunc.Result {
 	return autofunc.Pool(in, func(in autofunc.Result) autofunc.Result {
 		// Compute the log of the sum of the exponents by
@@ -65,6 +69,14 @@ func (s *LogSoftmaxLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofu
 		denomLog := autofunc.AddR(expLog, maxValue)
 		return autofunc.AddFirstR(in, autofunc.ScaleR(denomLog, -1))
 	})
+}
+
+func (s *LogSoftmaxLayer) Serialize() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (s *LogSoftmaxLayer) SerializerType() string {
+	return serializerTypeLogSoftmaxLayer
 }
 
 func maxVecIdx(v linalg.Vector) int {

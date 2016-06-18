@@ -16,6 +16,7 @@ const (
 	serializerTypeDenseLayer        = serializerTypePrefix + "DenseLayer"
 	serializerTypeMaxPoolingLayer   = serializerTypePrefix + "MaxPoolingLayer"
 	serializerTypeSoftmaxLayer      = serializerTypePrefix + "SoftmaxLayer"
+	serializerTypeLogSoftmaxLayer   = serializerTypePrefix + "LogSoftmaxLayer"
 	serializerTypeNetwork           = serializerTypePrefix + "Network"
 	serializerTypeReLU              = serializerTypePrefix + "ReLU"
 )
@@ -43,6 +44,8 @@ func init() {
 		convertDeserializer(DeserializeBorderLayer))
 	serializer.RegisterDeserializer(serializerTypeSoftmaxLayer,
 		convertDeserializer(DeserializeSoftmaxLayer))
+	serializer.RegisterDeserializer(serializerTypeLogSoftmaxLayer,
+		convertDeserializer(DeserializeLogSoftmaxLayer))
 	serializer.RegisterDeserializer(serializerTypeMaxPoolingLayer,
 		convertDeserializer(DeserializeMaxPoolingLayer))
 	serializer.RegisterDeserializer(serializerTypeUnstackLayer,

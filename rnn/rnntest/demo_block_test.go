@@ -10,4 +10,6 @@ func TestDemoBlockGradients(t *testing.T) {
 		InStates:       gradientTestVariables[2:4],
 	}
 	test.Run(t)
+	test.GradientParams = nil
+	test.Run(t)
 }

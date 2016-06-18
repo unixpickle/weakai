@@ -29,6 +29,10 @@ func (i IdentityBlock) BatchR(v autofunc.RVector, in *rnn.BlockRInput) rnn.Block
 	}
 }
 
+func (i IdentityBlock) Parameters() []*autofunc.Variable {
+	return nil
+}
+
 type identityOutput struct {
 	Inputs   []*autofunc.Variable
 	InStates []*autofunc.Variable

@@ -19,7 +19,7 @@ const (
 // GradientTest performs gradient and r-gradient
 // checking on a Block.
 type GradientTest struct {
-	Block          rnn.Block
+	Block          rnn.BlockLearner
 	GradientParams []*autofunc.Variable
 	Inputs         []*autofunc.Variable
 	InStates       []*autofunc.Variable
@@ -33,15 +33,15 @@ func (g *GradientTest) Run(t *testing.T) {
 
 func (g *GradientTest) checkGradient(t *testing.T) {
 	for i := 0; i < 2; i++ {
-		actual := exactJacobian(g.evaluate, g.GradientParams)
+		actual := exactJacobian(g.evaluate, g.allParams())
 		var expected []autofunc.Gradient
 		if i == 0 {
-			expected = approximateJacobian(g.evaluate, g.GradientParams)
+			expected = approximateJacobian(g.evaluate, g.allParams())
 		} else {
 			ev := g.rEvaluator(g.randomRVector())
 			expected = approximateJacobian(func() rnn.BlockOutput {
 				return &rOutputToOutput{ev()}
-			}, g.GradientParams)
+			}, g.allParams())
 		}
 
 		if len(actual) != len(expected) {
@@ -62,8 +62,8 @@ func (g *GradientTest) checkGradient(t *testing.T) {
 
 func (g *GradientTest) checkRGradient(t *testing.T) {
 	rv := g.randomRVector()
-	expected := approximateRJacobian(g.rEvaluator(rv), g.GradientParams, rv)
-	actual := exactRJacobian(g.rEvaluator(rv), g.GradientParams)
+	expected := approximateRJacobian(g.rEvaluator(rv), g.allParams(), rv)
+	actual := exactRJacobian(g.rEvaluator(rv), g.allParams())
 
 	var actualMaps []map[*autofunc.Variable]linalg.Vector
 	var expectedMaps []map[*autofunc.Variable]linalg.Vector
@@ -128,7 +128,7 @@ func (g *GradientTest) rEvaluator(rv autofunc.RVector) func() rnn.BlockROutput {
 
 func (g *GradientTest) randomRVector() autofunc.RVector {
 	res := autofunc.RVector{}
-	for _, variable := range g.GradientParams {
+	for _, variable := range g.allParams() {
 		vec := make(linalg.Vector, len(variable.Vector))
 		for i := range vec {
 			vec[i] = rand.NormFloat64()
@@ -146,7 +146,7 @@ func (g *GradientTest) compareGradMaps(t *testing.T, prefix string, actual,
 			t.Error(prefix + "gradient lengths don't match")
 			return
 		}
-		for variableIdx, variable := range g.GradientParams {
+		for variableIdx, variable := range g.allParams() {
 			expVec := x[variable]
 			actVec := a[variable]
 			if len(expVec) != len(actVec) {
@@ -166,6 +166,13 @@ func (g *GradientTest) compareGradMaps(t *testing.T, prefix string, actual,
 			}
 		}
 	}
+}
+
+func (g *GradientTest) allParams() []*autofunc.Variable {
+	params := make([]*autofunc.Variable, len(g.GradientParams))
+	copy(params, g.GradientParams)
+	params = append(params, g.Block.Parameters()...)
+	return params
 }
 
 func approximateJacobian(f func() rnn.BlockOutput, v []*autofunc.Variable) []autofunc.Gradient {

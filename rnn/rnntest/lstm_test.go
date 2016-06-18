@@ -1,15 +1,10 @@
 package rnntest
 
 import (
-	"math"
 	"testing"
 
-	"github.com/unixpickle/autofunc"
-	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/rnn"
 )
-
-const lstmTestPrec = 1e-3
 
 func TestLSTMGradients(t *testing.T) {
 	test := GradientTest{
@@ -20,8 +15,25 @@ func TestLSTMGradients(t *testing.T) {
 		InStates:       gradientTestVariables[6:8],
 	}
 	test.Run(t)
+	test.GradientParams = nil
+	test.Run(t)
 }
 
+func TestLSTMBatches(t *testing.T) {
+	batchTest := BatchTest{
+		Block: rnn.StackedBlock{rnn.NewLSTM(3, 5), NewSquareBlock(1)},
+
+		OutputSize:     5,
+		GradientParams: gradientTestVariables,
+		Inputs:         gradientTestVariables[:2],
+		InStates:       gradientTestVariables[6:8],
+	}
+	batchTest.Run(t)
+	batchTest.GradientParams = nil
+	batchTest.Run(t)
+}
+
+/*
 func TestLSTMBatchOutputs(t *testing.T) {
 	block := rnn.StackedBlock{rnn.NewLSTM(3, 5), NewSquareBlock(1)}
 	inputs := gradientTestVariables[:2]
@@ -110,3 +122,4 @@ func TestLSTMBatchGradients(t *testing.T) {
 		}
 	}
 }
+*/

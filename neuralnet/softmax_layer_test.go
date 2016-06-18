@@ -29,6 +29,27 @@ func TestSoftmaxLayerOutput(t *testing.T) {
 	}
 }
 
+func TestLogSoftmaxLayerOutput(t *testing.T) {
+	input := &autofunc.Variable{
+		Vector: []float64{
+			0.175974, 0.764459, 0.573260, 0.105675, 0.320708,
+			0.554257, 0.028740, 0.826560, 0.290679, 0.208740,
+		},
+	}
+	layer := LogSoftmaxLayer{}
+	output := layer.Apply(input).Output()
+	expOutput := []float64{
+		-2.547194905, -1.958711741, -2.149915509, -2.617501338, -2.402460678,
+		-2.168911211, -2.694428401, -1.896613447, -2.432488788, -2.514430213,
+	}
+	for i, x := range expOutput {
+		actual := output[i]
+		if math.Abs(actual-x) > 1e-5 {
+			t.Errorf("invalid output %d: got %f expected %f", i, actual, x)
+		}
+	}
+}
+
 func BenchmarkSoftmaxForward(b *testing.B) {
 	rand.Seed(123)
 	inputVec := make([]float64, 3000)

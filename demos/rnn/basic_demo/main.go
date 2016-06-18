@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
@@ -10,8 +11,8 @@ import (
 )
 
 const (
-	StepSize  = 0.1
-	Epochs    = 30
+	StepSize  = 0.05
+	Epochs    = 60
 	BatchSize = 10
 
 	TrainingCount = 100
@@ -23,8 +24,7 @@ const (
 )
 
 func main() {
-	//rand.Seed(time.Now().UnixNano())
-	rand.Seed(123)
+	rand.Seed(time.Now().UnixNano())
 
 	sampleSet := neuralnet.SampleSet{}
 	for i := 0; i < TrainingCount; i++ {

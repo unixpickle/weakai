@@ -11,32 +11,44 @@ import (
 	"github.com/unixpickle/weakai/rnn"
 )
 
-var (
-	gradientTestSamples = neuralnet.SampleSet{
-		rnn.Sequence{
-			Inputs:  []linalg.Vector{{1, 2, 3}, {3, 2, 1}, {1, 3, 2}},
-			Outputs: []linalg.Vector{{1, 0.5, 0.3, 0}, {0.2, 0.5, 0.4, 0.9}, {1, 0, 1, 0}},
-		},
-		rnn.Sequence{
-			Inputs:  []linalg.Vector{},
-			Outputs: []linalg.Vector{},
-		},
-		rnn.Sequence{
-			Inputs:  []linalg.Vector{{3, 2, 1}},
-			Outputs: []linalg.Vector{{1, 0, 0.5, 0.2}},
-		},
-	}
+var gradienterTestSamples neuralnet.SampleSet
+var gradienterTestBlock rnn.StackedBlock
+var gradienterTestCost = neuralnet.CrossEntropyCost{}
 
-	gradientTestBlock = rnn.StackedBlock{rnn.NewLSTM(3, 4), NewSquareBlock(2)}
-	gradientTestCost  = neuralnet.MeanSquaredCost{}
+const (
+	gradienterTestPrec    = 1e-6
+	gradienterTestInSize  = 10
+	gradienterTestOutSize = 100
 )
 
-const gradienterTestPrec = 1e-6
+func init() {
+	gradienterTestSamples = neuralnet.SampleSet{
+		rnn.Sequence{},
+	}
+	for i := 0; i < 100; i++ {
+		seqLen := rand.Intn(10) + 5
+		var seq rnn.Sequence
+		for i := 0; i < seqLen; i++ {
+			input := make(linalg.Vector, gradienterTestInSize)
+			for i := range input {
+				input[i] = rand.NormFloat64()
+			}
+			output := make(linalg.Vector, gradienterTestOutSize)
+			output[i] = rand.Float64()
+			seq.Inputs = append(seq.Inputs, input)
+			seq.Outputs = append(seq.Outputs, output)
+		}
+		gradienterTestSamples = append(gradienterTestSamples, seq)
+	}
+	outBlock := NewSquareBlock(0)
+	l := rnn.NewLSTM(gradienterTestInSize, gradienterTestOutSize)
+	gradienterTestBlock = rnn.StackedBlock{l, outBlock}
+}
 
 func TestFullRGradienterBasic(t *testing.T) {
 	g := &rnn.FullRGradienter{
-		Learner:       gradientTestBlock,
-		CostFunc:      gradientTestCost,
+		Learner:       gradienterTestBlock,
+		CostFunc:      gradienterTestCost,
 		MaxLanes:      1,
 		MaxGoroutines: 1,
 	}
@@ -45,8 +57,8 @@ func TestFullRGradienterBasic(t *testing.T) {
 
 func TestFullRGradienterConcurrent(t *testing.T) {
 	g := &rnn.FullRGradienter{
-		Learner:       gradientTestBlock,
-		CostFunc:      gradientTestCost,
+		Learner:       gradienterTestBlock,
+		CostFunc:      gradienterTestCost,
 		MaxLanes:      1,
 		MaxGoroutines: 10,
 	}
@@ -55,8 +67,8 @@ func TestFullRGradienterConcurrent(t *testing.T) {
 
 func TestFullRGradienterWideLanes(t *testing.T) {
 	g := &rnn.FullRGradienter{
-		Learner:       gradientTestBlock,
-		CostFunc:      gradientTestCost,
+		Learner:       gradienterTestBlock,
+		CostFunc:      gradienterTestCost,
 		MaxLanes:      3,
 		MaxGoroutines: 1,
 	}
@@ -65,8 +77,8 @@ func TestFullRGradienterWideLanes(t *testing.T) {
 
 func TestFullRGradienterConcurrentWideLanes(t *testing.T) {
 	g := &rnn.FullRGradienter{
-		Learner:       gradientTestBlock,
-		CostFunc:      gradientTestCost,
+		Learner:       gradienterTestBlock,
+		CostFunc:      gradienterTestCost,
 		MaxLanes:      2,
 		MaxGoroutines: 2,
 	}
@@ -74,17 +86,17 @@ func TestFullRGradienterConcurrentWideLanes(t *testing.T) {
 }
 
 func testRGradienter(t *testing.T, g neuralnet.RGradienter) {
-	rv := autofunc.RVector(autofunc.NewGradient(gradientTestBlock.Parameters()))
+	rv := autofunc.RVector(autofunc.NewGradient(gradienterTestBlock.Parameters()))
 	for _, v := range rv {
 		for i := range v {
 			v[i] = rand.NormFloat64()
 		}
 	}
-	expected, expectedR := expectedRGradient(rv, gradientTestBlock, gradientTestCost,
-		gradientTestSamples)
-	actual := g.Gradient(gradientTestSamples)
+	expected, expectedR := expectedRGradient(rv, gradienterTestBlock, gradienterTestCost,
+		gradienterTestSamples)
+	actual := g.Gradient(gradienterTestSamples)
 	compareGrads(t, "gradient", actual, expected)
-	actual, actualR := g.RGradient(rv, gradientTestSamples)
+	actual, actualR := g.RGradient(rv, gradienterTestSamples)
 	compareGrads(t, "gradient (RGradient)", actual, expected)
 	compareGrads(t, "r-gradient", actualR, expectedR)
 }

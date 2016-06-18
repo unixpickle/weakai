@@ -3,6 +3,7 @@ package rnntest
 import (
 	"math"
 	"math/rand"
+	"runtime"
 	"testing"
 
 	"github.com/unixpickle/autofunc"
@@ -58,6 +59,8 @@ func TestFullRGradienterBasic(t *testing.T) {
 }
 
 func TestFullRGradienterConcurrent(t *testing.T) {
+	n := runtime.GOMAXPROCS(0)
+	runtime.GOMAXPROCS(10)
 	g := &rnn.FullRGradienter{
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
@@ -65,6 +68,7 @@ func TestFullRGradienterConcurrent(t *testing.T) {
 		MaxGoroutines: 10,
 	}
 	testRGradienter(t, g)
+	runtime.GOMAXPROCS(n)
 }
 
 func TestFullRGradienterWideLanes(t *testing.T) {

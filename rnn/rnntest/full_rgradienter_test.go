@@ -18,7 +18,7 @@ var gradienterTestCost = neuralnet.CrossEntropyCost{}
 const (
 	gradienterTestPrec    = 1e-6
 	gradienterTestInSize  = 10
-	gradienterTestOutSize = 100
+	gradienterTestOutSize = 10
 )
 
 func init() {
@@ -34,7 +34,9 @@ func init() {
 				input[i] = rand.NormFloat64()
 			}
 			output := make(linalg.Vector, gradienterTestOutSize)
-			output[i] = rand.Float64()
+			for i := range output {
+				output[i] = rand.Float64()
+			}
 			seq.Inputs = append(seq.Inputs, input)
 			seq.Outputs = append(seq.Outputs, output)
 		}

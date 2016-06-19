@@ -148,6 +148,38 @@ func (_ DotCost) CostR(v autofunc.RVector, x linalg.Vector,
 	return autofunc.ScaleR(autofunc.SumAllR(autofunc.MulR(xVar, a)), -1)
 }
 
+// SigmoidCECost applies a sigmoid to the actual
+// output and then uses cross-entropy loss on the
+// result.
+// This is more numerically stable than feeding the
+// output of a sigmoid to a cross-entropy loss.
+type SigmoidCECost struct{}
+
+func (_ SigmoidCECost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
+	logsig := autofunc.LogSigmoid{}
+	log := logsig.Apply(a)
+	invLog := logsig.Apply(autofunc.Scale(a, -1))
+
+	xVar := &autofunc.Variable{x}
+	oneMinusX := autofunc.AddScaler(autofunc.Scale(xVar, -1), 1)
+
+	sums := autofunc.Add(autofunc.Mul(xVar, log), autofunc.Mul(oneMinusX, invLog))
+	return autofunc.SumAll(sums)
+}
+
+func (_ SigmoidCECost) CostR(v autofunc.RVector, x linalg.Vector,
+	a autofunc.RResult) autofunc.RResult {
+	logsig := autofunc.LogSigmoid{}
+	log := logsig.ApplyR(v, a)
+	invLog := logsig.ApplyR(v, autofunc.ScaleR(a, -1))
+
+	xVar := autofunc.NewRVariable(&autofunc.Variable{x}, v)
+	oneMinusX := autofunc.AddScalerR(autofunc.ScaleR(xVar, -1), 1)
+
+	sums := autofunc.AddR(autofunc.MulR(xVar, log), autofunc.MulR(oneMinusX, invLog))
+	return autofunc.SumAllR(sums)
+}
+
 // RegularizingCost adds onto another cost function
 // the squared magnitudes of various variables.
 type RegularizingCost struct {

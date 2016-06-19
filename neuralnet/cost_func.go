@@ -164,7 +164,7 @@ func (_ SigmoidCECost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result 
 	oneMinusX := autofunc.AddScaler(autofunc.Scale(xVar, -1), 1)
 
 	sums := autofunc.Add(autofunc.Mul(xVar, log), autofunc.Mul(oneMinusX, invLog))
-	return autofunc.SumAll(sums)
+	return autofunc.Scale(autofunc.SumAll(sums), -1)
 }
 
 func (_ SigmoidCECost) CostR(v autofunc.RVector, x linalg.Vector,

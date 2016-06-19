@@ -11,7 +11,7 @@ import (
 
 const (
 	HiddenSize = 50
-	BatchSize  = 30
+	BatchSize  = 200
 	MaxEpochs  = 100000
 )
 
@@ -50,6 +50,11 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 		neuralnet.Sigmoid{},
 		&neuralnet.DenseLayer{
 			InputCount:  HiddenSize,
+			OutputCount: HiddenSize,
+		},
+		neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
+			InputCount:  HiddenSize,
 			OutputCount: width * height * 3,
 		},
 	}
@@ -63,7 +68,7 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 
 	batcher := &neuralnet.BatchRGradienter{
 		Learner:  network.BatchLearner(),
-		CostFunc: neuralnet.MeanSquaredCost{},
+		CostFunc: neuralnet.SigmoidCECost{},
 	}
 	rms := &neuralnet.RMSProp{Gradienter: batcher}
 
@@ -75,6 +80,8 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 			return true
 		})
 	}
+
+	network = append(network, neuralnet.Sigmoid{})
 
 	return network, nil
 }

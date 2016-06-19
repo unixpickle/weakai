@@ -48,6 +48,7 @@ func main() {
 			for req := range reqChan {
 				parts := strings.Split(req.line, "\t")
 				url := parts[2]
+				name := strings.Join(parts[:2], " ")
 				rectParts := strings.Split(parts[3], ",")
 				var rectNums [4]int
 				for i, r := range rectParts {
@@ -59,7 +60,7 @@ func main() {
 					log.Printf("Error for face %d: %s", req.index, err.Error())
 				} else {
 					imageData := encodeImage(face)
-					filePath := filepath.Join(OutputDir, strconv.Itoa(req.index)+".png")
+					filePath := filepath.Join(OutputDir, name+".png")
 					if err := ioutil.WriteFile(filePath, imageData, 0755); err != nil {
 						log.Printf("Error writing: %s", filePath)
 					}

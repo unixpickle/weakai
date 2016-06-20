@@ -42,8 +42,8 @@ type SampleSet interface {
 	// copied.
 	Copy() SampleSet
 
-	// Shuffle randomly rearranges the training samples.
-	Shuffle()
+	// Swap swaps the samples at two indices.
+	Swap(i, j int)
 
 	// Get gets the sample at the given index.
 	GetSample(idx int) interface{}
@@ -52,6 +52,13 @@ type SampleSet interface {
 	// subset of this sample set from the start index
 	// (inclusive) to the end index (exclusive).
 	Subset(start, end int) SampleSet
+}
+
+func ShuffleSampleSet(s SampleSet) {
+	for i := 0; i < s.Len(); i++ {
+		j := i + rand.Intn(s.Len()-i)
+		s.Swap(i, j)
+	}
 }
 
 // SliceSampleSet is a SampleSet which is backed by a
@@ -68,11 +75,8 @@ func (s SliceSampleSet) Copy() SampleSet {
 	return s
 }
 
-func (s SliceSampleSet) Shuffle() {
-	for i := range s {
-		j := i + rand.Intn(len(s)-i)
-		s[i], s[j] = s[j], s[i]
-	}
+func (s SliceSampleSet) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
 
 func (s SliceSampleSet) GetSample(idx int) interface{} {

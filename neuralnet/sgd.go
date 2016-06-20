@@ -13,7 +13,7 @@ import (
 func SGD(g Gradienter, samples SampleSet, stepSize float64, epochs, batchSize int) {
 	s := samples.Copy()
 	for i := 0; i < epochs; i++ {
-		s.Shuffle()
+		ShuffleSampleSet(s)
 		for j := 0; j < s.Len(); j += batchSize {
 			count := batchSize
 			if count > s.Len()-j {

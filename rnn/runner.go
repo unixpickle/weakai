@@ -3,6 +3,7 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/weakai/neuralnet"
 )
 
 // Runner makes it easy to evaluate an RNN across time
@@ -53,6 +54,37 @@ func (r *Runner) RunAll(inputs [][]linalg.Vector) [][]linalg.Vector {
 		initStates[i] = zeroState
 	}
 	return r.recursiveRunAll(inputs, initStates)
+}
+
+// TotalCost evaluates a cost function for every input
+// in a set of Sequences and returns the total cost.
+//
+// The batchSize specifies how many samples to run
+// in batches while computing the cost.
+func (r *Runner) TotalCost(batchSize int, s neuralnet.SampleSet, c neuralnet.CostFunc) float64 {
+	var cost float64
+	for i := 0; i < len(s); i += batchSize {
+		bs := batchSize
+		if bs > len(s)-i {
+			bs = len(s) - i
+		}
+		inSeqs := make([][]linalg.Vector, bs)
+		outSeqs := make([][]linalg.Vector, bs)
+		for i, sample := range s[i : i+bs] {
+			seq := sample.(Sequence)
+			inSeqs[i] = seq.Inputs
+			outSeqs[i] = seq.Outputs
+		}
+		output := r.RunAll(inSeqs)
+		for j, outSeq := range outSeqs {
+			for t, actual := range output[j] {
+				expected := outSeq[t]
+				actualVar := &autofunc.Variable{actual}
+				cost += c.Cost(expected, actualVar).Output()[0]
+			}
+		}
+	}
+	return cost
 }
 
 func (r *Runner) recursiveRunAll(seqs [][]linalg.Vector,

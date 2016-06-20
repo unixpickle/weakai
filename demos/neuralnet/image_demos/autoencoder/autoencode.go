@@ -4,18 +4,20 @@ import (
 	"errors"
 	"image"
 	"log"
+	"math"
 
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
 const (
-	HiddenSize = 50
-	BatchSize  = 200
-	MaxEpochs  = 100000
+	HiddenSize1 = 300
+	HiddenSize2 = 100
+	BatchSize   = 200
+	MaxEpochs   = 100000
 )
 
-var StepSizes = []float64{1e-3, 1e-4, 1e-5, 1e-6}
+var StepSizes = []float64{3e-3, 1e-3, 1e-4}
 
 func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	firstImage := <-images
@@ -42,29 +44,40 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	log.Print("Training network...")
 	log.Print("Press ctrl+c to move on to the next step size.")
 
-	network := neuralnet.Network{
-		&neuralnet.DenseLayer{
-			InputCount:  width * height * 3,
-			OutputCount: HiddenSize,
-		},
-		neuralnet.Sigmoid{},
-		&neuralnet.DenseLayer{
-			InputCount:  HiddenSize,
-			OutputCount: HiddenSize,
-		},
-		neuralnet.Sigmoid{},
-		&neuralnet.DenseLayer{
-			InputCount:  HiddenSize,
-			OutputCount: width * height * 3,
-		},
-	}
-	network.Randomize()
-
 	tensorSlices := make([]linalg.Vector, len(tensors))
 	for i, tensor := range tensors {
 		tensorSlices[i] = tensor.Data
 	}
 	samples := neuralnet.VectorSampleSet(tensorSlices, tensorSlices)
+
+	average, stddev := statisticalInfo(tensorSlices)
+
+	network := neuralnet.Network{
+		&neuralnet.RescaleLayer{
+			Bias:  -average,
+			Scale: 1 / stddev,
+		},
+		&neuralnet.DenseLayer{
+			InputCount:  width * height * 3,
+			OutputCount: HiddenSize1,
+		},
+		neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
+			InputCount:  HiddenSize1,
+			OutputCount: HiddenSize2,
+		},
+		neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
+			InputCount:  HiddenSize2,
+			OutputCount: HiddenSize1,
+		},
+		neuralnet.Sigmoid{},
+		&neuralnet.DenseLayer{
+			InputCount:  HiddenSize1,
+			OutputCount: width * height * 3,
+		},
+	}
+	network.Randomize()
 
 	batcher := &neuralnet.BatchRGradienter{
 		Learner:  network.BatchLearner(),
@@ -84,4 +97,27 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	network = append(network, neuralnet.Sigmoid{})
 
 	return network, nil
+}
+
+func statisticalInfo(samples []linalg.Vector) (mean, stddev float64) {
+	var count int
+	for _, v := range samples {
+		for _, x := range v {
+			mean += x
+			count++
+		}
+	}
+
+	mean /= float64(count)
+
+	for _, v := range samples {
+		for _, x := range v {
+			stddev += math.Pow(x-mean, 2)
+			count++
+		}
+	}
+	stddev /= float64(count)
+	stddev = math.Sqrt(stddev)
+
+	return
 }

@@ -63,17 +63,12 @@ func (r *Runner) RunAll(inputs [][]linalg.Vector) [][]linalg.Vector {
 // in batches while computing the cost.
 func (r *Runner) TotalCost(batchSize int, s neuralnet.SampleSet, c neuralnet.CostFunc) float64 {
 	var cost float64
-	for i := 0; i < len(s); i += batchSize {
-		bs := batchSize
-		if bs > len(s)-i {
-			bs = len(s) - i
-		}
-		inSeqs := make([][]linalg.Vector, bs)
-		outSeqs := make([][]linalg.Vector, bs)
-		for i, sample := range s[i : i+bs] {
-			seq := sample.(Sequence)
-			inSeqs[i] = seq.Inputs
-			outSeqs[i] = seq.Outputs
+	for i := 0; i < s.Len(); i += batchSize {
+		var inSeqs, outSeqs [][]linalg.Vector
+		for j := i; j < i+batchSize && j < s.Len(); j++ {
+			seq := s.GetSample(j).(Sequence)
+			inSeqs = append(inSeqs, seq.Inputs)
+			outSeqs = append(outSeqs, seq.Outputs)
 		}
 		output := r.RunAll(inSeqs)
 		for j, outSeq := range outSeqs {

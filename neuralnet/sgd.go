@@ -14,12 +14,12 @@ func SGD(g Gradienter, samples SampleSet, stepSize float64, epochs, batchSize in
 	s := samples.Copy()
 	for i := 0; i < epochs; i++ {
 		s.Shuffle()
-		for j := 0; j < len(s); j += batchSize {
+		for j := 0; j < s.Len(); j += batchSize {
 			count := batchSize
-			if count > len(s)-j {
-				count = len(s) - j
+			if count > s.Len()-j {
+				count = s.Len() - j
 			}
-			subset := s[j : j+count]
+			subset := s.Subset(j, j+count)
 			grad := g.Gradient(subset)
 			grad.AddToVars(-stepSize)
 		}

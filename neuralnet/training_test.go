@@ -72,7 +72,8 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 	}
 	SGD(gradienter, samples, 0.9, 1000, batchSize)
 
-	for _, sample := range samples {
+	for i := 0; i < samples.Len(); i++ {
+		sample := samples.GetSample(i)
 		vs := sample.(VectorSample)
 		output := net.Apply(&autofunc.Variable{vs.Input}).Output()
 		expected := vs.Output[0]

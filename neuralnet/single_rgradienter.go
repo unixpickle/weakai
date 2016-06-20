@@ -31,7 +31,8 @@ func (b *SingleRGradienter) Gradient(s SampleSet) autofunc.Gradient {
 		b.gradCache.Zero()
 	}
 
-	for _, sample := range s {
+	for i := 0; i < s.Len(); i++ {
+		sample := s.GetSample(i)
 		vs := sample.(VectorSample)
 		output := vs.Output
 		inVar := &autofunc.Variable{vs.Input}
@@ -56,7 +57,8 @@ func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s SampleSet) (autofun
 		b.rgradCache.Zero()
 	}
 
-	for _, sample := range s {
+	for i := 0; i < s.Len(); i++ {
+		sample := s.GetSample(i)
 		vs := sample.(VectorSample)
 		output := vs.Output
 		inVar := &autofunc.Variable{vs.Input}

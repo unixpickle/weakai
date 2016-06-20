@@ -76,26 +76,26 @@ func (b *BatchRGradienter) batch(rv autofunc.RVector, s SampleSet) (autofunc.Gra
 	maxGos := b.goroutineCount()
 	maxBatch := b.batchSize()
 
-	if maxGos < 2 || len(s) <= maxBatch {
+	if maxGos < 2 || s.Len() <= maxBatch {
 		b.lastGradResult, b.lastGradRResult = b.runBatches(rv, s)
 		return b.lastGradResult, b.lastGradRResult
 	}
 
-	goCount := len(s) / maxBatch
-	if len(s)%maxBatch != 0 {
+	goCount := s.Len() / maxBatch
+	if s.Len()%maxBatch != 0 {
 		goCount++
 	}
 	if goCount > maxGos {
 		goCount = maxGos
 	}
 
-	batchChan := make(chan SampleSet, len(s)/maxBatch+1)
-	for i := 0; i < len(s); i += maxBatch {
+	batchChan := make(chan SampleSet, s.Len()/maxBatch+1)
+	for i := 0; i < s.Len(); i += maxBatch {
 		bs := maxBatch
-		if bs > len(s)-i {
-			bs = len(s) - i
+		if bs > s.Len()-i {
+			bs = s.Len() - i
 		}
-		batchChan <- s[i : i+bs]
+		batchChan <- s.Subset(i, i+bs)
 	}
 	close(batchChan)
 
@@ -130,12 +130,12 @@ func (b *BatchRGradienter) runBatches(rv autofunc.RVector, s SampleSet) (autofun
 	}
 
 	batchSize := b.batchSize()
-	for i := 0; i < len(s); i += batchSize {
+	for i := 0; i < s.Len(); i += batchSize {
 		bs := batchSize
-		if bs > len(s)-i {
-			bs = len(s) - i
+		if bs > s.Len()-i {
+			bs = s.Len() - i
 		}
-		b.runBatch(rv, s[i:i+bs], grad, rgrad)
+		b.runBatch(rv, s.Subset(i, i+bs), grad, rgrad)
 	}
 
 	return grad, rgrad
@@ -169,17 +169,18 @@ func (b *BatchRGradienter) launchGoroutines(rv autofunc.RVector,
 
 func (b *BatchRGradienter) runBatch(rv autofunc.RVector, s SampleSet, grad autofunc.Gradient,
 	rgrad autofunc.RGradient) {
-	if len(s) == 0 {
+	if s.Len() == 0 {
 		return
 	}
-	sampleCount := len(s)
-	firstSample := s[0].(VectorSample)
+	sampleCount := s.Len()
+	firstSample := s.GetSample(0).(VectorSample)
 	inputSize := len(firstSample.Input)
 	outputSize := len(firstSample.Output)
 	inVec := make(linalg.Vector, sampleCount*inputSize)
 	outVec := make(linalg.Vector, sampleCount*outputSize)
 
-	for i, sample := range s {
+	for i := 0; i < s.Len(); i++ {
+		sample := s.GetSample(i)
 		vs := sample.(VectorSample)
 		copy(inVec[i*inputSize:], vs.Input)
 		copy(outVec[i*outputSize:], vs.Output)

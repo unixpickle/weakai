@@ -24,7 +24,8 @@ type CostFunc interface {
 // The elements of s must be VectorSamples.
 func TotalCost(c CostFunc, layer autofunc.Func, s SampleSet) float64 {
 	var totalCost float64
-	for _, sample := range s {
+	for i := 0; i < s.Len(); i++ {
+		sample := s.GetSample(i)
 		vs := sample.(VectorSample)
 		inVar := &autofunc.Variable{vs.Input}
 		result := layer.Apply(inVar)

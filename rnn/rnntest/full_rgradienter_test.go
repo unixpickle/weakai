@@ -12,7 +12,7 @@ import (
 	"github.com/unixpickle/weakai/rnn"
 )
 
-var gradienterTestSamples neuralnet.SampleSet
+var gradienterTestSamples neuralnet.SliceSampleSet
 var gradienterTestBlock rnn.StackedBlock
 var gradienterTestCost = neuralnet.CrossEntropyCost{}
 
@@ -23,7 +23,7 @@ const (
 )
 
 func init() {
-	gradienterTestSamples = neuralnet.SampleSet{
+	gradienterTestSamples = neuralnet.SliceSampleSet{
 		rnn.Sequence{},
 	}
 	for i := 0; i < 100; i++ {
@@ -114,8 +114,8 @@ func expectedRGradient(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.C
 	}
 	res := autofunc.NewGradient(bl.Parameters())
 	resR := autofunc.NewRGradient(bl.Parameters())
-	for _, sample := range samples {
-		seq := sample.(rnn.Sequence)
+	for i := 0; i < samples.Len(); i++ {
+		seq := samples.GetSample(i).(rnn.Sequence)
 		if len(seq.Inputs) == 0 {
 			continue
 		}

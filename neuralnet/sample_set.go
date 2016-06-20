@@ -24,28 +24,61 @@ func VectorSampleSet(inputs []linalg.Vector, outputs []linalg.Vector) SampleSet 
 	if len(inputs) != len(outputs) {
 		panic("input and output counts do not match")
 	}
-	res := make(SampleSet, len(inputs))
+	res := make(SliceSampleSet, len(inputs))
 	for i, in := range inputs {
 		res[i] = VectorSample{Input: in, Output: outputs[i]}
 	}
 	return res
 }
 
-// SampleSet facilitates the manipulation of abstract
-// training samples.
-type SampleSet []interface{}
+// A SampleSet is an abstract list of abstract training
+// samples.
+type SampleSet interface {
+	// Len returns the length of the sample set.
+	Len() int
 
-// Copy performs a shallow copy of the SampleSet.
-func (s SampleSet) Copy() SampleSet {
-	res := make(SampleSet, len(s))
+	// Copy creates a shallow copy of the sample set.
+	// The training samples themselves needn't be
+	// copied.
+	Copy() SampleSet
+
+	// Shuffle randomly rearranges the training samples.
+	Shuffle()
+
+	// Get gets the sample at the given index.
+	GetSample(idx int) interface{}
+
+	// Subset creates a SampleSet which represents the
+	// subset of this sample set from the start index
+	// (inclusive) to the end index (exclusive).
+	Subset(start, end int) SampleSet
+}
+
+// SliceSampleSet is a SampleSet which is backed by a
+// slice of training samples.
+type SliceSampleSet []interface{}
+
+func (s SliceSampleSet) Len() int {
+	return len(s)
+}
+
+func (s SliceSampleSet) Copy() SampleSet {
+	res := make(SliceSampleSet, len(s))
 	copy(res, s)
 	return s
 }
 
-// Shuffle rearranges the samples in a random order.
-func (s SampleSet) Shuffle() {
+func (s SliceSampleSet) Shuffle() {
 	for i := range s {
 		j := i + rand.Intn(len(s)-i)
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+func (s SliceSampleSet) GetSample(idx int) interface{} {
+	return s[idx]
+}
+
+func (s SliceSampleSet) Subset(start, end int) SampleSet {
+	return s[start:end]
 }

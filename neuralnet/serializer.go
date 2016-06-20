@@ -20,6 +20,7 @@ const (
 	serializerTypeNetwork           = serializerTypePrefix + "Network"
 	serializerTypeReLU              = serializerTypePrefix + "ReLU"
 	serializerTypeRescaleLayer      = serializerTypePrefix + "RescaleLayer"
+	serializerTypeDropoutLayer      = serializerTypePrefix + "DropoutLayer"
 )
 
 func init() {
@@ -53,6 +54,8 @@ func init() {
 		convertDeserializer(DeserializeUnstackLayer))
 	serializer.RegisterDeserializer(serializerTypeRescaleLayer,
 		convertDeserializer(DeserializeRescaleLayer))
+	serializer.RegisterDeserializer(serializerTypeDropoutLayer,
+		convertDeserializer(DeserializeDropoutLayer))
 }
 
 func convertDeserializer(f interface{}) serializer.Deserializer {

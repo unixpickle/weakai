@@ -101,7 +101,8 @@ func (l *LSTM) Batch(in *BlockInput) BlockOutput {
 	// Pool the new state so that we do not
 	// back propagate through it twice.
 	newStateVar := &autofunc.Variable{Vector: newState.Output()}
-	gatedOutput := autofunc.Mul(outputGate, newStateVar)
+	squashedOut := neuralnet.HyperbolicTangent{}.Apply(newStateVar)
+	gatedOutput := autofunc.Mul(outputGate, squashedOut)
 
 	return &lstmOutput{
 		LaneCount: n,
@@ -131,7 +132,8 @@ func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 		Variable:   rawVar,
 		ROutputVec: newState.ROutput(),
 	}
-	gatedOutput := autofunc.MulR(outputGate, newStateVar)
+	squashedOut := neuralnet.HyperbolicTangent{}.ApplyR(v, newStateVar)
+	gatedOutput := autofunc.MulR(outputGate, squashedOut)
 
 	return &lstmROutput{
 		LaneCount: n,

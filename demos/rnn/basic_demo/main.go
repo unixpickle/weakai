@@ -26,7 +26,7 @@ const (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	sampleSet := neuralnet.SampleSet{}
+	sampleSet := neuralnet.SliceSampleSet{}
 	for i := 0; i < TrainingCount; i++ {
 		inSeq, outSeq := genEvenOddSeq(rand.Intn(MaxSeqLen-MinSeqLen) + MinSeqLen)
 		sampleSet = append(sampleSet, rnn.Sequence{
@@ -36,13 +36,10 @@ func main() {
 	}
 
 	outNet := neuralnet.Network{
-		&neuralnet.Sigmoid{},
 		&neuralnet.DenseLayer{
 			InputCount:  HiddenSize,
 			OutputCount: 2,
 		},
-		&neuralnet.Sigmoid{},
-		SquishLayer{},
 	}
 	outNet.Randomize()
 	outBlock := rnn.NewNetworkBlock(outNet, 0)
@@ -52,12 +49,14 @@ func main() {
 	gradienter := &neuralnet.RMSProp{
 		Gradienter: &rnn.FullRGradienter{
 			Learner:  net,
-			CostFunc: neuralnet.CrossEntropyCost{},
+			CostFunc: neuralnet.SigmoidCECost{},
 			MaxLanes: 1,
 		},
 	}
 
 	neuralnet.SGD(gradienter, sampleSet, StepSize, Epochs, BatchSize)
+
+	outNet = append(outNet, neuralnet.Sigmoid{})
 
 	var scoreSum float64
 	var scoreTotal float64

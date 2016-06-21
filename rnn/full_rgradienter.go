@@ -15,8 +15,8 @@ const defaultMaxLanes = 10
 // FullRGradienter is an RGradienter which computes
 // untruncated gradients for sets of Sequences.
 //
-// After a FullRGradienter is used on a BatchLearner,
-// it should never be reused on any BatchLearner with
+// After a FullRGradienter is used on a BlockLearner,
+// it should never be reused on any BlockLearner with
 // a different set of parameters.
 type FullRGradienter struct {
 	Learner  BlockLearner

@@ -46,12 +46,12 @@ func (b *BatchRGradienter) RGradient(v autofunc.RVector, s SampleSet) (autofunc.
 func (b *BatchRGradienter) makeHelper() *GradHelper {
 	if b.helper != nil {
 		b.helper.MaxConcurrency = b.MaxGoroutines
-		b.helper.MaxBatchSize = b.MaxBatchSize
+		b.helper.MaxSubBatch = b.MaxBatchSize
 		return b.helper
 	}
 	b.helper = &GradHelper{
 		MaxConcurrency: b.MaxGoroutines,
-		MaxBatchSize:   b.MaxBatchSize,
+		MaxSubBatch:    b.MaxBatchSize,
 		Learner:        b.Learner,
 
 		CompGrad: func(g autofunc.Gradient, s SampleSet) {

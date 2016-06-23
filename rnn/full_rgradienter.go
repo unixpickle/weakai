@@ -1,16 +1,12 @@
 package rnn
 
 import (
-	"runtime"
 	"sort"
-	"sync"
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 )
-
-const defaultMaxLanes = 10
 
 // FullRGradienter is an RGradienter which computes
 // untruncated gradients for sets of Sequences.
@@ -33,111 +29,38 @@ type FullRGradienter struct {
 	// on Learner at once.
 	MaxGoroutines int
 
-	cache       []map[*autofunc.Variable]linalg.Vector
-	lastResults []map[*autofunc.Variable]linalg.Vector
+	helper *neuralnet.GradHelper
 }
 
 func (b *FullRGradienter) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
-	res, _ := b.compute(nil, sampleSetSequences(s))
-	return res
+	return b.makeHelper().Gradient(sortSeqs(s))
 }
 
 func (b *FullRGradienter) RGradient(v autofunc.RVector,
 	s neuralnet.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
-	return b.compute(v, sampleSetSequences(s))
+	return b.makeHelper().RGradient(v, sortSeqs(s))
 }
 
-func (b *FullRGradienter) compute(v autofunc.RVector, seqs []Sequence) (autofunc.Gradient,
-	autofunc.RGradient) {
-	seqs = sortSeqs(seqs)
-	b.freeResults()
+func (b *FullRGradienter) makeHelper() *neuralnet.GradHelper {
+	if b.helper != nil {
+		b.helper.MaxConcurrency = b.MaxGoroutines
+		b.helper.MaxSubBatch = b.MaxLanes
+		return b.helper
+	}
+	b.helper = &neuralnet.GradHelper{
+		MaxConcurrency: b.MaxGoroutines,
+		MaxSubBatch:    b.MaxLanes,
+		Learner:        b.Learner,
 
-	maxGos := b.maxGoroutines()
-	if len(seqs) < b.maxLanes() || maxGos == 1 {
-		return b.syncGradient(v, seqs)
+		CompGrad: func(g autofunc.Gradient, s neuralnet.SampleSet) {
+			b.runBatch(nil, g, nil, sampleSetSequences(s))
+		},
+		CompRGrad: func(rv autofunc.RVector, rg autofunc.RGradient, g autofunc.Gradient,
+			s neuralnet.SampleSet) {
+			b.runBatch(rv, g, rg, sampleSetSequences(s))
+		},
 	}
-
-	batchCount := len(seqs) / b.maxLanes()
-	if len(seqs)%b.maxLanes() != 0 {
-		batchCount++
-	}
-
-	if maxGos > batchCount {
-		maxGos = batchCount
-	}
-
-	batchChan := make(chan []Sequence, batchCount)
-	for i := 0; i < len(seqs); i += b.maxLanes() {
-		batchSize := b.maxLanes()
-		if batchSize > len(seqs)-i {
-			batchSize = len(seqs) - i
-		}
-		batchChan <- seqs[i : i+batchSize]
-	}
-	close(batchChan)
-
-	return b.asyncGradient(v, maxGos, batchChan)
-}
-
-func (b *FullRGradienter) asyncGradient(v autofunc.RVector, count int,
-	batches <-chan []Sequence) (autofunc.Gradient, autofunc.RGradient) {
-	var wg sync.WaitGroup
-	var gradients []autofunc.Gradient
-	var rgradients []autofunc.RGradient
-	for i := 0; i < count; i++ {
-		wg.Add(1)
-		grad := b.allocCache()
-		gradients = append(gradients, grad)
-		var rgrad autofunc.RGradient
-		if v != nil {
-			rgrad = b.allocCache()
-			rgradients = append(rgradients, rgrad)
-		}
-		go func(g autofunc.Gradient, rg autofunc.RGradient) {
-			for batch := range batches {
-				b.runBatch(v, g, rg, batch)
-			}
-			wg.Done()
-		}(grad, rgrad)
-	}
-	wg.Wait()
-
-	for i := 1; i < len(gradients); i++ {
-		gradients[0].Add(gradients[i])
-		b.cache = append(b.cache, gradients[i])
-		if rgradients != nil {
-			rgradients[0].Add(rgradients[i])
-			b.cache = append(b.cache, rgradients[i])
-		}
-	}
-
-	b.lastResults = append(b.lastResults, gradients[0])
-	if rgradients != nil {
-		b.lastResults = append(b.lastResults, rgradients[0])
-		return gradients[0], rgradients[0]
-	} else {
-		return gradients[0], nil
-	}
-}
-
-func (b *FullRGradienter) syncGradient(v autofunc.RVector,
-	seqs []Sequence) (grad autofunc.Gradient, rgrad autofunc.RGradient) {
-	grad = b.allocCache()
-	if v != nil {
-		rgrad = b.allocCache()
-	}
-	for i := 0; i < len(seqs); i += b.maxLanes() {
-		batchSize := b.maxLanes()
-		if batchSize > len(seqs)-i {
-			batchSize = len(seqs) - i
-		}
-		b.runBatch(v, grad, rgrad, seqs[i:i+batchSize])
-	}
-	b.lastResults = append(b.lastResults, grad)
-	if rgrad != nil {
-		b.lastResults = append(b.lastResults, rgrad)
-	}
-	return
+	return b.helper
 }
 
 func (b *FullRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
@@ -234,38 +157,6 @@ func (b *FullRGradienter) recursiveRBatch(v autofunc.RVector, g autofunc.Gradien
 	return
 }
 
-func (b *FullRGradienter) allocCache() map[*autofunc.Variable]linalg.Vector {
-	if len(b.cache) == 0 {
-		return autofunc.NewGradient(b.Learner.Parameters())
-	} else {
-		res := b.cache[len(b.cache)-1]
-		autofunc.Gradient(res).Zero()
-		b.cache = b.cache[:len(b.cache)-1]
-		return res
-	}
-}
-
-func (b *FullRGradienter) freeResults() {
-	b.cache = append(b.cache, b.lastResults...)
-	b.lastResults = nil
-}
-
-func (b *FullRGradienter) maxGoroutines() int {
-	if b.MaxGoroutines == 0 {
-		return runtime.GOMAXPROCS(0)
-	} else {
-		return b.MaxGoroutines
-	}
-}
-
-func (b *FullRGradienter) maxLanes() int {
-	if b.MaxLanes == 0 {
-		return defaultMaxLanes
-	} else {
-		return b.MaxLanes
-	}
-}
-
 func removeEmpty(seqs []Sequence) []Sequence {
 	var res []Sequence
 	for _, seq := range seqs {
@@ -322,14 +213,20 @@ func injectDiscontinued(seqs []Sequence, outs []linalg.Vector, vecLen int) []lin
 	return res
 }
 
-type seqSorter []Sequence
-
-func sortSeqs(s []Sequence) []Sequence {
-	res := make(seqSorter, len(s))
-	copy(res, s)
+func sortSeqs(s neuralnet.SampleSet) neuralnet.SampleSet {
+	origSet := sampleSetSequences(s)
+	res := make(seqSorter, len(origSet))
+	copy(res, origSet)
 	sort.Sort(res)
-	return res
+
+	resSet := make(neuralnet.SliceSampleSet, len(res))
+	for i, x := range res {
+		resSet[i] = x
+	}
+	return resSet
 }
+
+type seqSorter []Sequence
 
 func (s seqSorter) Len() int {
 	return len(s)

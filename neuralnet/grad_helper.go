@@ -6,7 +6,7 @@ import (
 	"github.com/unixpickle/autofunc"
 )
 
-const defaultMaxBatchSize = 15
+const defaultMaxSubBatch = 15
 
 type gradResult struct {
 	Grad  autofunc.Gradient
@@ -27,7 +27,7 @@ type GradHelper struct {
 	// can be passed to the underlying gradient functions
 	// in one call.
 	// If this is 0, a reasonable default is used.
-	MaxBatchSize int
+	MaxSubBatch int
 
 	// Learner provides the GradHelper with a list of
 	// parameters so that it can allocate and cache
@@ -159,10 +159,10 @@ func (g *GradHelper) goroutineCount() int {
 }
 
 func (g *GradHelper) batchSize() int {
-	if g.MaxBatchSize != 0 {
-		return g.MaxBatchSize
+	if g.MaxSubBatch != 0 {
+		return g.MaxSubBatch
 	} else {
-		return defaultMaxBatchSize
+		return defaultMaxSubBatch
 	}
 }
 

@@ -1,6 +1,8 @@
 package rnn
 
 import (
+	"sort"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
@@ -78,7 +80,7 @@ func costFuncDeriv(c neuralnet.CostFunc, expected, actual linalg.Vector) linalg.
 	return result
 }
 
-func costFuncRDeriv(v autofunc.RVector, c neuralnet.CostFunc, expected, actual,
+func costFuncRDeriv(c neuralnet.CostFunc, expected, actual,
 	actualR linalg.Vector) (deriv, rDeriv linalg.Vector) {
 	variable := &autofunc.RVariable{
 		Variable:   &autofunc.Variable{Vector: actual},
@@ -86,45 +88,11 @@ func costFuncRDeriv(v autofunc.RVector, c neuralnet.CostFunc, expected, actual,
 	}
 	deriv = make(linalg.Vector, len(actual))
 	rDeriv = make(linalg.Vector, len(actual))
-	res := c.CostR(v, expected, variable)
+	res := c.CostR(autofunc.RVector{}, expected, variable)
 	res.PropagateRGradient([]float64{1}, []float64{0},
 		autofunc.RGradient{variable.Variable: rDeriv},
 		autofunc.Gradient{variable.Variable: deriv})
 	return
-}
-
-// seqHeadInput generates a BlockInput from the
-// first inputs of the input sequences, and given
-// all the current states.
-func seqHeadInput(seqs []Sequence, lastStates []linalg.Vector) *BlockInput {
-	input := &BlockInput{}
-	for lane, seq := range seqs {
-		inVar := &autofunc.Variable{Vector: seq.Inputs[0]}
-		input.Inputs = append(input.Inputs, inVar)
-		inState := &autofunc.Variable{Vector: lastStates[lane]}
-		input.States = append(input.States, inState)
-	}
-	return input
-}
-
-// seqHeadRInput is like seqHeadInput, but for
-// BlockRInputs.
-func seqHeadRInput(seqs []Sequence, states, rStates []linalg.Vector) *BlockRInput {
-	input := &BlockRInput{}
-	zeroInRVec := make(linalg.Vector, len(seqs[0].Inputs[0]))
-	for lane, seq := range seqs {
-		inVar := &autofunc.RVariable{
-			Variable:   &autofunc.Variable{Vector: seq.Inputs[0]},
-			ROutputVec: zeroInRVec,
-		}
-		input.Inputs = append(input.Inputs, inVar)
-		inState := &autofunc.RVariable{
-			Variable:   &autofunc.Variable{Vector: states[lane]},
-			ROutputVec: rStates[lane],
-		}
-		input.States = append(input.States, inState)
-	}
-	return input
 }
 
 // sampleSetSequences converts a sample set into a
@@ -135,4 +103,33 @@ func sampleSetSequences(s neuralnet.SampleSet) []Sequence {
 		res[i] = s.GetSample(i).(Sequence)
 	}
 	return res
+}
+
+// sortSeqs sorts the Sequences in a SampleSet by size,
+// with the longest sequences coming first.
+func sortSeqs(s neuralnet.SampleSet) neuralnet.SampleSet {
+	origSet := sampleSetSequences(s)
+	res := make(seqSorter, len(origSet))
+	copy(res, origSet)
+	sort.Sort(res)
+
+	resSet := make(neuralnet.SliceSampleSet, len(res))
+	for i, x := range res {
+		resSet[i] = x
+	}
+	return resSet
+}
+
+type seqSorter []Sequence
+
+func (s seqSorter) Len() int {
+	return len(s)
+}
+
+func (s seqSorter) Less(i, j int) bool {
+	return len(s[i].Inputs) > len(s[j].Inputs)
+}
+
+func (s seqSorter) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }

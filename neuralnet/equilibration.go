@@ -16,32 +16,43 @@ type Equilibration struct {
 	RGradienter RGradienter
 	Learner     Learner
 
-	// Memory is a ratio (between 0 and 1) of how much
-	// new approximate row magnitudes should override
-	// old ones.
+	// Accumulate indicates whether to use AdaGrad-
+	// style sums or RMSProp style exponential decay.
+	// If Accumulate is true, then the normalization
+	// coefficients are continually added together,
+	// resulting in a naturally decaying step size.
+	// If it is false, then Memory is used to decay
+	// old normalization coefficients and use new ones.
+	Accumulate bool
+
+	// If Accumulate is set to false, then Memory is a
+	// ratio (between 0 and 1) of how much new normalizing
+	// coefficients should override old ones.
+	//
 	// A value of 0 means that, at each update interval,
 	// a completely new approximation of the magnitudes
 	// of the Hessian's rows will be taken.
 	Memory float64
 
 	// UpdateInterval is the number of Gradient calls
-	// between each time the Hessian's row's magnitudes
-	// are re-approximated.
-	// A value of 0 means that the magnitudes are updated
-	// at each iteration.
+	// between each time the noramlizing coefficients
+	// are re-calculated.
+	// A value of 0 means that the coefficients are
+	// updated at each iteration.
 	UpdateInterval int
 
 	// NumSamples specifies the number of times the
 	// Hessian's rows' magnitudes will be sampled at
-	// each update.
+	// each update interval.
 	// If this is 0, a default value of 1 is used.
 	NumSamples int
 
 	// Damping specifies how much the equilibrated
 	// coefficients should be ignored.
 	// The higher the damping value, the less effect
-	// equilibration will have, with a damping value
-	// of 1 completely disabling equilibration.
+	// equilibration will have.
+	// A reasonable value is something relatively
+	// small, like 1e-4.
 	// A damping factor of 0 may work for some things,
 	// but it can cause numerical problems when a
 	// parameter has a very small row in the Hessian.
@@ -115,8 +126,10 @@ func (e *Equilibration) updateSquareMags(s SampleSet) autofunc.Gradient {
 			e.squareMags = rGrad.Copy()
 		}
 	} else {
-		e.squareMags.Scale(e.Memory)
-		rGrad.Scale(1 - e.Memory)
+		if !e.Accumulate {
+			e.squareMags.Scale(e.Memory)
+			rGrad.Scale(1 - e.Memory)
+		}
 		e.squareMags.Add(rGrad)
 	}
 

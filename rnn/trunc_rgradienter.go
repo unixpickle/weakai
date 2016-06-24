@@ -88,7 +88,7 @@ func (t *TruncRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
 			seqs = prop.TimeStep(seqs)
 			headLen++
 			if headLen == t.HeadSize || len(seqs) == 0 {
-				prop.BackPropagate(g, t.HeadSize, t.TailSize)
+				prop.BackPropagate(g, headLen, t.TailSize)
 				headLen = 0
 				prop.Truncate(t.TailSize)
 			}
@@ -103,7 +103,7 @@ func (t *TruncRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
 			seqs = prop.TimeStep(v, seqs)
 			headLen++
 			if headLen == t.HeadSize || len(seqs) == 0 {
-				prop.BackPropagate(g, rg, t.HeadSize, t.TailSize)
+				prop.BackPropagate(g, rg, headLen, t.TailSize)
 				headLen = 0
 				prop.Truncate(t.TailSize)
 			}

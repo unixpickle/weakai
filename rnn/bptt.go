@@ -5,13 +5,13 @@ import (
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
-// FullRGradienter is an RGradienter which computes
-// untruncated gradients for sets of Sequences.
+// BPTT is an RGradienter which uses untruncated
+// back propagation through time for Sequences.
 //
-// After a FullRGradienter is used on a BlockLearner,
+// After an instance of BPTT is used on a BlockLearner,
 // it should never be reused on any BlockLearner with
 // a different set of parameters.
-type FullRGradienter struct {
+type BPTT struct {
 	Learner  BlockLearner
 	CostFunc neuralnet.CostFunc
 
@@ -29,16 +29,16 @@ type FullRGradienter struct {
 	helper *neuralnet.GradHelper
 }
 
-func (b *FullRGradienter) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
+func (b *BPTT) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
 	return b.makeHelper().Gradient(sortSeqs(s))
 }
 
-func (b *FullRGradienter) RGradient(v autofunc.RVector,
+func (b *BPTT) RGradient(v autofunc.RVector,
 	s neuralnet.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
 	return b.makeHelper().RGradient(v, sortSeqs(s))
 }
 
-func (b *FullRGradienter) makeHelper() *neuralnet.GradHelper {
+func (b *BPTT) makeHelper() *neuralnet.GradHelper {
 	if b.helper != nil {
 		b.helper.MaxConcurrency = b.MaxGoroutines
 		b.helper.MaxSubBatch = b.MaxLanes
@@ -60,7 +60,7 @@ func (b *FullRGradienter) makeHelper() *neuralnet.GradHelper {
 	return b.helper
 }
 
-func (b *FullRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
+func (b *BPTT) runBatch(v autofunc.RVector, g autofunc.Gradient,
 	rg autofunc.RGradient, seqs []Sequence) {
 	if v == nil {
 		prop := seqProp{

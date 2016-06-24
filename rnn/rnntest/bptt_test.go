@@ -48,8 +48,8 @@ func init() {
 	gradienterTestBlock = rnn.StackedBlock{l, outBlock}
 }
 
-func TestFullRGradienterBasic(t *testing.T) {
-	g := &rnn.FullRGradienter{
+func TestBPTTBasic(t *testing.T) {
+	g := &rnn.BPTT{
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      1,
@@ -58,10 +58,10 @@ func TestFullRGradienterBasic(t *testing.T) {
 	testRGradienter(t, g)
 }
 
-func TestFullRGradienterConcurrent(t *testing.T) {
+func TestBPTTConcurrent(t *testing.T) {
 	n := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(10)
-	g := &rnn.FullRGradienter{
+	g := &rnn.BPTT{
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      1,
@@ -71,8 +71,8 @@ func TestFullRGradienterConcurrent(t *testing.T) {
 	runtime.GOMAXPROCS(n)
 }
 
-func TestFullRGradienterWideLanes(t *testing.T) {
-	g := &rnn.FullRGradienter{
+func TestBPTTWideLanes(t *testing.T) {
+	g := &rnn.BPTT{
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      3,
@@ -81,8 +81,8 @@ func TestFullRGradienterWideLanes(t *testing.T) {
 	testRGradienter(t, g)
 }
 
-func TestFullRGradienterConcurrentWideLanes(t *testing.T) {
-	g := &rnn.FullRGradienter{
+func TestBPTTConcurrentWideLanes(t *testing.T) {
+	g := &rnn.BPTT{
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      2,

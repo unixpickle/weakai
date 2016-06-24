@@ -47,7 +47,7 @@ func main() {
 	net := rnn.StackedBlock{lstm, outBlock}
 
 	gradienter := &neuralnet.RMSProp{
-		Gradienter: &rnn.FullRGradienter{
+		Gradienter: &rnn.BPTT{
 			Learner:  net,
 			CostFunc: neuralnet.SigmoidCECost{},
 			MaxLanes: 1,

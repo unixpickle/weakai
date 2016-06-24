@@ -5,7 +5,8 @@ import (
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
-// TruncRGradienter implements truncated BPTT.
+// TruncatedBPTT is an RGradienter which uses truncated
+// back propagation through time.
 //
 // For traditional truncated BPTT, use a HeadSize of
 // 1 and a TailSize of the desired number of timesteps
@@ -24,7 +25,7 @@ import (
 // This way, BPTT is applied to smaller chunks, yet the
 // network still learns to create states that work well
 // across chunks.
-type TruncRGradienter struct {
+type TruncatedBPTT struct {
 	Learner  BlockLearner
 	CostFunc neuralnet.CostFunc
 
@@ -45,16 +46,16 @@ type TruncRGradienter struct {
 	helper *neuralnet.GradHelper
 }
 
-func (t *TruncRGradienter) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
+func (t *TruncatedBPTT) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
 	return t.makeHelper().Gradient(sortSeqs(s))
 }
 
-func (t *TruncRGradienter) RGradient(v autofunc.RVector,
+func (t *TruncatedBPTT) RGradient(v autofunc.RVector,
 	s neuralnet.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
 	return t.makeHelper().RGradient(v, sortSeqs(s))
 }
 
-func (t *TruncRGradienter) makeHelper() *neuralnet.GradHelper {
+func (t *TruncatedBPTT) makeHelper() *neuralnet.GradHelper {
 	if t.helper != nil {
 		t.helper.MaxConcurrency = t.MaxGoroutines
 		t.helper.MaxSubBatch = t.MaxLanes
@@ -76,7 +77,7 @@ func (t *TruncRGradienter) makeHelper() *neuralnet.GradHelper {
 	return t.helper
 }
 
-func (t *TruncRGradienter) runBatch(v autofunc.RVector, g autofunc.Gradient,
+func (t *TruncatedBPTT) runBatch(v autofunc.RVector, g autofunc.Gradient,
 	rg autofunc.RGradient, seqs []Sequence) {
 	if v == nil {
 		prop := seqProp{

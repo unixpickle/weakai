@@ -67,7 +67,7 @@ func (s *seqProp) MemoryCount() int {
 // resetting the seqProp.
 func (s *seqProp) Truncate(n int) {
 	removeCount := s.MemoryCount() - n
-	if removeCount > 0 {
+	if removeCount <= 0 {
 		return
 	}
 
@@ -186,7 +186,7 @@ func (s *seqRProp) MemoryCount() int {
 
 func (s *seqRProp) Truncate(n int) {
 	removeCount := s.MemoryCount() - n
-	if removeCount > 0 {
+	if removeCount <= 0 {
 		return
 	}
 	copy(s.memory, s.memory[removeCount:])

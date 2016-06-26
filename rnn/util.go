@@ -5,6 +5,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -97,7 +98,7 @@ func costFuncRDeriv(c neuralnet.CostFunc, expected, actual,
 
 // sampleSetSequences converts a sample set into a
 // list of Sequences.
-func sampleSetSequences(s neuralnet.SampleSet) []Sequence {
+func sampleSetSequences(s sgd.SampleSet) []Sequence {
 	res := make([]Sequence, s.Len())
 	for i := 0; i < s.Len(); i++ {
 		res[i] = s.GetSample(i).(Sequence)
@@ -107,13 +108,13 @@ func sampleSetSequences(s neuralnet.SampleSet) []Sequence {
 
 // sortSeqs sorts the Sequences in a SampleSet by size,
 // with the longest sequences coming first.
-func sortSeqs(s neuralnet.SampleSet) neuralnet.SampleSet {
+func sortSeqs(s sgd.SampleSet) sgd.SampleSet {
 	origSet := sampleSetSequences(s)
 	res := make(seqSorter, len(origSet))
 	copy(res, origSet)
 	sort.Sort(res)
 
-	resSet := make(neuralnet.SliceSampleSet, len(res))
+	resSet := make(sgd.SliceSampleSet, len(res))
 	for i, x := range res {
 		resSet[i] = x
 	}

@@ -3,7 +3,7 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
-	"github.com/unixpickle/weakai/neuralnet"
+	"github.com/unixpickle/sgd"
 )
 
 // Sequence is used to create SampleSets for an RNN.
@@ -106,5 +106,5 @@ type Block interface {
 // BlockLearner is any Block with learnable parameters.
 type BlockLearner interface {
 	Block
-	neuralnet.Learner
+	sgd.Learner
 }

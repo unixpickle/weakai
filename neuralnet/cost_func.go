@@ -5,6 +5,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 )
 
 // A CostFunc is a cost function (aka loss function)
@@ -22,7 +23,7 @@ type CostFunc interface {
 // TotalCost returns the total cost of a layer on a
 // set of VectorSamples.
 // The elements of s must be VectorSamples.
-func TotalCost(c CostFunc, layer autofunc.Func, s SampleSet) float64 {
+func TotalCost(c CostFunc, layer autofunc.Func, s sgd.SampleSet) float64 {
 	var totalCost float64
 	for i := 0; i < s.Len(); i++ {
 		sample := s.GetSample(i)

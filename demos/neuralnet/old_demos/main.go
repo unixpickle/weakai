@@ -8,6 +8,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -63,7 +64,7 @@ func firstBitTest() {
 		Learner:  network,
 		CostFunc: neuralnet.MeanSquaredCost{},
 	}
-	neuralnet.SGD(batcher, samples, 0.2, 100000, 1)
+	sgd.SGD(batcher, samples, 0.2, 100000, 1)
 
 	var totalError float64
 	var maxPossibleError float64
@@ -147,7 +148,7 @@ func runHorizontalLineTest(name string, network neuralnet.Network) {
 		Learner:  network,
 		CostFunc: neuralnet.MeanSquaredCost{},
 	}
-	neuralnet.SGD(batcher, samples, 0.1, 1000, 100)
+	sgd.SGD(batcher, samples, 0.1, 1000, 100)
 
 	var trainingError float64
 	var maxTrainingError float64

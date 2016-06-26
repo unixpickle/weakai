@@ -6,6 +6,7 @@ import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/mnist"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -33,9 +34,9 @@ func main() {
 		Learner:  net.BatchLearner(),
 		CostFunc: neuralnet.MeanSquaredCost{},
 	}
-	rmsGrad := &neuralnet.RMSProp{Gradienter: gradienter}
+	rmsGrad := &sgd.RMSProp{Gradienter: gradienter}
 
-	neuralnet.SGDInteractive(rmsGrad, trainingSamples, StepSize, BatchSize, func() bool {
+	sgd.SGDInteractive(rmsGrad, trainingSamples, StepSize, BatchSize, func() bool {
 		log.Println("Printing score...")
 		printScore("Cross", net, crossValidation)
 		log.Println("Running training round...")
@@ -113,7 +114,7 @@ func outputIdx(r autofunc.Result) int {
 	return maxIdx
 }
 
-func dataSetSamples(d mnist.DataSet) neuralnet.SampleSet {
+func dataSetSamples(d mnist.DataSet) sgd.SampleSet {
 	labelVecs := d.LabelVectors()
 	inputVecs := d.IntensityVectors()
 	return neuralnet.VectorSampleSet(vecVec(inputVecs), vecVec(labelVecs))

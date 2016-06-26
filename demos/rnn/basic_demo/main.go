@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
 )
@@ -26,7 +27,7 @@ const (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	sampleSet := neuralnet.SliceSampleSet{}
+	sampleSet := sgd.SliceSampleSet{}
 	for i := 0; i < TrainingCount; i++ {
 		inSeq, outSeq := genEvenOddSeq(rand.Intn(MaxSeqLen-MinSeqLen) + MinSeqLen)
 		sampleSet = append(sampleSet, rnn.Sequence{
@@ -46,7 +47,7 @@ func main() {
 	lstm := rnn.NewLSTM(2, HiddenSize)
 	net := rnn.StackedBlock{lstm, outBlock}
 
-	gradienter := &neuralnet.RMSProp{
+	gradienter := &sgd.RMSProp{
 		Gradienter: &rnn.BPTT{
 			Learner:  net,
 			CostFunc: neuralnet.SigmoidCECost{},
@@ -54,7 +55,7 @@ func main() {
 		},
 	}
 
-	neuralnet.SGD(gradienter, sampleSet, StepSize, Epochs, BatchSize)
+	sgd.SGD(gradienter, sampleSet, StepSize, Epochs, BatchSize)
 
 	outNet = append(outNet, neuralnet.Sigmoid{})
 

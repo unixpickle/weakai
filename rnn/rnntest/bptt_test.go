@@ -8,11 +8,12 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
 )
 
-var gradienterTestSamples neuralnet.SliceSampleSet
+var gradienterTestSamples sgd.SliceSampleSet
 var gradienterTestBlock rnn.StackedBlock
 var gradienterTestCost = neuralnet.CrossEntropyCost{}
 
@@ -23,7 +24,7 @@ const (
 )
 
 func init() {
-	gradienterTestSamples = neuralnet.SliceSampleSet{
+	gradienterTestSamples = sgd.SliceSampleSet{
 		rnn.Sequence{},
 	}
 	for i := 0; i < 100; i++ {
@@ -91,7 +92,7 @@ func TestBPTTConcurrentWideLanes(t *testing.T) {
 	testRGradienter(t, g)
 }
 
-func testRGradienter(t *testing.T, g neuralnet.RGradienter) {
+func testRGradienter(t *testing.T, g sgd.RGradienter) {
 	rv := autofunc.RVector(autofunc.NewGradient(gradienterTestBlock.Parameters()))
 	for _, v := range rv {
 		for i := range v {
@@ -108,7 +109,7 @@ func testRGradienter(t *testing.T, g neuralnet.RGradienter) {
 }
 
 func expectedRGradient(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.CostFunc,
-	samples neuralnet.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
+	samples sgd.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
 	if v == nil {
 		v = autofunc.RVector{}
 	}

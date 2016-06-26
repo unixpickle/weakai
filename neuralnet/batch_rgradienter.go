@@ -3,6 +3,7 @@ package neuralnet
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 )
 
 // BatchRGradienter is an RGradienter that computes
@@ -34,11 +35,11 @@ type BatchRGradienter struct {
 	helper *GradHelper
 }
 
-func (b *BatchRGradienter) Gradient(s SampleSet) autofunc.Gradient {
+func (b *BatchRGradienter) Gradient(s sgd.SampleSet) autofunc.Gradient {
 	return b.makeHelper().Gradient(s)
 }
 
-func (b *BatchRGradienter) RGradient(v autofunc.RVector, s SampleSet) (autofunc.Gradient,
+func (b *BatchRGradienter) RGradient(v autofunc.RVector, s sgd.SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	return b.makeHelper().RGradient(v, s)
 }
@@ -54,7 +55,7 @@ func (b *BatchRGradienter) makeHelper() *GradHelper {
 		MaxSubBatch:    b.MaxBatchSize,
 		Learner:        b.Learner,
 
-		CompGrad: func(g autofunc.Gradient, s SampleSet) {
+		CompGrad: func(g autofunc.Gradient, s sgd.SampleSet) {
 			b.runBatch(nil, nil, g, s)
 		},
 		CompRGrad: b.runBatch,
@@ -63,7 +64,7 @@ func (b *BatchRGradienter) makeHelper() *GradHelper {
 }
 
 func (b *BatchRGradienter) runBatch(rv autofunc.RVector, rgrad autofunc.RGradient,
-	grad autofunc.Gradient, s SampleSet) {
+	grad autofunc.Gradient, s sgd.SampleSet) {
 	if s.Len() == 0 {
 		return
 	}

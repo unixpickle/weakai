@@ -2,6 +2,7 @@ package rnn
 
 import (
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -29,12 +30,12 @@ type BPTT struct {
 	helper *neuralnet.GradHelper
 }
 
-func (b *BPTT) Gradient(s neuralnet.SampleSet) autofunc.Gradient {
+func (b *BPTT) Gradient(s sgd.SampleSet) autofunc.Gradient {
 	return b.makeHelper().Gradient(sortSeqs(s))
 }
 
 func (b *BPTT) RGradient(v autofunc.RVector,
-	s neuralnet.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
+	s sgd.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
 	return b.makeHelper().RGradient(v, sortSeqs(s))
 }
 
@@ -49,11 +50,11 @@ func (b *BPTT) makeHelper() *neuralnet.GradHelper {
 		MaxSubBatch:    b.MaxLanes,
 		Learner:        b.Learner,
 
-		CompGrad: func(g autofunc.Gradient, s neuralnet.SampleSet) {
+		CompGrad: func(g autofunc.Gradient, s sgd.SampleSet) {
 			b.runBatch(nil, g, nil, sampleSetSequences(s))
 		},
 		CompRGrad: func(rv autofunc.RVector, rg autofunc.RGradient, g autofunc.Gradient,
-			s neuralnet.SampleSet) {
+			s sgd.SampleSet) {
 			b.runBatch(rv, g, rg, sampleSetSequences(s))
 		},
 	}

@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -83,11 +84,11 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 		Learner:  network.BatchLearner(),
 		CostFunc: neuralnet.SigmoidCECost{},
 	}
-	rms := &neuralnet.RMSProp{Gradienter: batcher}
+	rms := &sgd.RMSProp{Gradienter: batcher}
 
 	for i, stepSize := range StepSizes {
 		log.Printf("Using step size %f (%d out of %d)", stepSize, i+1, len(StepSizes))
-		neuralnet.SGDInteractive(rms, samples, stepSize, BatchSize, func() bool {
+		sgd.SGDInteractive(rms, samples, stepSize, BatchSize, func() bool {
 			cost := neuralnet.TotalCost(batcher.CostFunc, network, samples)
 			log.Println("Current cost is", cost)
 			return true

@@ -8,6 +8,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 )
 
 func TestTrainingXORSerial(t *testing.T) {
@@ -56,7 +57,7 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 		{1, 1},
 	}, []linalg.Vector{{0}, {1}, {1}, {0}})
 
-	var gradienter Gradienter
+	var gradienter sgd.Gradienter
 	if single {
 		gradienter = &SingleRGradienter{
 			Learner:  net,
@@ -70,7 +71,7 @@ func testTrainingXOR(t *testing.T, maxBatch, maxGos, batchSize int, single bool)
 			MaxBatchSize:  maxBatch,
 		}
 	}
-	SGD(gradienter, samples, 0.9, 1000, batchSize)
+	sgd.SGD(gradienter, samples, 0.9, 1000, batchSize)
 
 	for i := 0; i < samples.Len(); i++ {
 		sample := samples.GetSample(i)
@@ -160,5 +161,5 @@ func benchmarkTrainingBig(b *testing.B, hiddenSize, batchSize int) {
 	}
 
 	b.ResetTimer()
-	SGD(batcher, samples, 0.01, b.N, batchSize)
+	sgd.SGD(batcher, samples, 0.01, b.N, batchSize)
 }

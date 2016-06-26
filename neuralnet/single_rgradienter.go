@@ -3,6 +3,7 @@ package neuralnet
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 )
 
 // SingleRGradienter is an RGradienter that acts
@@ -24,7 +25,7 @@ type SingleRGradienter struct {
 	rgradCache autofunc.RGradient
 }
 
-func (b *SingleRGradienter) Gradient(s SampleSet) autofunc.Gradient {
+func (b *SingleRGradienter) Gradient(s sgd.SampleSet) autofunc.Gradient {
 	if b.gradCache == nil {
 		b.gradCache = autofunc.NewGradient(b.Learner.Parameters())
 	} else {
@@ -44,7 +45,7 @@ func (b *SingleRGradienter) Gradient(s SampleSet) autofunc.Gradient {
 	return b.gradCache
 }
 
-func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s SampleSet) (autofunc.Gradient,
+func (b *SingleRGradienter) RGradient(rv autofunc.RVector, s sgd.SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	if b.gradCache == nil {
 		b.gradCache = autofunc.NewGradient(b.Learner.Parameters())

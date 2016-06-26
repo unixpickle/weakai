@@ -5,6 +5,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/sgd"
 )
 
 // Network is a Layer formed by composing many
@@ -48,7 +49,7 @@ func (n Network) Randomize() {
 func (n Network) Parameters() []*autofunc.Variable {
 	var res []*autofunc.Variable
 	for _, layer := range n {
-		if l, ok := layer.(Learner); ok {
+		if l, ok := layer.(sgd.Learner); ok {
 			res = append(res, l.Parameters()...)
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/sgd"
 )
 
 const defaultMaxSubBatch = 15
@@ -35,28 +36,28 @@ type GradHelper struct {
 	// The Learner and its parameters should not change
 	// once you start using the GradHelper, since it
 	// caches gradients and assumes static parameters.
-	Learner Learner
+	Learner sgd.Learner
 
-	CompGrad  func(g autofunc.Gradient, s SampleSet)
+	CompGrad  func(g autofunc.Gradient, s sgd.SampleSet)
 	CompRGrad func(rv autofunc.RVector, rg autofunc.RGradient,
-		g autofunc.Gradient, s SampleSet)
+		g autofunc.Gradient, s sgd.SampleSet)
 
 	gradCache       gradientCache
 	lastGradResult  autofunc.Gradient
 	lastRGradResult autofunc.RGradient
 }
 
-func (g *GradHelper) Gradient(s SampleSet) autofunc.Gradient {
+func (g *GradHelper) Gradient(s sgd.SampleSet) autofunc.Gradient {
 	grad, _ := g.batch(nil, s)
 	return grad
 }
 
-func (g *GradHelper) RGradient(rv autofunc.RVector, s SampleSet) (autofunc.Gradient,
+func (g *GradHelper) RGradient(rv autofunc.RVector, s sgd.SampleSet) (autofunc.Gradient,
 	autofunc.RGradient) {
 	return g.batch(rv, s)
 }
 
-func (g *GradHelper) batch(rv autofunc.RVector, s SampleSet) (grad autofunc.Gradient,
+func (g *GradHelper) batch(rv autofunc.RVector, s sgd.SampleSet) (grad autofunc.Gradient,
 	rgrad autofunc.RGradient) {
 	g.gradCache.variables = g.Learner.Parameters()
 	if g.lastGradResult != nil {
@@ -77,7 +78,7 @@ func (g *GradHelper) batch(rv autofunc.RVector, s SampleSet) (grad autofunc.Grad
 	return
 }
 
-func (g *GradHelper) runSync(rv autofunc.RVector, s SampleSet) (grad autofunc.Gradient,
+func (g *GradHelper) runSync(rv autofunc.RVector, s sgd.SampleSet) (grad autofunc.Gradient,
 	rgrad autofunc.RGradient) {
 	grad = g.gradCache.Alloc()
 	if rv != nil {
@@ -93,7 +94,7 @@ func (g *GradHelper) runSync(rv autofunc.RVector, s SampleSet) (grad autofunc.Gr
 	return
 }
 
-func (g *GradHelper) runAsync(rv autofunc.RVector, s SampleSet) (grad autofunc.Gradient,
+func (g *GradHelper) runAsync(rv autofunc.RVector, s sgd.SampleSet) (grad autofunc.Gradient,
 	rgrad autofunc.RGradient) {
 	inChan := g.subBatches(s)
 	resChan := make(chan gradResult)
@@ -135,9 +136,9 @@ func (g *GradHelper) runAsync(rv autofunc.RVector, s SampleSet) (grad autofunc.G
 	return
 }
 
-func (g *GradHelper) subBatches(s SampleSet) <-chan SampleSet {
+func (g *GradHelper) subBatches(s sgd.SampleSet) <-chan sgd.SampleSet {
 	batchSize := g.batchSize()
-	res := make(chan SampleSet, s.Len()/batchSize+1)
+	res := make(chan sgd.SampleSet, s.Len()/batchSize+1)
 	for i := 0; i < s.Len(); i += batchSize {
 		bs := batchSize
 		if bs > s.Len()-i {

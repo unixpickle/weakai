@@ -11,6 +11,7 @@ import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/mnist"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rbm"
 )
@@ -104,7 +105,7 @@ func trainClassifier(n neuralnet.Network, d mnist.DataSet) {
 
 	crossValidation := mnist.LoadTestingDataSet()
 
-	neuralnet.SGDInteractive(batcher, samples, ClassifierStepSize,
+	sgd.SGDInteractive(batcher, samples, ClassifierStepSize,
 		ClassifierBatchSize, func() bool {
 			printScore("Training", n, d)
 			printScore("Cross", n, crossValidation)

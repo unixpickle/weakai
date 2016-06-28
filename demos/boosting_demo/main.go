@@ -35,11 +35,32 @@ func main() {
 		StepSize:   0.01,
 		Attempts:   5,
 	}, problem)
+
+	problem = pathologicalProblem()
+	solve("AdaBoost (pathological)", boosting.AdaboostSolver{MaxReuse: 10}, problem)
+	solve("Gradient (pathological)", &boosting.GradientSolver{
+		Iterations: 1000,
+		StepSize:   0.01,
+		Attempts:   5,
+	}, problem)
 }
 
 func solve(name string, solver boosting.Solver, p *boosting.Problem) {
 	solution := solver.Solve(p)
 	fmt.Println("Using", name, "we get", errorCount(solution, p), "wrong.")
+}
+
+func pathologicalProblem() *boosting.Problem {
+	prob := &boosting.Problem{
+		Samples: []boosting.Sample{[]float64{0, 0}, []float64{1, 0}, []float64{0, 1},
+			[]float64{1, 1}},
+		Classifications: []bool{true, false, false, true},
+	}
+	stumps := boosting.AllTreeStumps(prob.Samples, 2)
+	for _, s := range stumps {
+		prob.Classifiers = append(prob.Classifiers, s)
+	}
+	return prob
 }
 
 func errorCount(s *boosting.Solution, p *boosting.Problem) int {

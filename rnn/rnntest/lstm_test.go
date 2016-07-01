@@ -19,6 +19,11 @@ func TestLSTMGradients(t *testing.T) {
 	test.Run(t)
 	test.GradientParams = nil
 	test.Run(t)
+	test.GradientParams = gradientTestVariables
+	test.Block = rnn.NewLSTM(3, 3)
+	test.Run(t)
+	test.GradientParams = nil
+	test.Run(t)
 }
 
 func TestLSTMBatches(t *testing.T) {

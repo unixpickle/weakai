@@ -1,6 +1,8 @@
 package rnn
 
 import (
+	"fmt"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 )
@@ -96,20 +98,28 @@ func (b *batcherBlockOutput) extractOutputs(output linalg.Vector) []linalg.Vecto
 }
 
 func (b *batcherBlockOutput) joinUpstream(states, outputs []linalg.Vector) linalg.Vector {
+	outputSize := b.outputSize()
 	if states == nil {
 		for _ = range outputs {
 			states = append(states, make(linalg.Vector, b.StateSize))
 		}
 	} else if outputs == nil {
-		l := b.outputSize()
 		for _ = range states {
-			outputs = append(outputs, make(linalg.Vector, l))
+			outputs = append(outputs, make(linalg.Vector, outputSize))
 		}
 	}
 
 	upstreamVec := make(linalg.Vector, (len(states[0])+len(outputs[0]))*len(states))
 	var idx int
 	for i, output := range outputs {
+		if len(output) != outputSize {
+			panic(fmt.Sprintf("output should have len %d but has len %d",
+				outputSize, len(output)))
+		}
+		if len(states[i]) != b.StateSize {
+			panic(fmt.Sprintf("state should have len %d but has len %d",
+				b.StateSize, len(states[i])))
+		}
 		copy(upstreamVec[idx:], output)
 		idx += len(output)
 		state := states[i]

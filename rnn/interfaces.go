@@ -52,6 +52,7 @@ type BlockOutput interface {
 
 	// Gradient updates the gradients in g given the
 	// upstream gradient from this BlockOutput.
+	// This should not modify u.
 	Gradient(u *UpstreamGradient, g autofunc.Gradient)
 }
 
@@ -78,6 +79,7 @@ type BlockROutput interface {
 	// stored in ru.
 	// The gradient g may be nil to indicate that only
 	// the r-gradient is desired.
+	// This should not modify u.
 	RGradient(u *UpstreamRGradient, rg autofunc.RGradient, g autofunc.Gradient)
 }
 

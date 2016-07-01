@@ -33,3 +33,5 @@ Here are some demo programs I've created:
    * [RNN Lecture (Part 1)](https://www.youtube.com/watch?v=AvyhbrQptHk)
    * [RNN Lecture (Part 2)](https://www.youtube.com/watch?v=EAt9_4IhC7s)
    * [Wikipedia on LSTMs](https://en.wikipedia.org/wiki/Long_short-term_memory)
+   * [GRU Paper](http://arxiv.org/pdf/1406.1078v3.pdf)
+   * [Karpathy's char-rnn](http://karpathy.github.io/2015/05/21/rnn-effectiveness/)

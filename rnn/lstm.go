@@ -244,12 +244,12 @@ func (l *lstmOutput) Gradient(u *UpstreamGradient, g autofunc.Gradient) {
 	} else {
 		stateGrad = make(linalg.Vector, len(l.StatePool.Vector))
 	}
-	if u.Outputs != nil {
-		g[l.StatePool] = stateGrad
-		outputGrad := addLSTMOutputGrads(u.Outputs, u.States)
-		l.GatedOuts.PropagateGradient(outputGrad, g)
-		delete(g, l.StatePool)
-	}
+
+	g[l.StatePool] = stateGrad
+	outputGrad := addLSTMOutputGrads(u.Outputs, u.States)
+	l.GatedOuts.PropagateGradient(outputGrad, g)
+	delete(g, l.StatePool)
+
 	l.OutStates.PropagateGradient(stateGrad, g)
 }
 
@@ -293,14 +293,14 @@ func (l *lstmROutput) RGradient(u *UpstreamRGradient, rg autofunc.RGradient,
 		stateGrad = make(linalg.Vector, len(l.StatePool.Output()))
 		stateRGrad = make(linalg.Vector, len(l.StatePool.ROutput()))
 	}
-	if u.Outputs != nil {
-		g[l.StatePool.Variable] = stateGrad
-		rg[l.StatePool.Variable] = stateRGrad
-		l.GatedOuts.PropagateRGradient(addLSTMOutputGrads(u.Outputs, u.States),
-			addLSTMOutputGrads(u.ROutputs, u.RStates), rg, g)
-		delete(g, l.StatePool.Variable)
-		delete(rg, l.StatePool.Variable)
-	}
+
+	g[l.StatePool.Variable] = stateGrad
+	rg[l.StatePool.Variable] = stateRGrad
+	l.GatedOuts.PropagateRGradient(addLSTMOutputGrads(u.Outputs, u.States),
+		addLSTMOutputGrads(u.ROutputs, u.RStates), rg, g)
+	delete(g, l.StatePool.Variable)
+	delete(rg, l.StatePool.Variable)
+
 	l.OutStates.PropagateRGradient(stateGrad, stateRGrad, rg, g)
 }
 

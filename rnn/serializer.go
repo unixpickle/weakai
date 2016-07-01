@@ -8,6 +8,7 @@ const (
 	serializerTypeLSTMGate     = serializerPrefix + "lstmGate"
 	serializerTypeStackedBlock = serializerPrefix + "StackedBlock"
 	serializerTypeNetworkBlock = serializerPrefix + "NetworkBlock"
+	serializerTypeGRU          = serializerPrefix + "GRU"
 )
 
 func init() {

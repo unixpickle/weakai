@@ -75,7 +75,7 @@ func (r *Runner) TotalCost(batchSize int, s sgd.SampleSet, c neuralnet.CostFunc)
 		for j, outSeq := range outSeqs {
 			for t, actual := range output[j] {
 				expected := outSeq[t]
-				actualVar := &autofunc.Variable{actual}
+				actualVar := &autofunc.Variable{Vector: actual}
 				cost += c.Cost(expected, actualVar).Output()[0]
 			}
 		}

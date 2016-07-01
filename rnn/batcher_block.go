@@ -20,22 +20,22 @@ func (b *BatcherBlock) StateSize() int {
 	return b.StateSizeVal
 }
 
-func (f *BatcherBlock) Batch(in *BlockInput) BlockOutput {
+func (b *BatcherBlock) Batch(in *BlockInput) BlockOutput {
 	joined := joinBlockInput(in)
-	output := f.F.Batch(joined, len(in.States))
+	output := b.F.Batch(joined, len(in.States))
 	return &batcherBlockOutput{
 		Result:    output,
-		StateSize: f.StateSizeVal,
+		StateSize: b.StateSizeVal,
 		LaneCount: len(in.States),
 	}
 }
 
-func (f *BatcherBlock) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
+func (b *BatcherBlock) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	joined := joinBlockRInput(in)
-	output := f.F.BatchR(v, joined, len(in.States))
+	output := b.F.BatchR(v, joined, len(in.States))
 	return &batcherBlockOutput{
 		RResult:   output,
-		StateSize: f.StateSizeVal,
+		StateSize: b.StateSizeVal,
 		LaneCount: len(in.States),
 	}
 }

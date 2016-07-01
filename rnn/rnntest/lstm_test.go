@@ -8,8 +8,8 @@ import (
 
 func TestLSTMGradients(t *testing.T) {
 	test := GradientTest{
-		Block: rnn.StackedBlock{rnn.NewLSTM(3, 5),
-			NewSquareBlock(1)},
+		Block: rnn.StackedBlock{rnn.NewLSTM(3, 2),
+			NewSquareBlock(2)},
 		GradientParams: gradientTestVariables,
 		Inputs:         gradientTestVariables[:2],
 		InStates:       gradientTestVariables[6:8],
@@ -21,9 +21,9 @@ func TestLSTMGradients(t *testing.T) {
 
 func TestLSTMBatches(t *testing.T) {
 	batchTest := BatchTest{
-		Block: rnn.StackedBlock{rnn.NewLSTM(3, 5), NewSquareBlock(1)},
+		Block: rnn.StackedBlock{rnn.NewLSTM(3, 2), NewSquareBlock(2)},
 
-		OutputSize:     5,
+		OutputSize:     2,
 		GradientParams: gradientTestVariables,
 		Inputs:         gradientTestVariables[:2],
 		InStates:       gradientTestVariables[6:8],

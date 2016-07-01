@@ -23,6 +23,8 @@ type LSTM struct {
 
 // NewLSTM creates an LSTM with randomly initialized
 // weights and biases.
+// For each hidden unit, there are two elements of
+// state, so the total state size is 2*hiddenSize.
 func NewLSTM(inputSize, hiddenSize int) *LSTM {
 	res := &LSTM{
 		hiddenSize: hiddenSize,
@@ -82,12 +84,12 @@ func (l *LSTM) Parameters() []*autofunc.Variable {
 }
 
 func (l *LSTM) StateSize() int {
-	return l.hiddenSize
+	return l.hiddenSize * 2
 }
 
 func (l *LSTM) Batch(in *BlockInput) BlockOutput {
 	n := len(in.Inputs)
-	input := joinBlockInput(in)
+	input := joinLSTMGateInputs(in)
 
 	inValue := l.inputValue.Batch(input, n)
 	inGate := l.inputGate.Batch(input, n)
@@ -95,7 +97,7 @@ func (l *LSTM) Batch(in *BlockInput) BlockOutput {
 	outputGate := l.outputGate.Batch(input, n)
 
 	gatedIn := autofunc.Mul(inGate, inValue)
-	gatedState := autofunc.Mul(rememberGate, joinVariables(in.States))
+	gatedState := autofunc.Mul(rememberGate, joinLSTMInternalStates(in))
 	newState := autofunc.Add(gatedIn, gatedState)
 
 	// Pool the new state so that we do not
@@ -105,16 +107,17 @@ func (l *LSTM) Batch(in *BlockInput) BlockOutput {
 	gatedOutput := autofunc.Mul(outputGate, squashedOut)
 
 	return &lstmOutput{
-		LaneCount: n,
-		OutStates: newState,
-		StatePool: newStateVar,
-		GatedOuts: gatedOutput,
+		LaneCount:    n,
+		OutStates:    newState,
+		StatePool:    newStateVar,
+		GatedOuts:    gatedOutput,
+		WeavedStates: weaveLSTMOutputStates(newState.Output(), gatedOutput.Output(), n),
 	}
 }
 
 func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	n := len(in.Inputs)
-	input := joinBlockRInput(in)
+	input := joinLSTMGateRInputs(in)
 
 	inValue := l.inputValue.BatchR(v, input, n)
 	inGate := l.inputGate.BatchR(v, input, n)
@@ -122,7 +125,7 @@ func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	outputGate := l.outputGate.BatchR(v, input, n)
 
 	gatedIn := autofunc.MulR(inGate, inValue)
-	gatedState := autofunc.MulR(rememberGate, joinRVariables(in.States))
+	gatedState := autofunc.MulR(rememberGate, joinLSTMInternalRStates(in))
 	newState := autofunc.AddR(gatedIn, gatedState)
 
 	// Pool the new state so that we do not
@@ -140,6 +143,9 @@ func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 		OutStates: newState,
 		StatePool: newStateVar,
 		GatedOuts: gatedOutput,
+
+		WeavedStates:  weaveLSTMOutputStates(newState.Output(), gatedOutput.Output(), n),
+		WeavedRStates: weaveLSTMOutputStates(newState.ROutput(), gatedOutput.ROutput(), n),
 	}
 }
 
@@ -216,10 +222,11 @@ func (l *lstmGate) SerializerType() string {
 }
 
 type lstmOutput struct {
-	LaneCount int
-	OutStates autofunc.Result
-	StatePool *autofunc.Variable
-	GatedOuts autofunc.Result
+	LaneCount    int
+	OutStates    autofunc.Result
+	StatePool    *autofunc.Variable
+	GatedOuts    autofunc.Result
+	WeavedStates linalg.Vector
 }
 
 func (l *lstmOutput) Outputs() []linalg.Vector {
@@ -227,27 +234,32 @@ func (l *lstmOutput) Outputs() []linalg.Vector {
 }
 
 func (l *lstmOutput) States() []linalg.Vector {
-	return splitVectors(l.StatePool.Vector, l.LaneCount)
+	return splitVectors(l.WeavedStates, l.LaneCount)
 }
 
 func (l *lstmOutput) Gradient(u *UpstreamGradient, g autofunc.Gradient) {
-	stateGrad := make(linalg.Vector, len(l.StatePool.Vector))
+	var stateGrad linalg.Vector
 	if u.States != nil {
-		joinVectorsInPlace(stateGrad, u.States)
+		stateGrad = joinLSTMUpstreamInternalStates(u.States)
+	} else {
+		stateGrad = make(linalg.Vector, len(l.StatePool.Vector))
 	}
 	if u.Outputs != nil {
 		g[l.StatePool] = stateGrad
-		l.GatedOuts.PropagateGradient(joinVectors(u.Outputs), g)
+		outputGrad := addLSTMOutputGrads(u.Outputs, u.States)
+		l.GatedOuts.PropagateGradient(outputGrad, g)
 		delete(g, l.StatePool)
 	}
 	l.OutStates.PropagateGradient(stateGrad, g)
 }
 
 type lstmROutput struct {
-	LaneCount int
-	OutStates autofunc.RResult
-	StatePool *autofunc.RVariable
-	GatedOuts autofunc.RResult
+	LaneCount     int
+	OutStates     autofunc.RResult
+	StatePool     *autofunc.RVariable
+	GatedOuts     autofunc.RResult
+	WeavedStates  linalg.Vector
+	WeavedRStates linalg.Vector
 }
 
 func (l *lstmROutput) Outputs() []linalg.Vector {
@@ -259,11 +271,11 @@ func (l *lstmROutput) ROutputs() []linalg.Vector {
 }
 
 func (l *lstmROutput) States() []linalg.Vector {
-	return splitVectors(l.StatePool.Output(), l.LaneCount)
+	return splitVectors(l.WeavedStates, l.LaneCount)
 }
 
 func (l *lstmROutput) RStates() []linalg.Vector {
-	return splitVectors(l.StatePool.ROutput(), l.LaneCount)
+	return splitVectors(l.WeavedRStates, l.LaneCount)
 }
 
 func (l *lstmROutput) RGradient(u *UpstreamRGradient, rg autofunc.RGradient,
@@ -273,19 +285,106 @@ func (l *lstmROutput) RGradient(u *UpstreamRGradient, rg autofunc.RGradient,
 		g = autofunc.Gradient{}
 	}
 
-	stateGrad := make(linalg.Vector, len(l.StatePool.Output()))
-	stateRGrad := make(linalg.Vector, len(l.StatePool.ROutput()))
+	var stateGrad, stateRGrad linalg.Vector
 	if u.States != nil {
-		joinVectorsInPlace(stateGrad, u.States)
-		joinVectorsInPlace(stateRGrad, u.RStates)
+		stateGrad = joinLSTMUpstreamInternalStates(u.States)
+		stateRGrad = joinLSTMUpstreamInternalStates(u.RStates)
+	} else {
+		stateGrad = make(linalg.Vector, len(l.StatePool.Output()))
+		stateRGrad = make(linalg.Vector, len(l.StatePool.ROutput()))
 	}
 	if u.Outputs != nil {
 		g[l.StatePool.Variable] = stateGrad
 		rg[l.StatePool.Variable] = stateRGrad
-		l.GatedOuts.PropagateRGradient(joinVectors(u.Outputs),
-			joinVectors(u.ROutputs), rg, g)
+		l.GatedOuts.PropagateRGradient(addLSTMOutputGrads(u.Outputs, u.States),
+			addLSTMOutputGrads(u.ROutputs, u.RStates), rg, g)
 		delete(g, l.StatePool.Variable)
 		delete(rg, l.StatePool.Variable)
 	}
 	l.OutStates.PropagateRGradient(stateGrad, stateRGrad, rg, g)
+}
+
+func joinLSTMGateInputs(in *BlockInput) autofunc.Result {
+	results := make([]autofunc.Result, 0, len(in.States)*2)
+	for i, fullState := range in.States {
+		outputState := autofunc.Slice(fullState, 0, len(fullState.Vector)/2)
+		results = append(results, in.Inputs[i], outputState)
+	}
+	return autofunc.Concat(results...)
+}
+
+func joinLSTMGateRInputs(in *BlockRInput) autofunc.RResult {
+	results := make([]autofunc.RResult, 0, len(in.States)*2)
+	for i, fullState := range in.States {
+		outputState := autofunc.SliceR(fullState, 0, len(fullState.Variable.Vector)/2)
+		results = append(results, in.Inputs[i], outputState)
+	}
+	return autofunc.ConcatR(results...)
+}
+
+func joinLSTMInternalStates(in *BlockInput) autofunc.Result {
+	results := make([]autofunc.Result, 0, len(in.States))
+	for _, fullState := range in.States {
+		startIdx := len(fullState.Vector) / 2
+		outputState := autofunc.Slice(fullState, startIdx, startIdx*2)
+		results = append(results, outputState)
+	}
+	return autofunc.Concat(results...)
+}
+
+func joinLSTMInternalRStates(in *BlockRInput) autofunc.RResult {
+	results := make([]autofunc.RResult, 0, len(in.States))
+	for _, fullState := range in.States {
+		startIdx := len(fullState.Variable.Vector) / 2
+		outputState := autofunc.SliceR(fullState, startIdx, startIdx*2)
+		results = append(results, outputState)
+	}
+	return autofunc.ConcatR(results...)
+}
+
+func joinLSTMUpstreamInternalStates(vecs []linalg.Vector) linalg.Vector {
+	stateLen := len(vecs[0]) / 2
+	res := make(linalg.Vector, stateLen*len(vecs))
+	for i, fullState := range vecs {
+		halfIdx := len(fullState) / 2
+		copy(res[i*stateLen:(i+1)*stateLen], fullState[halfIdx:2*halfIdx])
+	}
+	return res
+}
+
+func weaveLSTMOutputStates(states, outputs linalg.Vector, n int) linalg.Vector {
+	stateLen := len(states) / n
+	res := make(linalg.Vector, len(states)*2)
+	for i := 0; i < n; i++ {
+		startIdx := i * stateLen
+		endIdx := (i + 1) * stateLen
+		copy(res[startIdx*2:], outputs[startIdx:endIdx])
+		copy(res[startIdx*2+stateLen:], states[startIdx:endIdx])
+	}
+	return res
+}
+
+func addLSTMOutputGrads(outputs, states []linalg.Vector) linalg.Vector {
+	var stateLen, stateCount int
+	if outputs != nil {
+		stateLen = len(outputs[0])
+		stateCount = len(outputs)
+	} else {
+		stateLen = len(states[0]) / 2
+		stateCount = len(states)
+	}
+	res := make(linalg.Vector, stateLen*stateCount)
+	for i := 0; i < stateCount; i++ {
+		outputIdx := i * stateLen
+		subVec := res[outputIdx : outputIdx+stateLen]
+		if outputs != nil {
+			copy(subVec, outputs[i])
+			if states != nil {
+				subVec.Add(states[i][:stateLen])
+			}
+		} else {
+			copy(subVec, states[i])
+		}
+	}
+	return res
 }

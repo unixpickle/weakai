@@ -16,4 +16,5 @@ func init() {
 	serializer.RegisterDeserializer(serializerTypeLSTMGate, deserializeLSTMGate)
 	serializer.RegisterDeserializer(serializerTypeStackedBlock, DeserializeStackedBlock)
 	serializer.RegisterDeserializer(serializerTypeNetworkBlock, DeserializeNetworkBlock)
+	serializer.RegisterDeserializer(serializerTypeGRU, DeserializeGRU)
 }

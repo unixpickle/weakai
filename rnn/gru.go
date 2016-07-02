@@ -84,7 +84,9 @@ func (g *GRU) Batch(in *BlockInput) BlockOutput {
 	updateMask := g.updateGate.Batch(gateInput, n)
 
 	maskedByReset := autofunc.Mul(resetMask, stateIn)
-	inputValue := g.inputValue.Batch(joinGRUMaskedStates(in.Inputs, maskedByReset), n)
+	inputValue := autofunc.Pool(maskedByReset, func(m autofunc.Result) autofunc.Result {
+		return g.inputValue.Batch(joinGRUMaskedStates(in.Inputs, m), n)
+	})
 
 	newState := autofunc.Pool(updateMask, func(umask autofunc.Result) autofunc.Result {
 		updateComplement := autofunc.AddScaler(autofunc.Scale(umask, -1), 1)
@@ -108,7 +110,9 @@ func (g *GRU) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	updateMask := g.updateGate.BatchR(v, gateInput, n)
 
 	maskedByReset := autofunc.MulR(resetMask, stateIn)
-	inputValue := g.inputValue.BatchR(v, joinGRUMaskedRStates(in.Inputs, maskedByReset), n)
+	inputValue := autofunc.PoolR(maskedByReset, func(m autofunc.RResult) autofunc.RResult {
+		return g.inputValue.BatchR(v, joinGRUMaskedRStates(in.Inputs, m), n)
+	})
 
 	newState := autofunc.PoolR(updateMask, func(umask autofunc.RResult) autofunc.RResult {
 		updateComplement := autofunc.AddScalerR(autofunc.ScaleR(umask, -1), 1)

@@ -86,9 +86,11 @@ func (g *GRU) Batch(in *BlockInput) BlockOutput {
 	maskedByReset := autofunc.Mul(resetMask, stateIn)
 	inputValue := g.inputValue.Batch(joinGRUMaskedStates(in.Inputs, maskedByReset), n)
 
-	updateComplement := autofunc.AddScaler(autofunc.Scale(updateMask, -1), 1)
-	newState := autofunc.Add(autofunc.Mul(updateMask, stateIn),
-		autofunc.Mul(updateComplement, inputValue))
+	newState := autofunc.Pool(updateMask, func(umask autofunc.Result) autofunc.Result {
+		updateComplement := autofunc.AddScaler(autofunc.Scale(umask, -1), 1)
+		return autofunc.Add(autofunc.Mul(umask, stateIn),
+			autofunc.Mul(updateComplement, inputValue))
+	})
 
 	return &gruOutput{
 		LaneCount: n,
@@ -108,9 +110,11 @@ func (g *GRU) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	maskedByReset := autofunc.MulR(resetMask, stateIn)
 	inputValue := g.inputValue.BatchR(v, joinGRUMaskedRStates(in.Inputs, maskedByReset), n)
 
-	updateComplement := autofunc.AddScalerR(autofunc.ScaleR(updateMask, -1), 1)
-	newState := autofunc.AddR(autofunc.MulR(updateMask, stateIn),
-		autofunc.MulR(updateComplement, inputValue))
+	newState := autofunc.PoolR(updateMask, func(umask autofunc.RResult) autofunc.RResult {
+		updateComplement := autofunc.AddScalerR(autofunc.ScaleR(umask, -1), 1)
+		return autofunc.AddR(autofunc.MulR(umask, stateIn),
+			autofunc.MulR(updateComplement, inputValue))
+	})
 
 	return &gruROutput{
 		LaneCount: n,

@@ -6,8 +6,8 @@ import (
 	"log"
 	"math"
 
+	"github.com/unixpickle/hessfree"
 	"github.com/unixpickle/num-analysis/linalg"
-	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -15,10 +15,8 @@ const (
 	HiddenSize1 = 300
 	HiddenSize2 = 100
 	BatchSize   = 200
-	MaxEpochs   = 100000
+	MaxSubBatch = 20
 )
-
-var StepSizes = []float64{3e-3, 1e-3, 1e-4}
 
 func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	firstImage := <-images
@@ -42,8 +40,7 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 		}
 	}
 
-	log.Print("Training network...")
-	log.Print("Press ctrl+c to move on to the next step size.")
+	log.Print("Training network (ctrl+c to finish)...")
 
 	tensorSlices := make([]linalg.Vector, len(tensors))
 	for i, tensor := range tensors {
@@ -80,20 +77,21 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	}
 	network.Randomize()
 
-	batcher := &neuralnet.BatchRGradienter{
-		Learner:  network.BatchLearner(),
-		CostFunc: neuralnet.SigmoidCECost{},
+	learner := &hessfree.DampingLearner{
+		WrappedLearner: &hessfree.NeuralNetLearner{
+			Layers:      network,
+			Output:      nil,
+			Cost:        neuralnet.SigmoidCECost{},
+			MaxSubBatch: MaxSubBatch,
+		},
 	}
-	rms := &sgd.RMSProp{Gradienter: batcher}
-
-	for i, stepSize := range StepSizes {
-		log.Printf("Using step size %f (%d out of %d)", stepSize, i+1, len(StepSizes))
-		sgd.SGDInteractive(rms, samples, stepSize, BatchSize, func() bool {
-			cost := neuralnet.TotalCost(batcher.CostFunc, network, samples)
-			log.Println("Current cost is", cost)
-			return true
-		})
+	trainer := hessfree.Trainer{
+		Learner:   learner,
+		Samples:   samples,
+		BatchSize: BatchSize,
+		UI:        hessfree.NewConsoleUI(),
 	}
+	trainer.Train()
 
 	network = append(network, neuralnet.Sigmoid{})
 

@@ -41,7 +41,7 @@ func Run() {
 		os.Exit(1)
 	}
 
-	res := network.Apply(&autofunc.Variable{ImageTensor(inputImage).Data})
+	res := network.Apply(&autofunc.Variable{Vector: ImageTensor(inputImage).Data})
 
 	tensor := &neuralnet.Tensor3{
 		Width:  inputImage.Bounds().Dx(),

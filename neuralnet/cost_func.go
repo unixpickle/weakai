@@ -179,7 +179,7 @@ func (_ SigmoidCECost) CostR(v autofunc.RVector, x linalg.Vector,
 	oneMinusX := autofunc.AddScalerR(autofunc.ScaleR(xVar, -1), 1)
 
 	sums := autofunc.AddR(autofunc.MulR(xVar, log), autofunc.MulR(oneMinusX, invLog))
-	return autofunc.SumAllR(sums)
+	return autofunc.ScaleR(autofunc.SumAllR(sums), -1)
 }
 
 // RegularizingCost adds onto another cost function

@@ -14,7 +14,6 @@ import (
 const (
 	HiddenSize1 = 300
 	HiddenSize2 = 100
-	BatchSize   = 200
 	MaxSubBatch = 20
 )
 
@@ -77,6 +76,7 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 	}
 	network.Randomize()
 
+	ui := hessfree.NewConsoleUI()
 	learner := &hessfree.DampingLearner{
 		WrappedLearner: &hessfree.NeuralNetLearner{
 			Layers:         network,
@@ -85,12 +85,14 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 			MaxSubBatch:    MaxSubBatch,
 			MaxConcurrency: 2,
 		},
+		DampingCoeff: 5,
+		UI:           ui,
 	}
 	trainer := hessfree.Trainer{
 		Learner:   learner,
 		Samples:   samples,
-		BatchSize: BatchSize,
-		UI:        hessfree.NewConsoleUI(),
+		BatchSize: samples.Len(),
+		UI:        ui,
 	}
 	trainer.Train()
 

@@ -79,10 +79,11 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 
 	learner := &hessfree.DampingLearner{
 		WrappedLearner: &hessfree.NeuralNetLearner{
-			Layers:      network,
-			Output:      nil,
-			Cost:        neuralnet.SigmoidCECost{},
-			MaxSubBatch: MaxSubBatch,
+			Layers:         network,
+			Output:         nil,
+			Cost:           neuralnet.SigmoidCECost{},
+			MaxSubBatch:    MaxSubBatch,
+			MaxConcurrency: 2,
 		},
 	}
 	trainer := hessfree.Trainer{

@@ -85,7 +85,7 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 			MaxSubBatch:    MaxSubBatch,
 			MaxConcurrency: 2,
 		},
-		DampingCoeff: 5,
+		DampingCoeff: 2,
 		UI:           ui,
 	}
 	trainer := hessfree.Trainer{
@@ -93,6 +93,9 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 		Samples:   samples,
 		BatchSize: samples.Len(),
 		UI:        ui,
+		Convergence: hessfree.ConvergenceCriteria{
+			MinK: 5,
+		},
 	}
 	trainer.Train()
 

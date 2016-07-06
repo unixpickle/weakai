@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 
 	"github.com/unixpickle/hessfree"
 	"github.com/unixpickle/num-analysis/linalg"
@@ -19,6 +20,7 @@ const (
 	HiddenSize2 = 100
 
 	TrainSGDEnvVar     = "IMGCLASS_USE_SGD"
+	TrainDampingEnvVar = "IMGCLASS_DAMPING"
 	ValidationFraction = 0.1
 	StepSize           = 0.001
 	BatchSize          = 100
@@ -98,6 +100,15 @@ func TrainCmd(netPath, dirPath string) {
 			network:           network,
 			validationSamples: validationSamples,
 		}
+		initDamping := 0.3
+		if dampingStr := os.Getenv(TrainDampingEnvVar); dampingStr != "" {
+			initDamping, err = strconv.ParseFloat(dampingStr, 64)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Invalid damping:", dampingStr)
+				os.Exit(1)
+			}
+			log.Println("Using initial damping", initDamping)
+		}
 		learner := &hessfree.DampingLearner{
 			WrappedLearner: &hessfree.NeuralNetLearner{
 				Layers:         network[:len(network)-1],
@@ -105,7 +116,7 @@ func TrainCmd(netPath, dirPath string) {
 				Cost:           costFunc,
 				MaxConcurrency: 2,
 			},
-			DampingCoeff: 0.3,
+			DampingCoeff: initDamping,
 			UseQuadMin:   true,
 			UI:           ui,
 		}

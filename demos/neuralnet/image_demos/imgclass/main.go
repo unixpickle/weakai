@@ -25,6 +25,7 @@ func main() {
 func dieUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: imgclass train <network_file> <image_dir>\n"+
 		"                classify <network_file> <image>\n\n"+
-		"The image directory should have a sub-directory per class.")
+		"The image directory should have a sub-directory per class.\n\n"+
+		"Environment variables: IMGCLASS_USE_SGD, IMGCLASS_DAMPING\n")
 	os.Exit(1)
 }

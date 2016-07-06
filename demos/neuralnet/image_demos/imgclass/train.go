@@ -24,6 +24,7 @@ const (
 	ValidationFraction = 0.1
 	StepSize           = 0.001
 	BatchSize          = 100
+	Regularization     = 5e-4
 )
 
 func TrainCmd(netPath, dirPath string) {
@@ -83,8 +84,12 @@ func TrainCmd(netPath, dirPath string) {
 	if os.Getenv(TrainSGDEnvVar) != "" {
 		gradienter := &sgd.Adam{
 			Gradienter: &neuralnet.BatchRGradienter{
-				Learner:  network.BatchLearner(),
-				CostFunc: costFunc,
+				Learner: network.BatchLearner(),
+				CostFunc: &neuralnet.RegularizingCost{
+					Variables: network.Parameters(),
+					Penalty:   Regularization,
+					CostFunc:  costFunc,
+				},
 			},
 		}
 		sgd.SGDInteractive(gradienter, trainingSamples, StepSize, BatchSize, func() bool {
@@ -110,11 +115,15 @@ func TrainCmd(netPath, dirPath string) {
 			log.Println("Using initial damping", initDamping)
 		}
 		learner := &hessfree.DampingLearner{
-			WrappedLearner: &hessfree.NeuralNetLearner{
-				Layers:         network[:len(network)-1],
-				Output:         network[len(network)-1:],
-				Cost:           costFunc,
-				MaxConcurrency: 2,
+			WrappedLearner: &hessfree.DampingLearner{
+				WrappedLearner: &hessfree.NeuralNetLearner{
+					Layers:         network[:len(network)-1],
+					Output:         network[len(network)-1:],
+					Cost:           costFunc,
+					MaxConcurrency: 2,
+				},
+				DampingCoeff: Regularization,
+				ChangeRatio:  1,
 			},
 			DampingCoeff: initDamping,
 			UseQuadMin:   true,

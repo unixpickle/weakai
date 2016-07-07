@@ -27,7 +27,7 @@ const (
 
 func TrainCmd(netPath, dirPath string) {
 	log.Println("Loading samples...")
-	images, err := LoadTrainingImages(dirPath)
+	images, width, height, err := LoadTrainingImages(dirPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -52,8 +52,8 @@ func TrainCmd(netPath, dirPath string) {
 			FilterHeight: 4,
 			Stride:       2,
 
-			InputWidth:  ImageSize,
-			InputHeight: ImageSize,
+			InputWidth:  width,
+			InputHeight: height,
 			InputDepth:  ImageDepth,
 		}
 		maxLayer := &neuralnet.MaxPoolingLayer{

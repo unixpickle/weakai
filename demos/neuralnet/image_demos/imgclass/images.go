@@ -12,16 +12,16 @@ import (
 )
 
 const (
-	ImageSize  = 96
 	ImageDepth = 3
 )
 
-func LoadTrainingImages(dir string) (map[string][]linalg.Vector, error) {
+func LoadTrainingImages(dir string) (imgs map[string][]linalg.Vector, width, height int,
+	err error) {
 	dirContents, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return
 	}
-	res := map[string][]linalg.Vector{}
+	imgs = map[string][]linalg.Vector{}
 	for _, item := range dirContents {
 		if !item.IsDir() {
 			continue
@@ -30,43 +30,48 @@ func LoadTrainingImages(dir string) (map[string][]linalg.Vector, error) {
 		subPath := filepath.Join(dir, item.Name())
 		subContents, err := ioutil.ReadDir(subPath)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
 		for _, subItem := range subContents {
 			if strings.HasPrefix(subItem.Name(), ".") {
 				continue
 			}
 			imgPath := filepath.Join(subPath, subItem.Name())
-			img, err := ReadImageFile(imgPath)
+			img, w, h, err := ReadImageFile(imgPath)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read image %s: %s", imgPath, err.Error())
+				return nil, 0, 0, fmt.Errorf("failed to read image %s: %s", imgPath,
+					err.Error())
+			} else if width == 0 && height == 0 {
+				width = w
+				height = h
+			} else if w != width || h != height {
+				return nil, 0, 0, fmt.Errorf("expected dimensions %dx%d but got %dx%d: %s",
+					width, height, w, h, imgPath)
 			}
-			res[category] = append(res[category], img)
+			imgs[category] = append(imgs[category], img)
 		}
 	}
-	return res, nil
+	return
 }
 
-func ReadImageFile(path string) (linalg.Vector, error) {
+func ReadImageFile(path string) (data linalg.Vector, width, height int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer f.Close()
 	img, _, err := image.Decode(f)
 	if err != nil {
-		return nil, err
+		return
 	}
-	if img.Bounds().Dx() != ImageSize || img.Bounds().Dy() != ImageSize {
-		return nil, fmt.Errorf("expected image size %dx%d but got %dx%d",
-			ImageSize, ImageSize, img.Bounds().Dx(), img.Bounds().Dy())
-	}
-	res := make(linalg.Vector, 0, img.Bounds().Dx()*img.Bounds().Dy()*ImageDepth)
-	for y := 0; y < img.Bounds().Dy(); y++ {
-		for x := 0; x < img.Bounds().Dx(); x++ {
+	data = make(linalg.Vector, 0, img.Bounds().Dx()*img.Bounds().Dy()*ImageDepth)
+	width = img.Bounds().Dx()
+	height = img.Bounds().Dy()
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
 			r, g, b, _ := img.At(x, y).RGBA()
-			res = append(res, float64(r)/0xffff, float64(g)/0xffff, float64(b)/0xffff)
+			data = append(data, float64(r)/0xffff, float64(g)/0xffff, float64(b)/0xffff)
 		}
 	}
-	return res, nil
+	return
 }

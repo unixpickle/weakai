@@ -7,24 +7,22 @@ import (
 	"math"
 	"os"
 	"sort"
-	"strconv"
 
-	"github.com/unixpickle/hessfree"
+	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
 const (
-	HiddenSize1 = 300
-	HiddenSize2 = 100
+	FilterCount  = 10
+	FilterCount1 = 10
+	HiddenSize   = 60
 
-	TrainSGDEnvVar     = "IMGCLASS_USE_SGD"
-	TrainDampingEnvVar = "IMGCLASS_DAMPING"
-	ValidationFraction = 0.1
+	ValidationFraction = 0.15
 	StepSize           = 0.001
 	BatchSize          = 100
-	Regularization     = 5e-4
+	Regularization     = 1e-2
 )
 
 func TrainCmd(netPath, dirPath string) {
@@ -48,23 +46,52 @@ func TrainCmd(netPath, dirPath string) {
 		log.Println("Loaded network from file.")
 	} else {
 		mean, stddev := sampleStatistics(images)
+		convLayer := &neuralnet.ConvLayer{
+			FilterCount:  FilterCount,
+			FilterWidth:  4,
+			FilterHeight: 4,
+			Stride:       2,
+
+			InputWidth:  ImageSize,
+			InputHeight: ImageSize,
+			InputDepth:  ImageDepth,
+		}
+		maxLayer := &neuralnet.MaxPoolingLayer{
+			XSpan:       3,
+			YSpan:       3,
+			InputWidth:  convLayer.OutputWidth(),
+			InputHeight: convLayer.OutputHeight(),
+			InputDepth:  convLayer.OutputDepth(),
+		}
+		convLayer1 := &neuralnet.ConvLayer{
+			FilterCount:  FilterCount1,
+			FilterWidth:  3,
+			FilterHeight: 3,
+			Stride:       2,
+
+			InputWidth:  maxLayer.OutputWidth(),
+			InputHeight: maxLayer.OutputHeight(),
+			InputDepth:  maxLayer.InputDepth,
+		}
 		network = neuralnet.Network{
 			&neuralnet.RescaleLayer{
 				Bias:  -mean,
 				Scale: 1 / stddev,
 			},
+			convLayer,
+			neuralnet.HyperbolicTangent{},
+			maxLayer,
+			neuralnet.HyperbolicTangent{},
+			convLayer1,
+			neuralnet.HyperbolicTangent{},
 			&neuralnet.DenseLayer{
-				InputCount:  ImageSize * ImageSize * ImageDepth,
-				OutputCount: HiddenSize1,
+				InputCount: convLayer1.OutputWidth() * convLayer1.OutputHeight() *
+					convLayer1.OutputDepth(),
+				OutputCount: HiddenSize,
 			},
 			neuralnet.HyperbolicTangent{},
 			&neuralnet.DenseLayer{
-				InputCount:  HiddenSize1,
-				OutputCount: HiddenSize2,
-			},
-			neuralnet.HyperbolicTangent{},
-			&neuralnet.DenseLayer{
-				InputCount:  HiddenSize2,
+				InputCount:  HiddenSize,
 				OutputCount: len(images),
 			},
 			&neuralnet.LogSoftmaxLayer{},
@@ -81,65 +108,22 @@ func TrainCmd(netPath, dirPath string) {
 	trainingSamples := samples.Subset(validationCount, samples.Len())
 
 	costFunc := neuralnet.DotCost{}
-	if os.Getenv(TrainSGDEnvVar) != "" {
-		gradienter := &sgd.Adam{
-			Gradienter: &neuralnet.BatchRGradienter{
-				Learner: network.BatchLearner(),
-				CostFunc: &neuralnet.RegularizingCost{
-					Variables: network.Parameters(),
-					Penalty:   Regularization,
-					CostFunc:  costFunc,
-				},
+	gradienter := &sgd.Adam{
+		Gradienter: &neuralnet.BatchRGradienter{
+			Learner: network.BatchLearner(),
+			CostFunc: &neuralnet.RegularizingCost{
+				Variables: network.Parameters(),
+				Penalty:   Regularization,
+				CostFunc:  costFunc,
 			},
-		}
-		sgd.SGDInteractive(gradienter, trainingSamples, StepSize, BatchSize, func() bool {
-			log.Printf("Costs: validation=%f training=%f",
-				neuralnet.TotalCost(costFunc, network, validationSamples),
-				neuralnet.TotalCost(costFunc, network, trainingSamples))
-			return true
-		})
-	} else {
-		ui := &crossValidationUI{
-			UI:                hessfree.NewConsoleUI(),
-			costFunc:          costFunc,
-			network:           network,
-			validationSamples: validationSamples,
-		}
-		initDamping := 0.3
-		if dampingStr := os.Getenv(TrainDampingEnvVar); dampingStr != "" {
-			initDamping, err = strconv.ParseFloat(dampingStr, 64)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "Invalid damping:", dampingStr)
-				os.Exit(1)
-			}
-			log.Println("Using initial damping", initDamping)
-		}
-		learner := &hessfree.DampingLearner{
-			WrappedLearner: &hessfree.DampingLearner{
-				WrappedLearner: &hessfree.NeuralNetLearner{
-					Layers:         network[:len(network)-1],
-					Output:         network[len(network)-1:],
-					Cost:           costFunc,
-					MaxConcurrency: 2,
-				},
-				DampingCoeff: Regularization,
-				ChangeRatio:  1,
-			},
-			DampingCoeff: initDamping,
-			UseQuadMin:   true,
-			UI:           ui,
-		}
-		trainer := hessfree.Trainer{
-			Learner:   learner,
-			Samples:   trainingSamples,
-			BatchSize: trainingSamples.Len(),
-			UI:        ui,
-			Convergence: hessfree.ConvergenceCriteria{
-				MinK: 5,
-			},
-		}
-		trainer.Train()
+		},
 	}
+	sgd.SGDInteractive(gradienter, trainingSamples, StepSize, BatchSize, func() bool {
+		log.Printf("Costs: validation=%d/%d cost=%f",
+			countCorrect(network, validationSamples), validationSamples.Len(),
+			neuralnet.TotalCost(costFunc, network, trainingSamples))
+		return true
+	})
 
 	data, _ := network.Serialize()
 	if err := ioutil.WriteFile(netPath, data, 0755); err != nil {
@@ -196,16 +180,22 @@ func sortedClasses(m map[string][]linalg.Vector) []string {
 	return keys
 }
 
-type crossValidationUI struct {
-	hessfree.UI
-
-	costFunc          neuralnet.CostFunc
-	network           neuralnet.Network
-	validationSamples sgd.SampleSet
-}
-
-func (c *crossValidationUI) LogCGStart(initQuad, quadLast float64) {
-	c.UI.Log("CrossValidation", fmt.Sprintf("cost=%f",
-		neuralnet.TotalCost(c.costFunc, c.network, c.validationSamples)))
-	c.UI.LogCGStart(initQuad, quadLast)
+func countCorrect(n neuralnet.Network, s sgd.SampleSet) int {
+	var count int
+	for i := 0; i < s.Len(); i++ {
+		sample := s.GetSample(i).(neuralnet.VectorSample)
+		output := n.Apply(&autofunc.Variable{Vector: sample.Input}).Output()
+		var maxIdx int
+		var maxVal float64
+		for j, x := range output {
+			if x > maxVal || j == 0 {
+				maxIdx = j
+				maxVal = x
+			}
+		}
+		if sample.Output[maxIdx] == 1 {
+			count++
+		}
+	}
+	return count
 }

@@ -3,13 +3,14 @@ package rnn
 import "github.com/unixpickle/serializer"
 
 const (
-	serializerPrefix           = "github.com/unixpickle/weakai/rnn."
-	serializerTypeLSTM         = serializerPrefix + "LSTM"
-	serializerTypeLSTMGate     = serializerPrefix + "lstmGate"
-	serializerTypeStackedBlock = serializerPrefix + "StackedBlock"
-	serializerTypeNetworkBlock = serializerPrefix + "NetworkBlock"
-	serializerTypeGRU          = serializerPrefix + "GRU"
-	serializerTypeRNNSeqFunc   = serializerPrefix + "RNNSeqFunc"
+	serializerPrefix             = "github.com/unixpickle/weakai/rnn."
+	serializerTypeLSTM           = serializerPrefix + "LSTM"
+	serializerTypeLSTMGate       = serializerPrefix + "lstmGate"
+	serializerTypeStackedBlock   = serializerPrefix + "StackedBlock"
+	serializerTypeNetworkBlock   = serializerPrefix + "NetworkBlock"
+	serializerTypeGRU            = serializerPrefix + "GRU"
+	serializerTypeRNNSeqFunc     = serializerPrefix + "RNNSeqFunc"
+	serializerTypeNetworkSeqFunc = serializerPrefix + "NetworkSeqFunc"
 )
 
 func init() {

@@ -205,7 +205,7 @@ func (r *rnnSeqFuncROutput) OutputSeqs() [][]linalg.Vector {
 }
 
 func (r *rnnSeqFuncROutput) ROutputSeqs() [][]linalg.Vector {
-	return r.PackedOut
+	return r.RPackedOut
 }
 
 func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,

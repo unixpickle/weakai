@@ -38,6 +38,29 @@ func TestRNNSeqFuncOutputs(t *testing.T) {
 	testSequencesEqual(t, actual, expected)
 }
 
+func TestRNNSeqFuncROutputs(t *testing.T) {
+	rand.Seed(123)
+	block := rnn.NewLSTM(3, 2)
+	seqFunc := &rnn.RNNSeqFunc{Block: block}
+
+	rInputs := seqsToRVarSeqs(rnnSeqFuncTests)
+	rVec := autofunc.RVector{}
+	for _, v := range block.Parameters() {
+		rVec[v] = make(linalg.Vector, len(v.Vector))
+		for i := range rVec[v] {
+			rVec[v][i] = rand.NormFloat64()
+		}
+	}
+
+	actual := seqFunc.BatchSeqsR(rVec, rInputs).ROutputSeqs()
+	var expected [][]linalg.Vector
+	for _, inSeq := range rInputs {
+		expected = append(expected, evaluateROutputs(rVec, block, inSeq))
+	}
+
+	testSequencesEqual(t, actual, expected)
+}
+
 func testSequencesEqual(t *testing.T, actual, expected [][]linalg.Vector) {
 	if len(actual) != len(expected) {
 		t.Errorf("expected %d outputs but got %d", len(expected), len(actual))
@@ -79,6 +102,7 @@ func seqsToVarSeqs(s [][]linalg.Vector) [][]autofunc.Result {
 }
 
 func seqsToRVarSeqs(s [][]linalg.Vector) [][]autofunc.RResult {
+	rand.Seed(123)
 	res := make([][]autofunc.RResult, len(s))
 	for i, x := range s {
 		for _, v := range x {
@@ -90,6 +114,31 @@ func seqsToRVarSeqs(s [][]linalg.Vector) [][]autofunc.RResult {
 			rVar := &autofunc.RVariable{Variable: variable, ROutputVec: rVec}
 			res[i] = append(res[i], rVar)
 		}
+	}
+	return res
+}
+
+func evaluateROutputs(rv autofunc.RVector, b rnn.Block,
+	s []autofunc.RResult) []linalg.Vector {
+	res := make([]linalg.Vector, 0, len(s))
+	lastState := make(linalg.Vector, b.StateSize())
+	lastRState := make(linalg.Vector, b.StateSize())
+	for _, in := range s {
+		inVar := &autofunc.RVariable{
+			Variable:   &autofunc.Variable{Vector: in.Output()},
+			ROutputVec: in.ROutput(),
+		}
+		inState := &autofunc.RVariable{
+			Variable:   &autofunc.Variable{Vector: lastState},
+			ROutputVec: lastRState,
+		}
+		out := b.BatchR(rv, &rnn.BlockRInput{
+			Inputs: []*autofunc.RVariable{inVar},
+			States: []*autofunc.RVariable{inState},
+		})
+		res = append(res, out.ROutputs()[0])
+		lastState = out.States()[0]
+		lastRState = out.RStates()[0]
 	}
 	return res
 }

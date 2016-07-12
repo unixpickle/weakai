@@ -12,7 +12,7 @@ type RNNSeqFunc struct {
 	Block Block
 }
 
-func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) OutputSeqs {
+func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
 	var res rnnSeqFuncOutput
 	res.PackedOut = make([][]linalg.Vector, len(seqs))
 
@@ -56,7 +56,7 @@ func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) OutputSeqs {
 	return &res
 }
 
-func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) ROutputSeqs {
+func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) RResultSeqs {
 	var res rnnSeqFuncROutput
 	res.PackedOut = make([][]linalg.Vector, len(seqs))
 	res.RPackedOut = make([][]linalg.Vector, len(seqs))
@@ -204,7 +204,7 @@ func (r *rnnSeqFuncROutput) OutputSeqs() [][]linalg.Vector {
 	return r.PackedOut
 }
 
-func (r *rnnSeqFuncROutput) OutputRSeqs() [][]linalg.Vector {
+func (r *rnnSeqFuncROutput) ROutputSeqs() [][]linalg.Vector {
 	return r.PackedOut
 }
 

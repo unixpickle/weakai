@@ -111,10 +111,10 @@ type BlockLearner interface {
 	sgd.Learner
 }
 
-// OutputSeqs is the output of a SeqFunc, storing a
+// ResultSeqs is the output of a SeqFunc, storing a
 // batch of output sequences and capable of
 // back-propagation.
-type OutputSeqs interface {
+type ResultSeqs interface {
 	// OutputSeqs is a slice of sequences, where each
 	// sequence is a slice of output vectors.
 	OutputSeqs() [][]linalg.Vector
@@ -126,11 +126,11 @@ type OutputSeqs interface {
 	Gradient(upstream [][]linalg.Vector, g autofunc.Gradient)
 }
 
-// ROutputSeqs is like OutputSeqs but with extra
+// RResultSeqs is like OutputSeqs but with extra
 // R-operator information.
-type ROutputSeqs interface {
+type RResultSeqs interface {
 	OutputSeqs() [][]linalg.Vector
-	OutputRSeqs() [][]linalg.Vector
+	ROutputSeqs() [][]linalg.Vector
 
 	// RGradient performs back-propagation.
 	// The gradient g may be nil.
@@ -146,9 +146,9 @@ type SeqFunc interface {
 	// as a slice of vectors (autofunc.Results).
 	// The output sequences will be in the same order
 	// as the input sequences.
-	BatchSeqs(seqs [][]autofunc.Result) OutputSeqs
+	BatchSeqs(seqs [][]autofunc.Result) ResultSeqs
 
 	// BatchSeqsR is like BatchSeqs but with support
 	// for the R-operator.
-	BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) ROutputSeqs
+	BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) RResultSeqs
 }

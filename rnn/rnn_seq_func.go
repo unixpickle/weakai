@@ -9,14 +9,14 @@ import (
 // a Block as an RNN and running the RNN on input
 // sequences.
 type RNNSeqFunc struct {
-	B Block
+	Block Block
 }
 
 func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) OutputSeqs {
 	var res rnnSeqFuncOutput
 	res.PackedOut = make([][]linalg.Vector, len(seqs))
 
-	zeroStateVec := make(linalg.Vector, r.B.StateSize())
+	zeroStateVec := make(linalg.Vector, r.Block.StateSize())
 
 	var t int
 	for {
@@ -45,7 +45,7 @@ func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) OutputSeqs {
 		if len(step.LaneToOut) == 0 {
 			break
 		}
-		step.Outputs = r.B.Batch(&input)
+		step.Outputs = r.Block.Batch(&input)
 		res.Steps = append(res.Steps, step)
 		for l, outIdx := range step.LaneToOut {
 			res.PackedOut[l] = append(res.PackedOut[l], step.Outputs.Outputs()[outIdx])
@@ -61,7 +61,7 @@ func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) 
 	res.PackedOut = make([][]linalg.Vector, len(seqs))
 	res.RPackedOut = make([][]linalg.Vector, len(seqs))
 
-	zeroStateVec := make(linalg.Vector, r.B.StateSize())
+	zeroStateVec := make(linalg.Vector, r.Block.StateSize())
 
 	var t int
 	for {
@@ -97,7 +97,7 @@ func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) 
 		if len(step.LaneToOut) == 0 {
 			break
 		}
-		step.Outputs = r.B.BatchR(rv, &input)
+		step.Outputs = r.Block.BatchR(rv, &input)
 		res.Steps = append(res.Steps, step)
 		for l, outIdx := range step.LaneToOut {
 			out := step.Outputs

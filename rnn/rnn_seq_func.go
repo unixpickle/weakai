@@ -148,7 +148,7 @@ func (r *rnnSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradi
 		step := r.Steps[t]
 
 		var stepUpstream UpstreamGradient
-		for l := range step.LaneToOut {
+		loopUsedLanes(step.LaneToOut, func(l int) {
 			stateVar := step.InStateVars[l]
 			u := upstream[l][t]
 			stepUpstream.Outputs = append(stepUpstream.Outputs, u)
@@ -163,24 +163,22 @@ func (r *rnnSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradi
 			if !step.Inputs[l].Constant(g) {
 				g[step.InputVars[l]] = make(linalg.Vector, len(step.InputVars[l].Vector))
 			}
-		}
+		})
 
 		step.Outputs.Gradient(&stepUpstream, g)
 
-		if t > 0 {
-			for l := range step.LaneToOut {
+		loopUsedLanes(step.LaneToOut, func(l int) {
+			if t > 0 {
 				stateVar := step.InStateVars[l]
 				stateUpstreams[l] = g[stateVar]
 				delete(g, stateVar)
 			}
-		}
-		for l := range step.LaneToOut {
 			if input := step.Inputs[l]; !input.Constant(g) {
 				upstream := g[step.InputVars[l]]
 				delete(g, step.InputVars[l])
 				input.PropagateGradient(upstream, g)
 			}
-		}
+		})
 	}
 }
 
@@ -231,7 +229,7 @@ func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 		step := r.Steps[t]
 
 		var stepUpstream UpstreamRGradient
-		for l := range step.LaneToOut {
+		loopUsedLanes(step.LaneToOut, func(l int) {
 			stateVar := step.InStateVars[l].Variable
 			u := upstream[l][t]
 			uR := upstreamR[l][t]
@@ -254,20 +252,18 @@ func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 				g[v] = make(linalg.Vector, len(v.Vector))
 				rg[v] = make(linalg.Vector, len(v.Vector))
 			}
-		}
+		})
 
 		step.Outputs.RGradient(&stepUpstream, rg, g)
 
-		if t > 0 {
-			for l := range step.LaneToOut {
+		loopUsedLanes(step.LaneToOut, func(l int) {
+			if t > 0 {
 				stateVar := step.InStateVars[l].Variable
 				stateUpstreams[l] = g[stateVar]
 				stateRUpstreams[l] = rg[stateVar]
 				delete(g, stateVar)
 				delete(rg, stateVar)
 			}
-		}
-		for l := range step.LaneToOut {
 			if input := step.Inputs[l]; !input.Constant(rg, g) {
 				v := step.InputVars[l].Variable
 				upstream := g[v]
@@ -276,6 +272,18 @@ func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 				delete(rg, v)
 				input.PropagateRGradient(upstream, upstreamR, rg, g)
 			}
+		})
+	}
+}
+
+func loopUsedLanes(laneToOut map[int]int, f func(int)) {
+	var lane int
+	k := len(laneToOut)
+	for k > 0 {
+		if _, ok := laneToOut[lane]; ok {
+			f(lane)
+			k--
 		}
+		lane++
 	}
 }

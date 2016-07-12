@@ -9,6 +9,7 @@ const (
 	serializerTypeStackedBlock = serializerPrefix + "StackedBlock"
 	serializerTypeNetworkBlock = serializerPrefix + "NetworkBlock"
 	serializerTypeGRU          = serializerPrefix + "GRU"
+	serializerTypeRNNSeqFunc   = serializerPrefix + "RNNSeqFunc"
 )
 
 func init() {
@@ -17,4 +18,5 @@ func init() {
 	serializer.RegisterDeserializer(serializerTypeStackedBlock, DeserializeStackedBlock)
 	serializer.RegisterDeserializer(serializerTypeNetworkBlock, DeserializeNetworkBlock)
 	serializer.RegisterDeserializer(serializerTypeGRU, DeserializeGRU)
+	serializer.RegisterDeserializer(serializerTypeRNNSeqFunc, DeserializeRNNSeqFunc)
 }

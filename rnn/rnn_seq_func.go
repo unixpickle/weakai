@@ -1,8 +1,12 @@
 package rnn
 
 import (
+	"fmt"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/sgd"
 )
 
 // RNNSeqFunc is a SeqFunc which operates by using
@@ -10,6 +14,20 @@ import (
 // sequences.
 type RNNSeqFunc struct {
 	Block Block
+}
+
+// DeserializeRNNSeqFunc deserializes an RNNSeqFunc
+// that was serialized.
+func DeserializeRNNSeqFunc(d []byte) (serializer.Serializer, error) {
+	obj, err := serializer.DeserializeWithType(d)
+	if err != nil {
+		return nil, err
+	}
+	block, ok := obj.(Block)
+	if !ok {
+		return nil, fmt.Errorf("expected Block but got %T", obj)
+	}
+	return &RNNSeqFunc{Block: block}, nil
 }
 
 func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
@@ -108,6 +126,30 @@ func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) 
 	}
 
 	return &res
+}
+
+// Parameters returns the underlying block's parameters
+// if it implements sgd.Learner, or nil otherwise.
+func (r *RNNSeqFunc) Parameters() []*autofunc.Variable {
+	if l, ok := r.Block.(sgd.Learner); ok {
+		return l.Parameters()
+	} else {
+		return nil
+	}
+}
+
+func (r *RNNSeqFunc) SerializerType() string {
+	return serializerTypeRNNSeqFunc
+}
+
+// Serialize serializes the underlying block if it is
+// a serializer.Serializer (and fails otherwise).
+func (r *RNNSeqFunc) Serialize() ([]byte, error) {
+	s, ok := r.Block.(serializer.Serializer)
+	if !ok {
+		return nil, fmt.Errorf("type is not a Serializer: %T", r.Block)
+	}
+	return serializer.SerializeWithType(s)
 }
 
 type rnnSeqFuncOutputStep struct {

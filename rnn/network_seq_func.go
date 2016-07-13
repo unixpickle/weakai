@@ -3,7 +3,6 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
-	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -16,7 +15,7 @@ type NetworkSeqFunc struct {
 
 // DeserializeNetworkSeqFunc deserializes a NetworkSeqFunc
 // that was previously serialized.
-func DeserializeNetworkSeqFunc(d []byte) (serializer.Serializer, error) {
+func DeserializeNetworkSeqFunc(d []byte) (*NetworkSeqFunc, error) {
 	net, err := neuralnet.DeserializeNetwork(d)
 	if err != nil {
 		return nil, err

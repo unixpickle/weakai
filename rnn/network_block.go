@@ -26,7 +26,7 @@ func NewNetworkBlock(n neuralnet.Network, stateSize int) *NetworkBlock {
 	}
 }
 
-func DeserializeNetworkBlock(d []byte) (serializer.Serializer, error) {
+func DeserializeNetworkBlock(d []byte) (*NetworkBlock, error) {
 	list, err := serializer.DeserializeSlice(d)
 	if err != nil {
 		return nil, err

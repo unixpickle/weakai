@@ -18,7 +18,7 @@ type RNNSeqFunc struct {
 
 // DeserializeRNNSeqFunc deserializes an RNNSeqFunc
 // that was serialized.
-func DeserializeRNNSeqFunc(d []byte) (serializer.Serializer, error) {
+func DeserializeRNNSeqFunc(d []byte) (*RNNSeqFunc, error) {
 	obj, err := serializer.DeserializeWithType(d)
 	if err != nil {
 		return nil, err

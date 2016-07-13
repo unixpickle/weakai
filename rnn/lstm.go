@@ -40,7 +40,7 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 
 // DeserializeLSTM creates an LSTM from some serialized
 // data about the LSTM.
-func DeserializeLSTM(d []byte) (serializer.Serializer, error) {
+func DeserializeLSTM(d []byte) (*LSTM, error) {
 	slice, err := serializer.DeserializeSlice(d)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func newLSTMGate(inputSize, hiddenSize int, activation neuralnet.Layer) *lstmGat
 	return res
 }
 
-func deserializeLSTMGate(d []byte) (serializer.Serializer, error) {
+func deserializeLSTMGate(d []byte) (*lstmGate, error) {
 	list, err := serializer.DeserializeSlice(d)
 	if err != nil {
 		return nil, err

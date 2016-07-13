@@ -32,7 +32,7 @@ func NewGRU(inputSize, hiddenSize int) *GRU {
 
 // DeserializeGRU creates a GRU from some serialized
 // data about the GRU.
-func DeserializeGRU(d []byte) (serializer.Serializer, error) {
+func DeserializeGRU(d []byte) (*GRU, error) {
 	slice, err := serializer.DeserializeSlice(d)
 	if err != nil {
 		return nil, err

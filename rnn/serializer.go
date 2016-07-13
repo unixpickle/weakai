@@ -14,10 +14,11 @@ const (
 )
 
 func init() {
-	serializer.RegisterDeserializer(serializerTypeLSTM, DeserializeLSTM)
-	serializer.RegisterDeserializer(serializerTypeLSTMGate, deserializeLSTMGate)
-	serializer.RegisterDeserializer(serializerTypeStackedBlock, DeserializeStackedBlock)
-	serializer.RegisterDeserializer(serializerTypeNetworkBlock, DeserializeNetworkBlock)
-	serializer.RegisterDeserializer(serializerTypeGRU, DeserializeGRU)
-	serializer.RegisterDeserializer(serializerTypeRNNSeqFunc, DeserializeRNNSeqFunc)
+	serializer.RegisterTypedDeserializer(serializerTypeLSTM, DeserializeLSTM)
+	serializer.RegisterTypedDeserializer(serializerTypeLSTMGate, deserializeLSTMGate)
+	serializer.RegisterTypedDeserializer(serializerTypeStackedBlock, DeserializeStackedBlock)
+	serializer.RegisterTypedDeserializer(serializerTypeNetworkBlock, DeserializeNetworkBlock)
+	serializer.RegisterTypedDeserializer(serializerTypeGRU, DeserializeGRU)
+	serializer.RegisterTypedDeserializer(serializerTypeRNNSeqFunc, DeserializeRNNSeqFunc)
+	serializer.RegisterTypedDeserializer(serializerTypeNetworkSeqFunc, DeserializeNetworkSeqFunc)
 }

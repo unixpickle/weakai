@@ -15,7 +15,7 @@ import (
 // It can be used to form deep RNNs.
 type StackedBlock []Block
 
-func DeserializeStackedBlock(d []byte) (serializer.Serializer, error) {
+func DeserializeStackedBlock(d []byte) (StackedBlock, error) {
 	list, err := serializer.DeserializeSlice(d)
 	if err != nil {
 		return nil, err

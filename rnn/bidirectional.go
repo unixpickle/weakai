@@ -79,8 +79,48 @@ func (b *Bidirectional) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
 }
 
 func (b *Bidirectional) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) RResultSeqs {
-	// TODO: this.
-	panic("not yet implemented")
+	forwardOut := b.Forward.BatchSeqsR(rv, seqs)
+	backwardOut := b.Backward.BatchSeqsR(rv, reverseInputRSeqs(seqs))
+
+	rForwSeqs := forwardOut.ROutputSeqs()
+	rBackSeqs := backwardOut.ROutputSeqs()
+
+	joinedVars := make([][]*autofunc.Variable, len(seqs))
+	joinedResults := make([][]autofunc.RResult, len(seqs))
+	for lane, forwSeq := range forwardOut.OutputSeqs() {
+		backSeq := backwardOut.OutputSeqs()[lane]
+		forwSeqR := rForwSeqs[lane]
+		backSeqR := rBackSeqs[lane]
+		joinedSeq := make([]*autofunc.Variable, len(forwSeq))
+		joinedRes := make([]autofunc.RResult, len(forwSeq))
+		for time, forwEntry := range forwSeq {
+			backEntry := backSeq[len(forwSeq)-(time+1)]
+			fullVec := make(linalg.Vector, len(forwEntry)+len(backEntry))
+			copy(fullVec, forwEntry)
+			copy(fullVec[len(forwEntry):], backEntry)
+			joinedSeq[time] = &autofunc.Variable{Vector: fullVec}
+
+			forwEntryR := forwSeqR[time]
+			backEntryR := backSeqR[len(forwSeq)-(time+1)]
+			rVec := make(linalg.Vector, len(forwEntry)+len(backEntry))
+			copy(rVec, forwEntryR)
+			copy(rVec[len(forwEntry):], backEntryR)
+
+			joinedRes[time] = &autofunc.RVariable{
+				Variable:   joinedSeq[time],
+				ROutputVec: rVec,
+			}
+		}
+		joinedVars[lane] = joinedSeq
+		joinedResults[lane] = joinedRes
+	}
+
+	return &bidirectionalRResult{
+		ForwardOut:  forwardOut,
+		BackwardOut: backwardOut,
+		Joined:      joinedVars,
+		Out:         b.Output.BatchSeqsR(rv, joinedResults),
+	}
 }
 
 // Parameters combines the parameters of all three
@@ -135,7 +175,7 @@ func (b *bidirectionalResult) Gradient(upstream [][]linalg.Vector, g autofunc.Gr
 
 	b.Out.Gradient(upstream, g)
 
-	forwLen := b.forwardOutputSize()
+	forwLen := seqOutputSize(b.ForwardOut.OutputSeqs())
 	forwUpstream := make([][]linalg.Vector, len(upstream))
 	backUpstream := make([][]linalg.Vector, len(upstream))
 	for lane, joinedSeq := range b.Joined {
@@ -155,8 +195,69 @@ func (b *bidirectionalResult) Gradient(upstream [][]linalg.Vector, g autofunc.Gr
 	b.BackwardOut.Gradient(backUpstream, g)
 }
 
-func (b *bidirectionalResult) forwardOutputSize() int {
-	for _, outSeq := range b.ForwardOut.OutputSeqs() {
+type bidirectionalRResult struct {
+	ForwardOut  RResultSeqs
+	BackwardOut RResultSeqs
+	Joined      [][]*autofunc.Variable
+	Out         RResultSeqs
+}
+
+func (b *bidirectionalRResult) OutputSeqs() [][]linalg.Vector {
+	return b.Out.OutputSeqs()
+}
+
+func (b *bidirectionalRResult) ROutputSeqs() [][]linalg.Vector {
+	return b.Out.ROutputSeqs()
+}
+
+func (b *bidirectionalRResult) RGradient(upstream, upstreamR [][]linalg.Vector,
+	rg autofunc.RGradient, g autofunc.Gradient) {
+	// g is used for intermediate gradient variables.
+	if g == nil {
+		g = autofunc.Gradient{}
+	}
+
+	for _, joinedSeq := range b.Joined {
+		for _, joinedVar := range joinedSeq {
+			g[joinedVar] = make(linalg.Vector, len(joinedVar.Vector))
+			rg[joinedVar] = make(linalg.Vector, len(joinedVar.Vector))
+		}
+	}
+
+	b.Out.RGradient(upstream, upstreamR, rg, g)
+
+	forwLen := seqOutputSize(b.ForwardOut.OutputSeqs())
+	forwUpstream := make([][]linalg.Vector, len(upstream))
+	backUpstream := make([][]linalg.Vector, len(upstream))
+	forwUpstreamR := make([][]linalg.Vector, len(upstream))
+	backUpstreamR := make([][]linalg.Vector, len(upstream))
+	for lane, joinedSeq := range b.Joined {
+		subForw := make([]linalg.Vector, len(joinedSeq))
+		subBack := make([]linalg.Vector, len(joinedSeq))
+		subForwR := make([]linalg.Vector, len(joinedSeq))
+		subBackR := make([]linalg.Vector, len(joinedSeq))
+		for time, joinedVar := range joinedSeq {
+			joinedUpstream := g[joinedVar]
+			joinedUpstreamR := rg[joinedVar]
+			delete(g, joinedVar)
+			delete(rg, joinedVar)
+			subForw[time] = joinedUpstream[:forwLen]
+			subBack[len(joinedSeq)-(time+1)] = joinedUpstream[forwLen:]
+			subForwR[time] = joinedUpstreamR[:forwLen]
+			subBackR[len(joinedSeq)-(time+1)] = joinedUpstreamR[forwLen:]
+		}
+		forwUpstream[lane] = subForw
+		backUpstream[lane] = subBack
+		forwUpstreamR[lane] = subForwR
+		backUpstreamR[lane] = subBackR
+	}
+
+	b.ForwardOut.RGradient(forwUpstream, forwUpstreamR, rg, g)
+	b.BackwardOut.RGradient(backUpstream, backUpstreamR, rg, g)
+}
+
+func seqOutputSize(seqs [][]linalg.Vector) int {
+	for _, outSeq := range seqs {
 		if len(outSeq) > 0 {
 			return len(outSeq[0])
 		}
@@ -168,6 +269,17 @@ func reverseInputSeqs(seqs [][]autofunc.Result) [][]autofunc.Result {
 	res := make([][]autofunc.Result, len(seqs))
 	for i, s := range seqs {
 		res[i] = make([]autofunc.Result, len(s))
+		for j, element := range s {
+			res[i][len(s)-(j+1)] = element
+		}
+	}
+	return res
+}
+
+func reverseInputRSeqs(seqs [][]autofunc.RResult) [][]autofunc.RResult {
+	res := make([][]autofunc.RResult, len(seqs))
+	for i, s := range seqs {
+		res[i] = make([]autofunc.RResult, len(s))
 		for j, element := range s {
 			res[i][len(s)-(j+1)] = element
 		}

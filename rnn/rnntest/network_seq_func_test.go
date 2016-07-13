@@ -84,8 +84,8 @@ func TestNetworkSeqFuncGradients(t *testing.T) {
 		}
 	}
 
-	upstream := randomUpstream(rnnSeqFuncTests, 2)
-	upstreamR := randomUpstream(rnnSeqFuncTests, 2)
+	upstream := randomUpstreamSeqs(rnnSeqFuncTests, 2)
+	upstreamR := randomUpstreamSeqs(rnnSeqFuncTests, 2)
 
 	actual := autofunc.NewGradient(params)
 	seqFunc.BatchSeqs(nonRSeqs).Gradient(upstream, actual)

@@ -55,7 +55,7 @@ func TestRNNSeqFuncROutputs(t *testing.T) {
 	actual := seqFunc.BatchSeqsR(rVec, rInputs).ROutputSeqs()
 	var expected [][]linalg.Vector
 	for _, inSeq := range rInputs {
-		expected = append(expected, evaluateROutputs(rVec, block, inSeq))
+		expected = append(expected, evaluateRNNSeqFuncROutputs(rVec, block, inSeq))
 	}
 
 	testSequencesEqual(t, actual, expected)
@@ -84,11 +84,11 @@ func TestRNNSeqFuncGradients(t *testing.T) {
 	actualGrad := autofunc.NewGradient(parameters)
 	expectedGrad := autofunc.NewGradient(parameters)
 
-	upstream, upstreamR := randomUpstream(rnnSeqFuncTests, 2),
-		randomUpstream(rnnSeqFuncTests, 2)
+	upstream, upstreamR := randomUpstreamSeqs(rnnSeqFuncTests, 2),
+		randomUpstreamSeqs(rnnSeqFuncTests, 2)
 
 	for i, inSeq := range inputsR {
-		evaluateGradients(autofunc.RVector{}, block, inSeq, upstream[i],
+		evaluateRNNSeqFuncGradients(autofunc.RVector{}, block, inSeq, upstream[i],
 			upstreamR[i], autofunc.RGradient{}, expectedGrad)
 	}
 
@@ -127,11 +127,11 @@ func TestRNNSeqFuncRGradients(t *testing.T) {
 	expectedGrad := autofunc.NewGradient(parameters)
 	expectedRGrad := autofunc.NewRGradient(parameters)
 
-	upstream, upstreamR := randomUpstream(rnnSeqFuncTests, 2),
-		randomUpstream(rnnSeqFuncTests, 2)
+	upstream, upstreamR := randomUpstreamSeqs(rnnSeqFuncTests, 2),
+		randomUpstreamSeqs(rnnSeqFuncTests, 2)
 
 	for i, inSeq := range inputsR {
-		evaluateGradients(rVector, block, inSeq, upstream[i], upstreamR[i],
+		evaluateRNNSeqFuncGradients(rVector, block, inSeq, upstream[i], upstreamR[i],
 			expectedRGrad, expectedGrad)
 	}
 
@@ -221,7 +221,7 @@ func seqsToRVarSeqs(s [][]linalg.Vector) [][]autofunc.RResult {
 	return res
 }
 
-func randomUpstream(s [][]linalg.Vector, outputSize int) [][]linalg.Vector {
+func randomUpstreamSeqs(s [][]linalg.Vector, outputSize int) [][]linalg.Vector {
 	rand.Seed(123123)
 	var res [][]linalg.Vector
 	for _, v := range s {
@@ -237,7 +237,7 @@ func randomUpstream(s [][]linalg.Vector, outputSize int) [][]linalg.Vector {
 	return res
 }
 
-func evaluateROutputs(rv autofunc.RVector, b rnn.Block,
+func evaluateRNNSeqFuncROutputs(rv autofunc.RVector, b rnn.Block,
 	s []autofunc.RResult) []linalg.Vector {
 	res := make([]linalg.Vector, 0, len(s))
 	lastState := make(linalg.Vector, b.StateSize())
@@ -262,7 +262,7 @@ func evaluateROutputs(rv autofunc.RVector, b rnn.Block,
 	return res
 }
 
-func evaluateGradients(rv autofunc.RVector, b rnn.Block,
+func evaluateRNNSeqFuncGradients(rv autofunc.RVector, b rnn.Block,
 	inputs []autofunc.RResult, upstream,
 	upstreamR []linalg.Vector, rg autofunc.RGradient,
 	g autofunc.Gradient) {

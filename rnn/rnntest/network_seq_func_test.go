@@ -56,6 +56,56 @@ func TestNetworkSeqFuncROutputs(t *testing.T) {
 	testSequencesEqual(t, actualR, expectedR)
 }
 
+func TestNetworkSeqFuncGradients(t *testing.T) {
+	rand.Seed(123)
+	networkSeqFuncTestNet.Randomize()
+	seqFunc := &rnn.NetworkSeqFunc{Network: networkSeqFuncTestNet}
+
+	rSeqs := seqsToRVarSeqs(rnnSeqFuncTests)
+	var nonRSeqs [][]autofunc.Result
+
+	var params []*autofunc.Variable
+	params = append(params, seqFunc.Parameters()...)
+	for _, x := range rSeqs {
+		var nonRSeq []autofunc.Result
+		for _, y := range x {
+			z := y.(*autofunc.RVariable)
+			params = append(params, z.Variable)
+			nonRSeq = append(nonRSeq, z.Variable)
+		}
+		nonRSeqs = append(nonRSeqs, nonRSeq)
+	}
+
+	rVec := autofunc.RVector{}
+	for _, v := range params {
+		rVec[v] = make(linalg.Vector, len(v.Vector))
+		for i := range rVec[v] {
+			rVec[v][i] = rand.NormFloat64()
+		}
+	}
+
+	upstream := randomUpstream(rnnSeqFuncTests, 2)
+	upstreamR := randomUpstream(rnnSeqFuncTests, 2)
+
+	actual := autofunc.NewGradient(params)
+	seqFunc.BatchSeqs(nonRSeqs).Gradient(upstream, actual)
+
+	expected := autofunc.NewGradient(params)
+	expectedR := autofunc.NewRGradient(params)
+	evaluateNetworkSeqGrads(rVec, networkSeqFuncTestNet, rSeqs, upstream, upstreamR,
+		expectedR, expected)
+
+	testGradMapsEqual(t, "gradient", actual, expected)
+
+	rOut := seqFunc.BatchSeqsR(rVec, rSeqs)
+	actual.Zero()
+	actualR := autofunc.NewRGradient(params)
+	rOut.RGradient(upstream, upstreamR, actualR, actual)
+
+	testGradMapsEqual(t, "gradient (r)", actual, expected)
+	testGradMapsEqual(t, "r-gradient", actualR, expectedR)
+}
+
 func evaluateNetworkSeqROutputs(rv autofunc.RVector, n neuralnet.Network,
 	inSeqs [][]autofunc.RResult) (output, outputR [][]linalg.Vector) {
 	for _, inSeq := range inSeqs {
@@ -69,4 +119,19 @@ func evaluateNetworkSeqROutputs(rv autofunc.RVector, n neuralnet.Network,
 		outputR = append(outputR, outRVec)
 	}
 	return
+}
+
+func evaluateNetworkSeqGrads(rv autofunc.RVector, n neuralnet.Network,
+	inSeqs [][]autofunc.RResult, upstream, upstreamR [][]linalg.Vector,
+	rg autofunc.RGradient, g autofunc.Gradient) {
+	for i, inSeq := range inSeqs {
+		for j, x := range inSeq {
+			res := n.ApplyR(rv, x)
+			upstreamCopy := make(linalg.Vector, len(upstream[i][j]))
+			copy(upstreamCopy, upstream[i][j])
+			rUpstreamCopy := make(linalg.Vector, len(upstreamR[i][j]))
+			copy(rUpstreamCopy, upstreamR[i][j])
+			res.PropagateRGradient(upstreamCopy, rUpstreamCopy, rg, g)
+		}
+	}
 }

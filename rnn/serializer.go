@@ -11,6 +11,7 @@ const (
 	serializerTypeGRU            = serializerPrefix + "GRU"
 	serializerTypeRNNSeqFunc     = serializerPrefix + "RNNSeqFunc"
 	serializerTypeNetworkSeqFunc = serializerPrefix + "NetworkSeqFunc"
+	serializerTypeBidirectional  = serializerPrefix + "Bidirectional"
 )
 
 func init() {
@@ -21,4 +22,5 @@ func init() {
 	serializer.RegisterTypedDeserializer(serializerTypeGRU, DeserializeGRU)
 	serializer.RegisterTypedDeserializer(serializerTypeRNNSeqFunc, DeserializeRNNSeqFunc)
 	serializer.RegisterTypedDeserializer(serializerTypeNetworkSeqFunc, DeserializeNetworkSeqFunc)
+	serializer.RegisterTypedDeserializer(serializerTypeBidirectional, DeserializeBidirectional)
 }

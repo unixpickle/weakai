@@ -1,7 +1,6 @@
 package rnntest
 
 import (
-	"math"
 	"math/rand"
 	"testing"
 
@@ -19,8 +18,6 @@ var rnnSeqFuncTests = [][]linalg.Vector{
 	{{1, 0, 3}, {-1, 1, 1}, {1, 1, -1}, {0, 0, 0}},
 }
 
-const rnnSeqFuncTestPrec = 1e-5
-
 func TestRNNSeqFuncOutputs(t *testing.T) {
 	rand.Seed(123)
 	block := rnn.NewLSTM(3, 2)
@@ -30,12 +27,12 @@ func TestRNNSeqFuncOutputs(t *testing.T) {
 	actual := seqFunc.BatchSeqs(seqsToVarSeqs(rnnSeqFuncTests)).OutputSeqs()
 	expected := runner.RunAll(rnnSeqFuncTests)
 
-	testSequencesEqual(t, actual, expected)
+	testSequencesEqual(t, "outputs", actual, expected)
 
 	actual = seqFunc.BatchSeqsR(autofunc.RVector{},
 		seqsToRVarSeqs(rnnSeqFuncTests)).OutputSeqs()
 
-	testSequencesEqual(t, actual, expected)
+	testSequencesEqual(t, "outputs (r)", actual, expected)
 }
 
 func TestRNNSeqFuncROutputs(t *testing.T) {
@@ -58,7 +55,7 @@ func TestRNNSeqFuncROutputs(t *testing.T) {
 		expected = append(expected, evaluateRNNSeqFuncROutputs(rVec, block, inSeq))
 	}
 
-	testSequencesEqual(t, actual, expected)
+	testSequencesEqual(t, "r-outputs", actual, expected)
 }
 
 func TestRNNSeqFuncGradients(t *testing.T) {
@@ -140,101 +137,6 @@ func TestRNNSeqFuncRGradients(t *testing.T) {
 
 	testGradMapsEqual(t, "gradient", actualGrad, expectedGrad)
 	testGradMapsEqual(t, "r-gradient", actualRGrad, expectedRGrad)
-}
-
-func testSequencesEqual(t *testing.T, actual, expected [][]linalg.Vector) {
-	if len(actual) != len(expected) {
-		t.Errorf("expected %d outputs but got %d", len(expected), len(actual))
-		return
-	}
-	for i, xs := range expected {
-		as := actual[i]
-		if len(xs) != len(as) {
-			t.Errorf("output %d: expected %d timesteps but got %d",
-				i, len(xs), len(as))
-			continue
-		}
-		for time, xVec := range xs {
-			aVec := as[time]
-			if len(xVec) != len(aVec) {
-				t.Errorf("output %d time %d: expected len %d got %d",
-					i, time, len(xVec), len(aVec))
-			} else {
-				for j, x := range xVec {
-					a := aVec[j]
-					if math.Abs(a-x) > rnnSeqFuncTestPrec {
-						t.Errorf("output %d time %d entry %d: expected %f got %f",
-							i, time, j, x, a)
-					}
-				}
-			}
-		}
-	}
-}
-
-func testGradMapsEqual(t *testing.T, label string, actual,
-	expected map[*autofunc.Variable]linalg.Vector) {
-	if len(actual) != len(expected) {
-		t.Errorf("%s: expected len %d got len %d", label, len(expected), len(actual))
-		return
-	}
-	for variable, expectedVec := range expected {
-		actualVec := actual[variable]
-		if len(actualVec) != len(expectedVec) {
-			t.Errorf("%s: variable len should be %d but got %d",
-				label, len(expectedVec), len(actualVec))
-			continue
-		}
-		for i, x := range expectedVec {
-			a := actualVec[i]
-			if math.Abs(a-x) > rnnSeqFuncTestPrec {
-				t.Errorf("%s: entry %d: should be %f but got %f", label, i, x, a)
-			}
-		}
-	}
-}
-
-func seqsToVarSeqs(s [][]linalg.Vector) [][]autofunc.Result {
-	res := make([][]autofunc.Result, len(s))
-	for i, x := range s {
-		for _, v := range x {
-			res[i] = append(res[i], &autofunc.Variable{Vector: v})
-		}
-	}
-	return res
-}
-
-func seqsToRVarSeqs(s [][]linalg.Vector) [][]autofunc.RResult {
-	rand.Seed(123)
-	res := make([][]autofunc.RResult, len(s))
-	for i, x := range s {
-		for _, v := range x {
-			variable := &autofunc.Variable{Vector: v}
-			rVec := make(linalg.Vector, len(v))
-			for i := range rVec {
-				rVec[i] = rand.NormFloat64()
-			}
-			rVar := &autofunc.RVariable{Variable: variable, ROutputVec: rVec}
-			res[i] = append(res[i], rVar)
-		}
-	}
-	return res
-}
-
-func randomUpstreamSeqs(s [][]linalg.Vector, outputSize int) [][]linalg.Vector {
-	rand.Seed(123123)
-	var res [][]linalg.Vector
-	for _, v := range s {
-		randSeq := make([]linalg.Vector, len(v))
-		for i := range v {
-			randSeq[i] = make(linalg.Vector, outputSize)
-			for j := range randSeq[i] {
-				randSeq[i][j] = rand.NormFloat64()
-			}
-		}
-		res = append(res, randSeq)
-	}
-	return res
 }
 
 func evaluateRNNSeqFuncROutputs(rv autofunc.RVector, b rnn.Block,

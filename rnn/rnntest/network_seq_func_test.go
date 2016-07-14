@@ -29,12 +29,12 @@ func TestNetworkSeqFuncOutputs(t *testing.T) {
 	actual := seqFunc.BatchSeqs(seqsToVarSeqs(rnnSeqFuncTests)).OutputSeqs()
 	expected, _ := evaluateNetworkSeqROutputs(rVec, networkSeqFuncTestNet, rSeqs)
 
-	testSequencesEqual(t, actual, expected)
+	testSequencesEqual(t, "outputs", actual, expected)
 
 	actual = seqFunc.BatchSeqsR(autofunc.RVector{},
 		seqsToRVarSeqs(rnnSeqFuncTests)).OutputSeqs()
 
-	testSequencesEqual(t, actual, expected)
+	testSequencesEqual(t, "outputs (r)", actual, expected)
 }
 
 func TestNetworkSeqFuncROutputs(t *testing.T) {
@@ -53,7 +53,7 @@ func TestNetworkSeqFuncROutputs(t *testing.T) {
 
 	_, expectedR := evaluateNetworkSeqROutputs(rVec, networkSeqFuncTestNet, rSeqs)
 	actualR := seqFunc.BatchSeqsR(rVec, seqsToRVarSeqs(rnnSeqFuncTests)).ROutputSeqs()
-	testSequencesEqual(t, actualR, expectedR)
+	testSequencesEqual(t, "r-outputs", actualR, expectedR)
 }
 
 func TestNetworkSeqFuncGradients(t *testing.T) {

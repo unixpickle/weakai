@@ -45,10 +45,13 @@ func (s *SeqFuncTest) Run(t *testing.T) {
 	testSequencesEqual(t, "output (R)", actualOut, expectedOut)
 	testSequencesEqual(t, "r-output", actualROut, expectedROut)
 
-	actualGrad, actualRGrad := s.actualGradients(rv, rSeqs, upstream, upstreamR)
-	expectedGrad, expectedRGrad := s.expectedGradients(rv, rSeqs, upstream, upstreamR)
-	testGradMapsEqual(t, "gradients", actualGrad, expectedGrad)
+	actualRGrad, actualGrad := s.actualGradients(rv, rSeqs, upstream, upstreamR)
+	expectedRGrad, expectedGrad := s.expectedGradients(rv, rSeqs, upstream, upstreamR)
+	testGradMapsEqual(t, "gradients (R)", actualGrad, expectedGrad)
 	testGradMapsEqual(t, "r-gradients", actualRGrad, expectedRGrad)
+
+	actualGrad = s.actualGradientNonR(rv, rSeqs, upstream)
+	testGradMapsEqual(t, "gradients", actualGrad, expectedGrad)
 }
 
 func (s *SeqFuncTest) actualOutput() [][]linalg.Vector {
@@ -59,6 +62,31 @@ func (s *SeqFuncTest) actualOutputR(rv autofunc.RVector, rSeqs [][]autofunc.RRes
 	outputR [][]linalg.Vector) {
 	res := s.S.BatchSeqsR(rv, rSeqs)
 	return res.OutputSeqs(), res.ROutputSeqs()
+}
+
+func (s *SeqFuncTest) actualGradientNonR(rv autofunc.RVector,
+	rSeqs [][]autofunc.RResult,
+	upstream [][]linalg.Vector) autofunc.Gradient {
+	params := make([]*autofunc.Variable, 0, len(rv))
+	for p := range rv {
+		params = append(params, p)
+	}
+
+	g := autofunc.NewGradient(params)
+
+	var seqs [][]autofunc.Result
+	for _, rSeq := range rSeqs {
+		var seq []autofunc.Result
+		for _, x := range rSeq {
+			seq = append(seq, x.(*autofunc.RVariable).Variable)
+		}
+		seqs = append(seqs, seq)
+	}
+
+	output := s.S.BatchSeqs(seqs)
+	output.Gradient(upstream, g)
+
+	return g
 }
 
 func (s *SeqFuncTest) actualGradients(rv autofunc.RVector,

@@ -17,6 +17,7 @@ const (
 	serializerTypeReLU              = serializerTypePrefix + "ReLU"
 	serializerTypeRescaleLayer      = serializerTypePrefix + "RescaleLayer"
 	serializerTypeDropoutLayer      = serializerTypePrefix + "DropoutLayer"
+	serializerTypeVecRescaleLayer   = serializerTypePrefix + "VecRescaleLayer"
 )
 
 func init() {
@@ -52,4 +53,6 @@ func init() {
 		DeserializeRescaleLayer)
 	serializer.RegisterTypedDeserializer(serializerTypeDropoutLayer,
 		DeserializeDropoutLayer)
+	serializer.RegisterTypedDeserializer(serializerTypeVecRescaleLayer,
+		DeserializeVecRescaleLayer)
 }

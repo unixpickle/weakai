@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/num-analysis/linalg"
 )
 
 // RescaleLayer is a Layer which adds a bias to its
@@ -37,4 +38,46 @@ func (r *RescaleLayer) Serialize() ([]byte, error) {
 
 func (r *RescaleLayer) SerializerType() string {
 	return serializerTypeRescaleLayer
+}
+
+// VecRescaleLayer is similar to a RescaleLayer, but
+// it applies a different bias and scale to each entry
+// of its input vectors.
+type VecRescaleLayer struct {
+	Biases linalg.Vector
+	Scales linalg.Vector
+}
+
+func DeserializeVecRescaleLayer(d []byte) (*VecRescaleLayer, error) {
+	var res VecRescaleLayer
+	if err := json.Unmarshal(d, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (v *VecRescaleLayer) Apply(in autofunc.Result) autofunc.Result {
+	return autofunc.Mul(autofunc.Add(in, &autofunc.Variable{Vector: v.Biases}),
+		&autofunc.Variable{Vector: v.Scales})
+}
+
+func (v *VecRescaleLayer) ApplyR(rv autofunc.RVector, in autofunc.RResult) autofunc.RResult {
+	zeroVec := make(linalg.Vector, len(in.Output()))
+	biases := &autofunc.RVariable{
+		Variable:   &autofunc.Variable{Vector: v.Biases},
+		ROutputVec: zeroVec,
+	}
+	scales := &autofunc.RVariable{
+		Variable:   &autofunc.Variable{Vector: v.Scales},
+		ROutputVec: zeroVec,
+	}
+	return autofunc.MulR(autofunc.AddR(in, biases), scales)
+}
+
+func (v *VecRescaleLayer) Serialize() ([]byte, error) {
+	return json.Marshal(v)
+}
+
+func (v *VecRescaleLayer) SerializerType() string {
+	return serializerTypeVecRescaleLayer
 }

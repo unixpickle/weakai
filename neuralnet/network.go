@@ -1,3 +1,45 @@
+// Package neuralnet provides APIs for implementing and
+// training feedforward neural networks.
+//
+// Every layer in a neural network implements the Layer
+// interface. Any set of Layers can be stacked in a
+// Network (a type equivalent to []Layer), which is
+// itself a Layer. All Layers can be serialized, so
+// saving a neural network to a file is easy.
+//
+// To train a network, you can use the sgd package at
+// https://github.com/unixpickle/sgd or the Hessian Free
+// package at https://github.com/unixpickle/hessfree.
+// Both packages depend on the sgd.Gradienter interface,
+// which is implemented by BatchRGradienter and
+// SingleRGradienter.
+//
+// Here is how you could train a simple neural network:
+//
+//     var trainingSamples, trainingOutputs []linalg.Vector
+//     ...
+//     samples := neuralnet.VectorSampleSet(trainingSamples, trainingOutputs)
+//
+//     network := neuralnet.Network{
+//         &neuralnet.DenseLayer{
+//             InputCount:  InputVectorSize,
+//             OutputCount: FirstHiddenSize,
+//         },
+//         &neuralnet.Sigmoid{},
+//         &neuralnet.DenseLayer{
+//             InputCount:  FirstHiddenSize,
+//             OutputCount: OutputSize,
+//         },
+//         &neuralnet.Sigmoid{},
+//     }
+//     network.Randomize()
+//
+//     batcher := &neuralnet.BatchRGradienter{
+//         Learner:  network.BatchLearner(),
+//         CostFunc: neuralnet.MeanSquaredCost{},
+//     }
+//     sgd.SGD(batcher, samples, 0.2, 100000, 1)
+//
 package neuralnet
 
 import (

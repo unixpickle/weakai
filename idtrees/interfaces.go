@@ -1,3 +1,5 @@
+// Package idtrees implements the ID3 algorithm
+// for creating identification trees.
 package idtrees
 
 import "fmt"

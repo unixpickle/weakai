@@ -1,3 +1,4 @@
+// Package svm implements Support Vector Machines.
 package svm
 
 // A Sample represents an arbitrary piece of information.

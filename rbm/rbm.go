@@ -1,3 +1,4 @@
+// Package rbm implements Restricted Boltzmann Machines.
 package rbm
 
 import (

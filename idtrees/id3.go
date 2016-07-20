@@ -65,7 +65,7 @@ func id3(samples []Sample, attrs []string, maxGos int, entropy float64) *Tree {
 		less := id3(bestSplit.NumSplitSamples[0], attrs, maxGos,
 			bestSplit.NumSplitEntropies[0])
 		greater := id3(bestSplit.NumSplitSamples[1], attrs, maxGos,
-			bestSplit.NumSplitEntropies[0])
+			bestSplit.NumSplitEntropies[1])
 		return &Tree{
 			Attr: bestSplit.Attr,
 			NumSplit: &NumSplit{
@@ -120,9 +120,9 @@ func createPotentialSplit(samples []Sample, attr string) *potentialSplit {
 	val1 := samples[0].Attr(attr)
 	switch val1.(type) {
 	case int64:
-		return createIntSplit(samples, attr)
+		return createIntSplit(copySampleSlice(samples), attr)
 	case float64:
-		return createFloatSplit(samples, attr)
+		return createFloatSplit(copySampleSlice(samples), attr)
 	}
 
 	res := &potentialSplit{
@@ -132,14 +132,14 @@ func createPotentialSplit(samples []Sample, attr string) *potentialSplit {
 	}
 
 	for _, s := range samples {
-		c := s.Class()
-		res.ValSplitSamples[c] = append(res.ValSplitSamples[c], s)
+		v := s.Attr(attr)
+		res.ValSplitSamples[v] = append(res.ValSplitSamples[v], s)
 	}
 
 	totalDivider := 1 / float64(len(samples))
-	for class, s := range res.ValSplitSamples {
+	for attrVal, s := range res.ValSplitSamples {
 		e := newEntropyCounter(s).Entropy()
-		res.ValSplitEntropies[class] = e
+		res.ValSplitEntropies[attrVal] = e
 		res.Entropy += float64(len(s)) * totalDivider * e
 	}
 
@@ -269,6 +269,12 @@ func (e *entropyCounter) Add(s Sample) {
 func (e *entropyCounter) Remove(s Sample) {
 	e.classCounts[s.Class()]--
 	e.totalCount--
+}
+
+func copySampleSlice(s []Sample) []Sample {
+	res := make([]Sample, len(s))
+	copy(res, s)
+	return res
 }
 
 type sampleSorter struct {

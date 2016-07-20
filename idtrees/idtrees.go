@@ -47,6 +47,40 @@ type Tree struct {
 	ValSplit ValSplit
 }
 
+// Classify follows the tree for the given sample and
+// returns the resulting leaf classification.
+func (t *Tree) Classify(s Sample) map[interface{}]float64 {
+	for t.Classification == nil {
+		val := s.Attr(t.Attr)
+		if t.NumSplit != nil {
+			var greater bool
+			switch val := val.(type) {
+			case float64:
+				greater = val > t.NumSplit.Threshold.(float64)
+			case int64:
+				greater = val > t.NumSplit.Threshold.(int64)
+			}
+			if greater {
+				t = t.NumSplit.Greater
+			} else {
+				t = t.NumSplit.LessEqual
+			}
+		} else {
+			var found bool
+			for k, newTree := range t.ValSplit {
+				if k == val {
+					found = true
+					t = newTree
+				}
+			}
+			if !found {
+				return map[interface{}]float64{}
+			}
+		}
+	}
+	return t.Classification
+}
+
 // NumSplit stores the two branches resulting from
 // splitting a tree based on a numerical cutoff.
 type NumSplit struct {

@@ -1,103 +1,137 @@
 package main
 
 import (
+	"encoding/csv"
 	"errors"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"strings"
+
+	"github.com/unixpickle/weakai/idtrees"
 )
 
-type FieldType int
-
-const (
-	Integer FieldType = iota
-	String
-)
-
-type Field struct {
-	Name    string
-	Special bool
-	Ignore  bool
-	Type    FieldType
-	Values  []interface{}
+func ReadCSV(r io.Reader) (samples []idtrees.Sample, keys []string, err error) {
+	records, err := readStringRecords(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	rawVals := stringsToValues(records)
+	key, err := classKey(rawVals)
+	if err != nil {
+		return nil, nil, err
+	}
+	res := make([]idtrees.Sample, len(rawVals))
+	for i, x := range rawVals {
+		res[i] = &csvSample{
+			Map:       x,
+			ClassAttr: key,
+		}
+	}
+	return res, trainingKeys(rawVals), nil
 }
 
-type Entry struct {
-	Values map[*Field]interface{}
+type csvSample struct {
+	Map       map[string]interface{}
+	ClassAttr string
 }
 
-type CSV struct {
-	Fields  []*Field
-	Entries []*Entry
+func (c *csvSample) Attr(name string) interface{} {
+	return c.Map[name]
 }
 
-func ReadCSVFile(file string) (*CSV, error) {
-	contents, err := ioutil.ReadFile(file)
+func (c *csvSample) Class() interface{} {
+	return c.Map[c.ClassAttr]
+}
+
+// trainingKeys returns the keys in the data set to
+// use for training.
+func trainingKeys(c []map[string]interface{}) []string {
+	var res []string
+	if len(c) > 0 {
+		for key := range c[0] {
+			if !strings.HasPrefix(key, "_") && !strings.HasPrefix(key, "*") {
+				res = append(res, key)
+			}
+		}
+	}
+	return res
+}
+
+func classKey(c []map[string]interface{}) (string, error) {
+	var useKey string
+	if len(c) > 0 {
+		for key := range c[0] {
+			if strings.HasPrefix(key, "*") {
+				if useKey != "" {
+					return "", errors.New("multiple keys begin with asterisk")
+				}
+				useKey = key
+			}
+		}
+	}
+	if useKey == "" {
+		return "", errors.New("missing class attribute " +
+			"(name prefixed with asterisk)")
+	}
+	return useKey, nil
+}
+
+func readStringRecords(r io.Reader) ([]map[string]string, error) {
+	csvReader := csv.NewReader(r)
+	allRecords, err := csvReader.ReadAll()
 	if err != nil {
 		return nil, err
 	}
-
-	lines := strings.Split(string(contents), "\n")
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
+	if len(allRecords) < 2 {
+		return nil, nil
 	}
-
-	if len(lines) == 0 {
-		return nil, errors.New("missing header line")
-	}
-
-	res := &CSV{Fields: []*Field{}, Entries: []*Entry{}}
-	fieldNames := strings.Split(lines[0], ",")
-	fieldSeenValues := map[*Field]map[string]bool{}
-	for _, fieldName := range fieldNames {
-		field := &Field{Name: fieldName, Type: String, Values: []interface{}{}}
-		if len(fieldName) > 0 && fieldName[0] == '*' {
-			field.Name = field.Name[1:]
-			field.Special = true
-		} else if len(fieldName) > 0 && fieldName[0] == '_' {
-			field.Ignore = true
+	header := allRecords[0]
+	res := make([]map[string]string, len(allRecords)-1)
+	for i, x := range allRecords[1:] {
+		r := map[string]string{}
+		for j, val := range x {
+			r[header[j]] = val
 		}
-		res.Fields = append(res.Fields, field)
-		fieldSeenValues[field] = map[string]bool{}
+		res[i] = r
 	}
-
-	for i := 1; i < len(lines); i++ {
-		comps := strings.Split(lines[i], ",")
-		if len(comps) != len(fieldNames) {
-			return nil, errors.New("row " + strconv.Itoa(i) + " has wrong number of rows")
-		}
-		entry := &Entry{Values: map[*Field]interface{}{}}
-		for j, comp := range comps {
-			field := res.Fields[j]
-			entry.Values[field] = comp
-			if !fieldSeenValues[field][comp] {
-				fieldSeenValues[field][comp] = true
-				field.Values = append(field.Values, comp)
-			}
-		}
-		res.Entries = append(res.Entries, entry)
-	}
-
-	res.processIntegerFields()
-
 	return res, nil
 }
 
-func (c *CSV) processIntegerFields() {
-FieldLoop:
-	for _, field := range c.Fields {
-		intValues := []interface{}{}
-		for _, value := range field.Values {
-			if num, err := strconv.Atoi(value.(string)); err != nil {
-				continue FieldLoop
-			} else {
-				intValues = append(intValues, num)
+func stringsToValues(strs []map[string]string) []map[string]interface{} {
+	if len(strs) == 0 {
+		return nil
+	}
+	res := make([]map[string]interface{}, len(strs))
+	for i := range res {
+		res[i] = map[string]interface{}{}
+	}
+	for key := range strs[0] {
+		allInt, allFloat := true, true
+		for _, x := range strs {
+			_, intErr := strconv.ParseInt(x[key], 0, 64)
+			_, floatErr := strconv.ParseFloat(x[key], 64)
+			if intErr != nil {
+				allInt = false
+			}
+			if floatErr != nil {
+				allFloat = false
 			}
 		}
-		field.Type = Integer
-		field.Values = intValues
-		for _, entry := range c.Entries {
-			entry.Values[field], _ = strconv.Atoi(entry.Values[field].(string))
+		if allInt {
+			for i, x := range strs {
+				num, _ := strconv.ParseInt(x[key], 0, 64)
+				res[i][key] = num
+			}
+		} else if allFloat {
+			for i, x := range strs {
+				num, _ := strconv.ParseFloat(x[key], 64)
+				res[i][key] = num
+			}
+		} else {
+			for i, x := range strs {
+				res[i][key] = x[key]
+			}
 		}
 	}
+	return res
 }

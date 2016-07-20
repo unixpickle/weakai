@@ -155,11 +155,11 @@ func createIntSplit(samples []Sample, attr string) *potentialSplit {
 	}
 	sort.Sort(sorter)
 
-	lastValue := sorter.Samples[0].Attr(attr).(int)
+	lastValue := sorter.Samples[0].Attr(attr).(int64)
 	var cutoffIdxs []int
 	var cutoffs []interface{}
 	for i := 1; i < len(sorter.Samples); i++ {
-		val := sorter.Samples[i].Attr(attr).(int)
+		val := sorter.Samples[i].Attr(attr).(int64)
 		if val > lastValue {
 			cutoffIdxs = append(cutoffIdxs, i)
 			cutoffs = append(cutoffs, lastValue+(val-lastValue)/2)
@@ -289,8 +289,8 @@ type intSorter struct {
 }
 
 func (i *intSorter) Less(k, j int) bool {
-	kVal := i.Samples[k].Attr(i.Attr).(int)
-	jVal := i.Samples[j].Attr(i.Attr).(int)
+	kVal := i.Samples[k].Attr(i.Attr).(int64)
+	jVal := i.Samples[j].Attr(i.Attr).(int64)
 	return kVal < jVal
 }
 

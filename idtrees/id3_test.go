@@ -19,23 +19,23 @@ func TestID3(t *testing.T) {
 				treeTestSample{"age": int64(16), "class": "teenager"},
 				treeTestSample{"age": int64(30), "class": "adult"},
 			},
-			Attrs: []string{"age"},
+			Attrs: []Attr{"age"},
 			Expected: &Tree{
 				Attr: "age",
 				NumSplit: &NumSplit{
 					Threshold: int64(10),
 					LessEqual: &Tree{
-						Classification: map[interface{}]float64{"child": 1},
+						Classification: map[Class]float64{"child": 1},
 					},
 					Greater: &Tree{
 						Attr: "age",
 						NumSplit: &NumSplit{
 							Threshold: int64(22),
 							LessEqual: &Tree{
-								Classification: map[interface{}]float64{"teenager": 1},
+								Classification: map[Class]float64{"teenager": 1},
 							},
 							Greater: &Tree{
-								Classification: map[interface{}]float64{"adult": 1},
+								Classification: map[Class]float64{"adult": 1},
 							},
 						},
 					},
@@ -54,23 +54,23 @@ func TestID3(t *testing.T) {
 				treeTestSample{"height": 5.0, "class": "teenager"},
 				treeTestSample{"height": 6.0, "class": "adult"},
 			},
-			Attrs: []string{"height"},
+			Attrs: []Attr{"height"},
 			Expected: &Tree{
 				Attr: "height",
 				NumSplit: &NumSplit{
 					Threshold: (3.0 + 4.3) / 2.0,
 					LessEqual: &Tree{
-						Classification: map[interface{}]float64{"child": 1},
+						Classification: map[Class]float64{"child": 1},
 					},
 					Greater: &Tree{
 						Attr: "height",
 						NumSplit: &NumSplit{
 							Threshold: (5.0 + 5.5) / 2.0,
 							LessEqual: &Tree{
-								Classification: map[interface{}]float64{"teenager": 1},
+								Classification: map[Class]float64{"teenager": 1},
 							},
 							Greater: &Tree{
-								Classification: map[interface{}]float64{"adult": 1},
+								Classification: map[Class]float64{"adult": 1},
 							},
 						},
 					},
@@ -89,22 +89,22 @@ func TestID3(t *testing.T) {
 				treeTestSample{"drinks": false, "height": 6.0, "class": "teenager"},
 				treeTestSample{"drinks": true, "height": 6.0, "class": "adult"},
 			},
-			Attrs: []string{"height", "drinks"},
+			Attrs: []Attr{"height", "drinks"},
 			Expected: &Tree{
 				Attr: "height",
 				NumSplit: &NumSplit{
 					Threshold: (3.0 + 4.3) / 2.0,
 					LessEqual: &Tree{
-						Classification: map[interface{}]float64{"child": 1},
+						Classification: map[Class]float64{"child": 1},
 					},
 					Greater: &Tree{
 						Attr: "drinks",
-						ValSplit: map[interface{}]*Tree{
+						ValSplit: map[Val]*Tree{
 							true: &Tree{
-								Classification: map[interface{}]float64{"adult": 1},
+								Classification: map[Class]float64{"adult": 1},
 							},
 							false: &Tree{
-								Classification: map[interface{}]float64{"teenager": 1},
+								Classification: map[Class]float64{"teenager": 1},
 							},
 						},
 					},
@@ -125,29 +125,29 @@ func TestID3(t *testing.T) {
 				treeTestSample{"drinks": true, "height": 6.0, "class": "teenager"},
 				treeTestSample{"drinks": true, "height": 6.0, "class": "adult"},
 			},
-			Attrs: []string{"height", "drinks"},
+			Attrs: []Attr{"height", "drinks"},
 			Expected: &Tree{
 				Attr: "height",
 				NumSplit: &NumSplit{
 					Threshold: (3.0 + 4.3) / 2.0,
 					LessEqual: &Tree{
-						Classification: map[interface{}]float64{"child": 1},
+						Classification: map[Class]float64{"child": 1},
 					},
 					Greater: &Tree{
 						Attr: "drinks",
-						ValSplit: map[interface{}]*Tree{
+						ValSplit: map[Val]*Tree{
 							false: &Tree{
-								Classification: map[interface{}]float64{"teenager": 1},
+								Classification: map[Class]float64{"teenager": 1},
 							},
 							true: &Tree{
 								Attr: "height",
 								NumSplit: &NumSplit{
 									Threshold: (6.0 + 5.5) / 2.0,
 									LessEqual: &Tree{
-										Classification: map[interface{}]float64{"adult": 1},
+										Classification: map[Class]float64{"adult": 1},
 									},
 									Greater: &Tree{
-										Classification: map[interface{}]float64{
+										Classification: map[Class]float64{
 											"adult": 0.5, "teenager": 0.5,
 										},
 									},

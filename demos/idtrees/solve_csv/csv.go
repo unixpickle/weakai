@@ -10,7 +10,7 @@ import (
 	"github.com/unixpickle/weakai/idtrees"
 )
 
-func ReadCSV(r io.Reader) (samples []idtrees.Sample, keys []string, err error) {
+func ReadCSV(r io.Reader) ([]idtrees.Sample, []idtrees.Attr, error) {
 	records, err := readStringRecords(r)
 	if err != nil {
 		return nil, nil, err
@@ -35,18 +35,18 @@ type csvSample struct {
 	ClassAttr string
 }
 
-func (c *csvSample) Attr(name string) interface{} {
-	return c.Map[name]
+func (c *csvSample) Attr(a idtrees.Attr) idtrees.Val {
+	return c.Map[a.(string)]
 }
 
-func (c *csvSample) Class() interface{} {
+func (c *csvSample) Class() idtrees.Class {
 	return c.Map[c.ClassAttr]
 }
 
 // trainingKeys returns the keys in the data set to
 // use for training.
-func trainingKeys(c []map[string]interface{}) []string {
-	var res []string
+func trainingKeys(c []map[string]interface{}) []idtrees.Attr {
+	var res []idtrees.Attr
 	if len(c) > 0 {
 		for key := range c[0] {
 			if !strings.HasPrefix(key, "_") && !strings.HasPrefix(key, "*") {

@@ -15,7 +15,7 @@ func (t *Tree) String() string {
 
 	var buf bytes.Buffer
 
-	buf.WriteString(t.Attr)
+	buf.WriteString(fmt.Sprintf("%v", t.Attr))
 	buf.WriteRune('\n')
 
 	split := t.ValSplit
@@ -46,7 +46,7 @@ func (t *Tree) String() string {
 	return buf.String()
 }
 
-func classificationString(m map[interface{}]float64) string {
+func classificationString(m map[Class]float64) string {
 	if len(m) == 0 {
 		return "Unreachable"
 	}

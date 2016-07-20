@@ -4,7 +4,7 @@ import "math/rand"
 
 // A TreeGen generates decision trees which classify
 // a set of samples using a set of attributes.
-type TreeGen func(s []Sample, attrs []string) *Tree
+type TreeGen func(s []Sample, attrs []Attr) *Tree
 
 // A Forest is a list of bagged trees that are used
 // to classify samples.
@@ -16,13 +16,13 @@ type Forest []*Tree
 //
 // If nAttrs is 0, the rounded square root of the
 // number of attributes is used.
-func BuildForest(n int, samples []Sample, attrs []string,
+func BuildForest(n int, samples []Sample, attrs []Attr,
 	nSamples, nAttrs int, g TreeGen) Forest {
 	if nAttrs == 0 {
 		nAttrs = int(float64(len(attrs)) + 0.5)
 	}
 	sampleCopy := make([]Sample, len(samples))
-	attrCopy := make([]string, len(attrs))
+	attrCopy := make([]Attr, len(attrs))
 
 	copy(sampleCopy, samples)
 	copy(attrCopy, attrs)
@@ -38,8 +38,8 @@ func BuildForest(n int, samples []Sample, attrs []string,
 
 // Classify uses f to compute the class probabilities
 // of the given sample.
-func (f Forest) Classify(s AttrMap) map[interface{}]float64 {
-	res := map[interface{}]float64{}
+func (f Forest) Classify(s AttrMap) map[Class]float64 {
+	res := map[Class]float64{}
 	for _, t := range f {
 		x := t.Classify(s)
 		for k, v := range x {
@@ -60,7 +60,7 @@ func randomizeSamples(s []Sample, n int) {
 	}
 }
 
-func randomizeAttrs(a []string, n int) {
+func randomizeAttrs(a []Attr, n int) {
 	for i := 0; i < n; i++ {
 		idx := rand.Intn(len(a)-i) + i
 		a[i], a[idx] = a[idx], a[i]

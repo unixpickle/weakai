@@ -2,19 +2,19 @@ package idtrees
 
 import "testing"
 
-type treeTestSample map[string]interface{}
+type treeTestSample map[Attr]Val
 
-func (t treeTestSample) Attr(n string) interface{} {
+func (t treeTestSample) Attr(n Attr) Val {
 	return t[n]
 }
 
-func (t treeTestSample) Class() interface{} {
+func (t treeTestSample) Class() Class {
 	return t["class"]
 }
 
 type treeTest struct {
 	Samples  []Sample
-	Attrs    []string
+	Attrs    []Attr
 	Expected *Tree
 }
 

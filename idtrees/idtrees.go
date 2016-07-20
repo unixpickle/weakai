@@ -2,10 +2,28 @@
 // identification trees.
 package idtrees
 
+// Comparable is any type, with the restriction
+// that the type must be comparable with the ==
+// operator. Thus, slices and maps are not
+// Comparable.
+type Comparable interface{}
+
+// An Attr is a comparable value used for keys in
+// an AttrMap.
+type Attr Comparable
+
+// A Val is a comparable value used for values in
+// an AttrMap.
+type Val Comparable
+
+// A Class is a comparable value used for classes
+// of samples.
+type Class Comparable
+
 // An AttrMap is anything with a set of attributes.
 type AttrMap interface {
 	// Attr returns the attribute value for the given key.
-	Attr(name string) interface{}
+	Attr(attr Attr) Val
 }
 
 // A Sample has a classification and a set of attributes.
@@ -24,7 +42,7 @@ type Sample interface {
 	// The result may be any type, with the only caveat
 	// being that classes must be comparable and thus
 	// cannot be maps or slices.
-	Class() interface{}
+	Class() Class
 }
 
 type Tree struct {
@@ -37,15 +55,15 @@ type Tree struct {
 	//
 	// If this leaf was unreachable in the training
 	// data, then this map is empty.
-	Classification map[interface{}]float64
+	Classification map[Class]float64
 
 	// If Classification is nil (i.e. this is not a leaf),
 	// then this is the attribute used to split the branch.
-	// If the attribute refered to by Attr is an int64, or
+	// If the attribute refered to by Attr is an int64 or
 	// a float64, then NumSplit is non-nil.
-	// If the attribute is not an int64 or a float64, then
-	// ValSplit is non-nil.
-	Attr string
+	// If the attribute is not for an int64 or a float64,
+	// then ValSplit is non-nil.
+	Attr Attr
 
 	NumSplit *NumSplit
 	ValSplit ValSplit
@@ -53,7 +71,7 @@ type Tree struct {
 
 // Classify follows the tree for the given sample and
 // returns the resulting leaf classification.
-func (t *Tree) Classify(s AttrMap) map[interface{}]float64 {
+func (t *Tree) Classify(s AttrMap) map[Class]float64 {
 	for t.Classification == nil {
 		val := s.Attr(t.Attr)
 		if t.NumSplit != nil {
@@ -78,7 +96,7 @@ func (t *Tree) Classify(s AttrMap) map[interface{}]float64 {
 				}
 			}
 			if !found {
-				return map[interface{}]float64{}
+				return map[Class]float64{}
 			}
 		}
 	}
@@ -92,7 +110,7 @@ type NumSplit struct {
 	// If a sample's attribute's value is greater
 	// than Threshold, then the Greater branch is
 	// taken. Otherwise, the LessEqual branch is.
-	Threshold interface{}
+	Threshold Val
 
 	LessEqual *Tree
 	Greater   *Tree
@@ -100,4 +118,4 @@ type NumSplit struct {
 
 // ValSplit stores the branches resulting from splitting
 // a tree by a comparable but non-numeric attribute.
-type ValSplit map[interface{}]*Tree
+type ValSplit map[Val]*Tree

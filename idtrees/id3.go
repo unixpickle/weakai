@@ -12,7 +12,7 @@ import (
 // The maxGos argument specifies the maximum number
 // of Goroutines to use during tree generation.
 // If maxGos is 0, then GOMAXPROCS is used.
-func ID3(samples []Sample, attrs []string, maxGos int) *Tree {
+func ID3(samples []Sample, attrs []Attr, maxGos int) *Tree {
 	if maxGos == 0 {
 		maxGos = runtime.GOMAXPROCS(0)
 	}
@@ -20,12 +20,12 @@ func ID3(samples []Sample, attrs []string, maxGos int) *Tree {
 	return id3(samples, attrs, maxGos, baseEntropy)
 }
 
-func id3(samples []Sample, attrs []string, maxGos int, entropy float64) *Tree {
+func id3(samples []Sample, attrs []Attr, maxGos int, entropy float64) *Tree {
 	if entropy == 0 {
 		return createLeaf(samples)
 	}
 
-	attrChan := make(chan string, len(attrs))
+	attrChan := make(chan Attr, len(attrs))
 	for _, a := range attrs {
 		attrChan <- a
 	}
@@ -88,11 +88,11 @@ func id3(samples []Sample, attrs []string, maxGos int, entropy float64) *Tree {
 }
 
 func createLeaf(samples []Sample) *Tree {
-	counts := map[interface{}]int{}
+	counts := map[Class]int{}
 	for _, s := range samples {
 		counts[s.Class()]++
 	}
-	res := &Tree{Classification: map[interface{}]float64{}}
+	res := &Tree{Classification: map[Class]float64{}}
 	totalScaler := 1 / float64(len(samples))
 	for class, count := range counts {
 		res.Classification[class] = float64(count) * totalScaler
@@ -101,18 +101,18 @@ func createLeaf(samples []Sample) *Tree {
 }
 
 type potentialSplit struct {
-	Attr    string
+	Attr    Attr
 	Entropy float64
 
-	ValSplitEntropies map[interface{}]float64
-	ValSplitSamples   map[interface{}][]Sample
+	ValSplitEntropies map[Val]float64
+	ValSplitSamples   map[Val][]Sample
 
-	Threshold         interface{}
+	Threshold         Val
 	NumSplitEntropies [2]float64
 	NumSplitSamples   [2][]Sample
 }
 
-func createPotentialSplit(samples []Sample, attr string) *potentialSplit {
+func createPotentialSplit(samples []Sample, attr Attr) *potentialSplit {
 	if len(samples) == 0 {
 		panic("cannot split 0 samples")
 	}
@@ -127,8 +127,8 @@ func createPotentialSplit(samples []Sample, attr string) *potentialSplit {
 
 	res := &potentialSplit{
 		Attr:              attr,
-		ValSplitEntropies: map[interface{}]float64{},
-		ValSplitSamples:   map[interface{}][]Sample{},
+		ValSplitEntropies: map[Val]float64{},
+		ValSplitSamples:   map[Val][]Sample{},
 	}
 
 	for _, s := range samples {
@@ -146,7 +146,7 @@ func createPotentialSplit(samples []Sample, attr string) *potentialSplit {
 	return res
 }
 
-func createIntSplit(samples []Sample, attr string) *potentialSplit {
+func createIntSplit(samples []Sample, attr Attr) *potentialSplit {
 	sorter := &intSorter{
 		sampleSorter: sampleSorter{
 			Attr:    attr,
@@ -157,7 +157,7 @@ func createIntSplit(samples []Sample, attr string) *potentialSplit {
 
 	lastValue := sorter.Samples[0].Attr(attr).(int64)
 	var cutoffIdxs []int
-	var cutoffs []interface{}
+	var cutoffs []Val
 	for i := 1; i < len(sorter.Samples); i++ {
 		val := sorter.Samples[i].Attr(attr).(int64)
 		if val > lastValue {
@@ -170,7 +170,7 @@ func createIntSplit(samples []Sample, attr string) *potentialSplit {
 	return createNumericSplit(sorter.sampleSorter, cutoffIdxs, cutoffs)
 }
 
-func createFloatSplit(samples []Sample, attr string) *potentialSplit {
+func createFloatSplit(samples []Sample, attr Attr) *potentialSplit {
 	sorter := &floatSorter{
 		sampleSorter: sampleSorter{
 			Attr:    attr,
@@ -181,7 +181,7 @@ func createFloatSplit(samples []Sample, attr string) *potentialSplit {
 
 	lastValue := sorter.Samples[0].Attr(attr).(float64)
 	var cutoffIdxs []int
-	var cutoffs []interface{}
+	var cutoffs []Val
 	for i := 1; i < len(sorter.Samples); i++ {
 		val := sorter.Samples[i].Attr(attr).(float64)
 		if val > lastValue {
@@ -194,7 +194,7 @@ func createFloatSplit(samples []Sample, attr string) *potentialSplit {
 	return createNumericSplit(sorter.sampleSorter, cutoffIdxs, cutoffs)
 }
 
-func createNumericSplit(s sampleSorter, cutoffIdxs []int, cutoffs []interface{}) *potentialSplit {
+func createNumericSplit(s sampleSorter, cutoffIdxs []int, cutoffs []Val) *potentialSplit {
 	if len(cutoffIdxs) == 0 {
 		return nil
 	}
@@ -233,13 +233,13 @@ func createNumericSplit(s sampleSorter, cutoffIdxs []int, cutoffs []interface{})
 }
 
 type entropyCounter struct {
-	classCounts map[interface{}]int
+	classCounts map[Class]int
 	totalCount  int
 }
 
 func newEntropyCounter(s []Sample) *entropyCounter {
 	res := &entropyCounter{
-		classCounts: map[interface{}]int{},
+		classCounts: map[Class]int{},
 		totalCount:  len(s),
 	}
 	for _, sample := range s {
@@ -278,7 +278,7 @@ func copySampleSlice(s []Sample) []Sample {
 }
 
 type sampleSorter struct {
-	Attr    string
+	Attr    Attr
 	Samples []Sample
 }
 

@@ -17,6 +17,14 @@ func (_ Sigmoid) ApplyR(v autofunc.RVector, r autofunc.RResult) autofunc.RResult
 	return autofunc.Sigmoid{}.ApplyR(v, r)
 }
 
+func (_ Sigmoid) Batch(inputs autofunc.Result, n int) autofunc.Result {
+	return Sigmoid{}.Apply(inputs)
+}
+
+func (_ Sigmoid) BatchR(v autofunc.RVector, inputs autofunc.RResult, n int) autofunc.RResult {
+	return Sigmoid{}.ApplyR(v, inputs)
+}
+
 func (_ Sigmoid) Serialize() ([]byte, error) {
 	return []byte{}, nil
 }
@@ -57,6 +65,14 @@ func (_ ReLU) ApplyR(v autofunc.RVector, r autofunc.RResult) autofunc.RResult {
 		ROutputVec: vecR,
 		Input:      r,
 	}
+}
+
+func (_ ReLU) Batch(inputs autofunc.Result, n int) autofunc.Result {
+	return ReLU{}.Apply(inputs)
+}
+
+func (_ ReLU) BatchR(v autofunc.RVector, inputs autofunc.RResult, n int) autofunc.RResult {
+	return ReLU{}.ApplyR(v, inputs)
 }
 
 func (_ ReLU) Serialize() ([]byte, error) {
@@ -134,6 +150,15 @@ func (_ HyperbolicTangent) Apply(r autofunc.Result) autofunc.Result {
 func (_ HyperbolicTangent) ApplyR(v autofunc.RVector, r autofunc.RResult) autofunc.RResult {
 	stretched := autofunc.ScaleR(autofunc.Sigmoid{}.ApplyR(v, autofunc.ScaleR(r, 2)), 2)
 	return autofunc.AddScalerR(stretched, -1)
+}
+
+func (_ HyperbolicTangent) Batch(inputs autofunc.Result, n int) autofunc.Result {
+	return HyperbolicTangent{}.Apply(inputs)
+}
+
+func (_ HyperbolicTangent) BatchR(v autofunc.RVector, inputs autofunc.RResult,
+	n int) autofunc.RResult {
+	return HyperbolicTangent{}.ApplyR(v, inputs)
 }
 
 func (_ HyperbolicTangent) Serialize() ([]byte, error) {

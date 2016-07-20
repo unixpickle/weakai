@@ -38,7 +38,7 @@ func BuildForest(n int, samples []Sample, attrs []string,
 
 // Classify uses f to compute the class probabilities
 // of the given sample.
-func (f Forest) Classify(s Sample) map[interface{}]float64 {
+func (f Forest) Classify(s AttrMap) map[interface{}]float64 {
 	res := map[interface{}]float64{}
 	for _, t := range f {
 		x := t.Classify(s)

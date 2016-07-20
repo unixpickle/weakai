@@ -2,11 +2,15 @@
 // identification trees.
 package idtrees
 
+// An AttrMap is anything with a set of attributes.
+type AttrMap interface {
+	// Attr returns the attribute value for the given key.
+	Attr(name string) interface{}
+}
+
 // A Sample has a classification and a set of attributes.
 type Sample interface {
-	// Attr returns the attribute value for the given key.
-	//
-	// If this returns an int64 or a float64, then all
+	// If Attr returns an int64 or a float64, then all
 	// Samples in the training set must return the same
 	// type and the attribute will be used to form
 	// split rules like "x >= 3".
@@ -14,7 +18,7 @@ type Sample interface {
 	// If the returned type is not one of the numeric types
 	// listed above, then splits are equality-based (e.g.
 	// a rule like "x == true", or one like "x == Red").
-	Attr(name string) interface{}
+	AttrMap
 
 	// Class returns the class of this Sample.
 	// The result may be any type, with the only caveat
@@ -49,7 +53,7 @@ type Tree struct {
 
 // Classify follows the tree for the given sample and
 // returns the resulting leaf classification.
-func (t *Tree) Classify(s Sample) map[interface{}]float64 {
+func (t *Tree) Classify(s AttrMap) map[interface{}]float64 {
 	for t.Classification == nil {
 		val := s.Attr(t.Attr)
 		if t.NumSplit != nil {

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	ForestSize   = 500
-	TrainingSize = 900
+	ForestSize   = 100
+	TrainingSize = 4000
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 	samples := trainingSamples()
 	attrs := trainingAttrs()
 	log.Println("Training forest...")
-	forest := idtrees.BuildForest(ForestSize, samples, attrs, TrainingSize, 0,
+	forest := idtrees.BuildForest(ForestSize, samples, attrs, TrainingSize, 75,
 		func(s []idtrees.Sample, a []idtrees.Attr) *idtrees.Tree {
 			return idtrees.ID3(s, a, 0)
 		})
@@ -56,19 +56,15 @@ func trainingAttrs() []idtrees.Attr {
 }
 
 type imageSample struct {
-	Intensities []bool
+	Intensities []float64
 	Label       int
 }
 
 func newImageSample(s mnist.Sample) *imageSample {
-	res := &imageSample{
-		Intensities: make([]bool, len(s.Intensities)),
+	return &imageSample{
+		Intensities: s.Intensities,
 		Label:       s.Label,
 	}
-	for i, x := range s.Intensities {
-		res.Intensities[i] = x > 0.5
-	}
-	return res
 }
 
 func (i *imageSample) Attr(idx idtrees.Attr) idtrees.Val {

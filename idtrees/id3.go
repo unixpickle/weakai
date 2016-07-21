@@ -57,7 +57,7 @@ func id3(samples []Sample, attrs []Attr, maxGos int, entropy float64) *Tree {
 			bestSplit = split
 		}
 	}
-	if bestSplit.Entropy >= entropy {
+	if bestSplit == nil || bestSplit.Entropy >= entropy {
 		return createLeaf(samples)
 	}
 

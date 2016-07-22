@@ -46,6 +46,14 @@ func (g *GaussNoiseLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofu
 	}
 }
 
+func (g *GaussNoiseLayer) Batch(in autofunc.Result, n int) autofunc.Result {
+	return g.Apply(in)
+}
+
+func (g *GaussNoiseLayer) BatchR(v autofunc.RVector, in autofunc.RResult, n int) autofunc.RResult {
+	return g.ApplyR(v, in)
+}
+
 func (g *GaussNoiseLayer) SerializerType() string {
 	return serializerTypeGaussNoiseLayer
 }

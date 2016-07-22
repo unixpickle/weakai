@@ -59,6 +59,14 @@ func (d *DropoutLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.
 	}
 }
 
+func (d *DropoutLayer) Batch(in autofunc.Result, n int) autofunc.Result {
+	return d.Apply(in)
+}
+
+func (d *DropoutLayer) BatchR(v autofunc.RVector, in autofunc.RResult, n int) autofunc.RResult {
+	return d.ApplyR(v, in)
+}
+
 func (d *DropoutLayer) Serialize() ([]byte, error) {
 	return json.Marshal(d)
 }

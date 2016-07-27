@@ -22,13 +22,26 @@ type Gradient struct {
 	// Sum is the current ensemble classifier, which
 	// is added to during each step of boosting.
 	Sum SumClassifier
+
+	// OutCache is the current output of the ensemble
+	// classifier.
+	// This is used to avoid recomputing the outputs
+	// of all the classifiers at each iteration.
+	//
+	// If you modify Pool, List, Desired, Loss, or Sum
+	// during training, you should nil out or recompute
+	// CurrentOutput to reflect the new situation.
+	OutCache linalg.Vector
 }
 
 // Step performs a step of gradient boosting and
 // returns the loss before the step was performed.
 func (g *Gradient) Step() float64 {
+	if g.OutCache == nil {
+		g.OutCache = g.Sum.Classify(g.List)
+	}
 	curOutput := &autofunc.Variable{
-		Vector: g.Sum.Classify(g.List),
+		Vector: g.OutCache,
 	}
 	curLoss := g.Loss.Loss(curOutput, g.Desired)
 
@@ -41,6 +54,8 @@ func (g *Gradient) Step() float64 {
 
 	g.Sum.Weights = append(g.Sum.Weights, stepAmount)
 	g.Sum.Classifiers = append(g.Sum.Classifiers, classifier)
+
+	g.OutCache.Add(classOutput.Scale(stepAmount))
 
 	return curLoss.Output()[0]
 }

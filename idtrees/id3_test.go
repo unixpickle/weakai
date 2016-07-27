@@ -2,7 +2,9 @@ package idtrees
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 )
 
 func TestID3(t *testing.T) {
@@ -161,5 +163,31 @@ func TestID3(t *testing.T) {
 	}
 	for i, test := range tests {
 		test.Run(t, fmt.Sprintf("case %d", i))
+	}
+}
+
+func TestID3NoReusing(t *testing.T) {
+	rand.Seed(123)
+
+	attrs := []Attr{"value"}
+
+	ch := make(chan struct{})
+	go func() {
+		for i := 0; i < 10; i++ {
+			var samples []Sample
+			for i := 0; i < 30000; i++ {
+				samples = append(samples, treeTestSample{"value": rand.Intn(10),
+					"class": rand.Intn(2)})
+			}
+			ID3(samples, attrs, 1)
+		}
+		close(ch)
+	}()
+
+	select {
+	case <-ch:
+		return
+	case <-time.After(time.Second * 10):
+		t.Error("got caught in long loop")
 	}
 }

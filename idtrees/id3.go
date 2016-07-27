@@ -57,7 +57,9 @@ func id3(samples []Sample, attrs []Attr, maxGos int, entropy float64) *Tree {
 			bestSplit = split
 		}
 	}
-	if bestSplit == nil || bestSplit.Entropy >= entropy {
+
+	if bestSplit == nil || bestSplit.Entropy >= entropy ||
+		bestSplit.numBranches() < 2 {
 		return createLeaf(samples)
 	}
 
@@ -110,6 +112,27 @@ type potentialSplit struct {
 	Threshold         Val
 	NumSplitEntropies [2]float64
 	NumSplitSamples   [2][]Sample
+}
+
+// numBranches returns the number of non-empty branches
+// resulting from the split.
+func (p *potentialSplit) numBranches() int {
+	var count int
+	if p.Threshold != nil {
+		if len(p.NumSplitSamples[0]) > 0 {
+			count++
+		}
+		if len(p.NumSplitSamples[1]) > 0 {
+			count++
+		}
+	} else {
+		for _, split := range p.ValSplitSamples {
+			if len(split) > 0 {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func createPotentialSplit(samples []Sample, attr Attr) *potentialSplit {

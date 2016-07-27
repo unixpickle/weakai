@@ -19,7 +19,7 @@ func main() {
 		Loss:    boosting.ExpLoss{},
 		Desired: classes,
 		List:    data,
-		Pool:    NewStumpPool(data),
+		Pool:    StumpPool(data),
 	}
 	var i int
 	for {

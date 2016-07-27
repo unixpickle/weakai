@@ -25,7 +25,7 @@ type Classifier interface {
 }
 
 // A Pool creates or reuses classifiers which are
-// tuned for particular sets of samples.
+// tuned for particular sets of weighted samples.
 type Pool interface {
 	// BestClassifier creates or reuses a Classifier
 	// which classifies s well given the weighting.

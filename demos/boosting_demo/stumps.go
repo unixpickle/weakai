@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"sort"
 
 	"github.com/unixpickle/num-analysis/linalg"
@@ -28,11 +27,9 @@ func (t TreeStump) Classify(s boosting.SampleList) linalg.Vector {
 	return res
 }
 
-type StumpPool []TreeStump
-
-func NewStumpPool(samples SampleList) StumpPool {
+func StumpPool(samples SampleList) boosting.Pool {
 	dims := len(samples[0])
-	res := make(StumpPool, 0, len(samples)*dims)
+	res := make([]boosting.Classifier, 0, len(samples)*dims)
 	for d := 0; d < dims; d++ {
 		values := make([]float64, 0, len(samples))
 		seenValues := map[float64]bool{}
@@ -56,18 +53,5 @@ func NewStumpPool(samples SampleList) StumpPool {
 			res = append(res, t)
 		}
 	}
-	return res
-}
-
-func (s StumpPool) BestClassifier(l boosting.SampleList, w linalg.Vector) boosting.Classifier {
-	var bestDot float64
-	var bestC boosting.Classifier
-	for i, c := range s {
-		dot := math.Abs(c.Classify(l).Dot(w))
-		if i == 0 || dot > bestDot {
-			bestDot = dot
-			bestC = c
-		}
-	}
-	return bestC
+	return boosting.NewStaticPool(res, samples)
 }

@@ -24,6 +24,19 @@ type Classifier interface {
 	Classify(s SampleList) linalg.Vector
 }
 
+// A Pool creates or reuses classifiers which are
+// tuned for particular sets of samples.
+type Pool interface {
+	// BestClassifier creates or reuses a Classifier
+	// which classifies s well given the weighting.
+	//
+	// In other words, the classifier's output vector
+	// on s should have as much correlation to the
+	// weight vector as possible, where correlation is
+	// measured by cosine distance.
+	BestClassifier(s SampleList, weights linalg.Vector) Classifier
+}
+
 // SumClassifier classifies samples by adding the
 // results of other classifiers.
 type SumClassifier struct {

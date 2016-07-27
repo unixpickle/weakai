@@ -16,7 +16,7 @@ func main() {
 	classes := RandomClassVector(data.Len())
 
 	grad := boosting.Gradient{
-		Loss:    boosting.SquareLoss{},
+		Loss:    boosting.ExpLoss{},
 		Desired: classes,
 		List:    data,
 		Pool:    NewStumpPool(data),

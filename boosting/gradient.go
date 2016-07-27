@@ -19,19 +19,16 @@ type Gradient struct {
 	// Pool is used to create weak learners for training.
 	Pool Pool
 
-	curSum SumClassifier
-}
-
-// Solution returns the current ensemble classifier.
-func (g *Gradient) Solution() *SumClassifier {
-	return &g.curSum
+	// Sum is the current ensemble classifier, which
+	// is added to during each step of boosting.
+	Sum SumClassifier
 }
 
 // Step performs a step of gradient boosting and
 // returns the loss before the step was performed.
 func (g *Gradient) Step() float64 {
 	curOutput := &autofunc.Variable{
-		Vector: g.curSum.Classify(g.List),
+		Vector: g.Sum.Classify(g.List),
 	}
 	curLoss := g.Loss.Loss(curOutput, g.Desired)
 
@@ -42,8 +39,8 @@ func (g *Gradient) Step() float64 {
 	classOutput := classifier.Classify(g.List)
 	stepAmount := g.Loss.OptimalStep(curOutput.Vector, classOutput, g.Desired)
 
-	g.curSum.Weights = append(g.curSum.Weights, stepAmount)
-	g.curSum.Classifiers = append(g.curSum.Classifiers, classifier)
+	g.Sum.Weights = append(g.Sum.Weights, stepAmount)
+	g.Sum.Classifiers = append(g.Sum.Classifiers, classifier)
 
 	return curLoss.Output()[0]
 }

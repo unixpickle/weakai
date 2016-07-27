@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"sort"
 
 	"github.com/unixpickle/num-analysis/linalg"
@@ -12,7 +13,6 @@ import (
 type TreeStump struct {
 	FieldIndex int
 	Threshold  float64
-	Sign       float64
 }
 
 func (t TreeStump) Classify(s boosting.SampleList) linalg.Vector {
@@ -20,9 +20,9 @@ func (t TreeStump) Classify(s boosting.SampleList) linalg.Vector {
 	res := make(linalg.Vector, s.Len())
 	for i, sample := range l {
 		if sample[t.FieldIndex] >= t.Threshold {
-			res[i] = t.Sign
+			res[i] = 1
 		} else {
-			res[i] = -t.Sign
+			res[i] = -1
 		}
 	}
 	return res
@@ -32,7 +32,7 @@ type StumpPool []TreeStump
 
 func NewStumpPool(samples SampleList) StumpPool {
 	dims := len(samples[0])
-	res := make(StumpPool, 0, len(samples)*dims*2)
+	res := make(StumpPool, 0, len(samples)*dims)
 	for d := 0; d < dims; d++ {
 		values := make([]float64, 0, len(samples))
 		seenValues := map[float64]bool{}
@@ -47,14 +47,12 @@ func NewStumpPool(samples SampleList) StumpPool {
 		for i, val := range values {
 			var t TreeStump
 			if i == 0 {
-				t = TreeStump{FieldIndex: d, Threshold: val - 1, Sign: 1}
+				t = TreeStump{FieldIndex: d, Threshold: val - 1}
 			} else {
 				lastVal := values[i-1]
 				average := (lastVal + val) / 2
-				t = TreeStump{FieldIndex: d, Threshold: average, Sign: 1}
+				t = TreeStump{FieldIndex: d, Threshold: average}
 			}
-			res = append(res, t)
-			t.Sign *= -1
 			res = append(res, t)
 		}
 	}
@@ -65,7 +63,7 @@ func (s StumpPool) BestClassifier(l boosting.SampleList, w linalg.Vector) boosti
 	var bestDot float64
 	var bestC boosting.Classifier
 	for i, c := range s {
-		dot := c.Classify(l).Dot(w)
+		dot := math.Abs(c.Classify(l).Dot(w))
 		if i == 0 || dot > bestDot {
 			bestDot = dot
 			bestC = c

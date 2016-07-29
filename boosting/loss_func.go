@@ -128,11 +128,14 @@ func (w *WeightedExpLoss) OptimalStep(x0, x, y linalg.Vector) float64 {
 			panic("all entries of y must be 1 or -1")
 		}
 		weight := math.Exp(-x0[i] * yVal)
+		if yVal > 0 {
+			weight *= w.PosWeight
+		}
 		if xVal == yVal {
 			weightedRight += weight
 		} else {
 			weightedWrong += weight
 		}
 	}
-	return 0.5 * math.Log(w.PosWeight*weightedRight/weightedWrong)
+	return 0.5 * math.Log(weightedRight/weightedWrong)
 }

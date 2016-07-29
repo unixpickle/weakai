@@ -28,9 +28,9 @@ type Gradient struct {
 	// This is used to avoid recomputing the outputs
 	// of all the classifiers at each iteration.
 	//
-	// If you modify Pool, List, Desired, Loss, or Sum
-	// during training, you should nil out or recompute
-	// CurrentOutput to reflect the new situation.
+	// If you modify Pool, List, Desired, or Sum during
+	// training, you should nil out or recompute OutCache
+	// to reflect the new situation.
 	OutCache linalg.Vector
 }
 

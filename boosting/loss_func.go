@@ -57,7 +57,7 @@ func (_ ExpLoss) Loss(actual autofunc.Result, expected linalg.Vector) autofunc.R
 
 // OptimalStep returns the value which minimizes
 // the exponential loss between y and x0+a*x.
-// It only works all the entries of x and y are
+// It only works if all the entries of x and y are
 // 1 or -1, although the entries of x0 are not
 // restricted in any way.
 func (_ ExpLoss) OptimalStep(x0, x, y linalg.Vector) float64 {

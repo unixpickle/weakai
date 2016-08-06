@@ -9,6 +9,7 @@ import (
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
+	"github.com/unixpickle/weakai/rnn/seqtoseq"
 )
 
 const (
@@ -30,7 +31,7 @@ func main() {
 	sampleSet := sgd.SliceSampleSet{}
 	for i := 0; i < TrainingCount; i++ {
 		inSeq, outSeq := genEvenOddSeq(rand.Intn(MaxSeqLen-MinSeqLen) + MinSeqLen)
-		sampleSet = append(sampleSet, rnn.Sequence{
+		sampleSet = append(sampleSet, seqtoseq.Sample{
 			Inputs:  inSeq,
 			Outputs: outSeq,
 		})
@@ -48,8 +49,9 @@ func main() {
 	net := rnn.StackedBlock{lstm, outBlock}
 
 	gradienter := &sgd.RMSProp{
-		Gradienter: &rnn.BPTT{
+		Gradienter: &seqtoseq.BPTT{
 			Learner:  net,
+			Block:    net,
 			CostFunc: neuralnet.SigmoidCECost{},
 			MaxLanes: 1,
 		},

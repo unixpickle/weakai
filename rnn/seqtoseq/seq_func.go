@@ -1,16 +1,17 @@
-package rnn
+package seqtoseq
 
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
+	"github.com/unixpickle/weakai/rnn"
 )
 
 // A SeqFuncGradienter computes gradients of a SeqFunc
 // for sample sets full of Sequence objects.
 type SeqFuncGradienter struct {
-	SeqFunc  SeqFunc
+	SeqFunc  rnn.SeqFunc
 	Learner  sgd.Learner
 	CostFunc neuralnet.CostFunc
 
@@ -54,7 +55,7 @@ func (s *SeqFuncGradienter) makeHelper() *neuralnet.GradHelper {
 }
 
 func (s *SeqFuncGradienter) runBatch(g autofunc.Gradient, set sgd.SampleSet) {
-	seqs := sampleSetSequences(set)
+	seqs := sampleSetSlice(set)
 	seqIns := make([][]autofunc.Result, len(seqs))
 	for i, seq := range seqs {
 		ins := make([]autofunc.Result, len(seq.Inputs))
@@ -82,7 +83,7 @@ func (s *SeqFuncGradienter) runBatch(g autofunc.Gradient, set sgd.SampleSet) {
 
 func (s *SeqFuncGradienter) runBatchR(rv autofunc.RVector, rg autofunc.RGradient,
 	g autofunc.Gradient, set sgd.SampleSet) {
-	seqs := sampleSetSequences(set)
+	seqs := sampleSetSlice(set)
 	seqIns := make([][]autofunc.RResult, len(seqs))
 	var zeroVec linalg.Vector
 	for i, seq := range seqs {

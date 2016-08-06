@@ -5,16 +5,7 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
-	"github.com/unixpickle/sgd"
 )
-
-// Sequence is used to create SampleSets for an RNN.
-// All RNN neuralnet.Gradienter implementations should
-// take a neuralnet.SampleSet of Sequence instances.
-type Sequence struct {
-	Inputs  []linalg.Vector
-	Outputs []linalg.Vector
-}
 
 // UpstreamGradient stores the gradients of some
 // output with respect to the outputs and output
@@ -105,12 +96,6 @@ type Block interface {
 	// block knows how much each of its hidden parameters
 	// changes with respect to R.
 	BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput
-}
-
-// BlockLearner is any Block with learnable parameters.
-type BlockLearner interface {
-	Block
-	sgd.Learner
 }
 
 // ResultSeqs is the output of a SeqFunc, storing a

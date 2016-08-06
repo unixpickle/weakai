@@ -10,6 +10,7 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
+	"github.com/unixpickle/weakai/rnn/seqtoseq"
 )
 
 const (
@@ -43,7 +44,7 @@ func main() {
 		Backward: &rnn.RNNSeqFunc{Block: rnn.NewGRU(2, StateSize)},
 		Output:   &rnn.NetworkSeqFunc{Network: outNet},
 	}
-	var samples []rnn.Sequence
+	var samples []seqtoseq.Sample
 	for i := 0; i < TrainingSize; i++ {
 		samples = append(samples, generateSequence())
 	}
@@ -71,7 +72,7 @@ func main() {
 		100*float64(testingCorrect)/float64(testingTotal))
 }
 
-func sgdOnSequences(f *rnn.Bidirectional, s []rnn.Sequence) {
+func sgdOnSequences(f *rnn.Bidirectional, s []seqtoseq.Sample) {
 	gradient := autofunc.NewGradient(f.Parameters())
 	for _, x := range s {
 		output := f.BatchSeqs(inputResultsForSeq(x))
@@ -93,8 +94,8 @@ func sgdOnSequences(f *rnn.Bidirectional, s []rnn.Sequence) {
 	gradient.AddToVars(-StepSize)
 }
 
-func generateSequence() rnn.Sequence {
-	var seq rnn.Sequence
+func generateSequence() seqtoseq.Sample {
+	var seq seqtoseq.Sample
 	for i := -10; i < rand.Intn(20); i++ {
 		if rand.Intn(2) == 0 {
 			seq.Inputs = append(seq.Inputs, linalg.Vector{1, 0})
@@ -119,7 +120,7 @@ func generateSequence() rnn.Sequence {
 	return seq
 }
 
-func totalCost(f *rnn.Bidirectional, s []rnn.Sequence) float64 {
+func totalCost(f *rnn.Bidirectional, s []seqtoseq.Sample) float64 {
 	var sum float64
 	for _, sample := range s {
 		output := f.BatchSeqs(inputResultsForSeq(sample))
@@ -130,7 +131,7 @@ func totalCost(f *rnn.Bidirectional, s []rnn.Sequence) float64 {
 	return -sum
 }
 
-func inputResultsForSeq(s rnn.Sequence) [][]autofunc.Result {
+func inputResultsForSeq(s seqtoseq.Sample) [][]autofunc.Result {
 	var res []autofunc.Result
 	for _, x := range s.Inputs {
 		res = append(res, &autofunc.Variable{Vector: x})

@@ -1,19 +1,22 @@
-package rnn
+package seqtoseq
 
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
+	"github.com/unixpickle/weakai/rnn"
 )
 
-// BPTT is an RGradienter which uses untruncated
-// back propagation through time for Sequences.
+// BPTT is an RGradienter which uses untruncated back
+// propagation through time to compute gradients for
+// Blocks on sets of Sample objects.
 //
 // After an instance of BPTT is used on a BlockLearner,
 // it should never be reused on any BlockLearner with
 // a different set of parameters.
 type BPTT struct {
-	Learner  BlockLearner
+	Block    rnn.Block
+	Learner  sgd.Learner
 	CostFunc neuralnet.CostFunc
 
 	// MaxLanes specifies the maximum number of lanes
@@ -51,21 +54,21 @@ func (b *BPTT) makeHelper() *neuralnet.GradHelper {
 		Learner:        b.Learner,
 
 		CompGrad: func(g autofunc.Gradient, s sgd.SampleSet) {
-			b.runBatch(nil, g, nil, sampleSetSequences(s))
+			b.runBatch(nil, g, nil, sampleSetSlice(s))
 		},
 		CompRGrad: func(rv autofunc.RVector, rg autofunc.RGradient, g autofunc.Gradient,
 			s sgd.SampleSet) {
-			b.runBatch(rv, g, rg, sampleSetSequences(s))
+			b.runBatch(rv, g, rg, sampleSetSlice(s))
 		},
 	}
 	return b.helper
 }
 
 func (b *BPTT) runBatch(v autofunc.RVector, g autofunc.Gradient,
-	rg autofunc.RGradient, seqs []Sequence) {
+	rg autofunc.RGradient, seqs []Sample) {
 	if v == nil {
 		prop := seqProp{
-			Block:    b.Learner,
+			Block:    b.Block,
 			CostFunc: b.CostFunc,
 		}
 		for len(seqs) > 0 {
@@ -74,7 +77,7 @@ func (b *BPTT) runBatch(v autofunc.RVector, g autofunc.Gradient,
 		prop.BackPropagate(g, prop.MemoryCount(), 0)
 	} else {
 		prop := seqRProp{
-			Block:    b.Learner,
+			Block:    b.Block,
 			CostFunc: b.CostFunc,
 		}
 		for len(seqs) > 0 {

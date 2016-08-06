@@ -8,6 +8,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/rnn"
 )
 
@@ -16,10 +17,15 @@ const (
 	gradientTestPrec  = 1e-4
 )
 
+type BlockLearner interface {
+	rnn.Block
+	sgd.Learner
+}
+
 // GradientTest performs gradient and r-gradient
 // checking on a Block.
 type GradientTest struct {
-	Block          rnn.BlockLearner
+	Block          BlockLearner
 	GradientParams []*autofunc.Variable
 	Inputs         []*autofunc.Variable
 	InStates       []*autofunc.Variable

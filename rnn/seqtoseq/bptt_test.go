@@ -1,4 +1,4 @@
-package rnntest
+package seqtoseq
 
 import (
 	"math"
@@ -11,6 +11,7 @@ import (
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
+	"github.com/unixpickle/weakai/rnn/rnntest"
 )
 
 var gradienterTestSamples sgd.SliceSampleSet
@@ -25,11 +26,11 @@ const (
 
 func init() {
 	gradienterTestSamples = sgd.SliceSampleSet{
-		rnn.Sequence{},
+		Sample{},
 	}
 	for i := 0; i < 100; i++ {
 		seqLen := rand.Intn(10) + 5
-		var seq rnn.Sequence
+		var seq Sample
 		for i := 0; i < seqLen; i++ {
 			input := make(linalg.Vector, gradienterTestInSize)
 			for i := range input {
@@ -44,13 +45,14 @@ func init() {
 		}
 		gradienterTestSamples = append(gradienterTestSamples, seq)
 	}
-	outBlock := NewSquareBlock(0)
+	outBlock := rnntest.NewSquareBlock(0)
 	l := rnn.NewLSTM(gradienterTestInSize, gradienterTestOutSize)
 	gradienterTestBlock = rnn.StackedBlock{l, outBlock}
 }
 
 func TestBPTTBasic(t *testing.T) {
-	g := &rnn.BPTT{
+	g := &BPTT{
+		Block:         gradienterTestBlock,
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      1,
@@ -62,7 +64,8 @@ func TestBPTTBasic(t *testing.T) {
 func TestBPTTConcurrent(t *testing.T) {
 	n := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(10)
-	g := &rnn.BPTT{
+	g := &BPTT{
+		Block:         gradienterTestBlock,
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      1,
@@ -73,7 +76,8 @@ func TestBPTTConcurrent(t *testing.T) {
 }
 
 func TestBPTTWideLanes(t *testing.T) {
-	g := &rnn.BPTT{
+	g := &BPTT{
+		Block:         gradienterTestBlock,
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      3,
@@ -83,7 +87,8 @@ func TestBPTTWideLanes(t *testing.T) {
 }
 
 func TestBPTTConcurrentWideLanes(t *testing.T) {
-	g := &rnn.BPTT{
+	g := &BPTT{
+		Block:         gradienterTestBlock,
 		Learner:       gradienterTestBlock,
 		CostFunc:      gradienterTestCost,
 		MaxLanes:      2,
@@ -108,7 +113,7 @@ func testRGradienter(t *testing.T, g sgd.RGradienter) {
 	compareGrads(t, "r-gradient", actualR, expectedR)
 }
 
-func expectedRGradient(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.CostFunc,
+func expectedRGradient(v autofunc.RVector, bl rnntest.BlockLearner, cost neuralnet.CostFunc,
 	samples sgd.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
 	if v == nil {
 		v = autofunc.RVector{}
@@ -116,7 +121,7 @@ func expectedRGradient(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.C
 	res := autofunc.NewGradient(bl.Parameters())
 	resR := autofunc.NewRGradient(bl.Parameters())
 	for i := 0; i < samples.Len(); i++ {
-		seq := samples.GetSample(i).(rnn.Sequence)
+		seq := samples.GetSample(i).(Sample)
 		if len(seq.Inputs) == 0 {
 			continue
 		}
@@ -126,8 +131,8 @@ func expectedRGradient(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.C
 	return res, resR
 }
 
-func recursiveGrad(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.CostFunc,
-	g autofunc.Gradient, rg autofunc.RGradient, seq rnn.Sequence,
+func recursiveGrad(v autofunc.RVector, bl rnntest.BlockLearner, cost neuralnet.CostFunc,
+	g autofunc.Gradient, rg autofunc.RGradient, seq Sample,
 	inState, inRState linalg.Vector) (linalg.Vector, linalg.Vector) {
 	input := &rnn.BlockRInput{
 		States: []*autofunc.RVariable{&autofunc.RVariable{
@@ -157,7 +162,7 @@ func recursiveGrad(v autofunc.RVector, bl rnn.BlockLearner, cost neuralnet.CostF
 	upstream.ROutputs = append(upstream.ROutputs, outputRGrad)
 
 	if len(seq.Inputs) > 1 {
-		seq = rnn.Sequence{Inputs: seq.Inputs[1:], Outputs: seq.Outputs[1:]}
+		seq = Sample{Inputs: seq.Inputs[1:], Outputs: seq.Outputs[1:]}
 		ups, upsR := recursiveGrad(v, bl, cost, g, rg, seq, output.States()[0],
 			output.RStates()[0])
 		upstream.States = append(upstream.States, ups)

@@ -34,8 +34,9 @@ var gradientTestVariables = []*autofunc.Variable{
 }
 
 func TestGradientTestIdentity(t *testing.T) {
+	blockLearner := IdentityBlock{StateSizeVal: 2}
 	test := GradientTest{
-		Block:          IdentityBlock{StateSizeVal: 2},
+		Block:          blockLearner,
 		GradientParams: gradientTestVariables,
 		Inputs:         gradientTestVariables[:2],
 		InStates:       gradientTestVariables[2:4],

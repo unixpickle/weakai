@@ -1,26 +1,27 @@
-package rnn
+package seqtoseq
 
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
+	"github.com/unixpickle/weakai/rnn"
 )
 
 type seqPropStep struct {
-	Output   BlockOutput
+	Output   rnn.BlockOutput
 	InStates []*autofunc.Variable
-	InSeqs   []Sequence
+	InSeqs   []Sample
 }
 
 type seqRPropStep struct {
-	Output   BlockROutput
+	Output   rnn.BlockROutput
 	InStates []*autofunc.RVariable
-	InSeqs   []Sequence
+	InSeqs   []Sample
 }
 
 // seqProp facilitates back propagation through sequences.
 type seqProp struct {
-	Block    Block
+	Block    rnn.Block
 	CostFunc neuralnet.CostFunc
 
 	memory []*seqPropStep
@@ -35,7 +36,7 @@ type seqProp struct {
 // first time step from all of the existing sequences.
 // The output batch may be smaller than the input batch,
 // since sequences with no more time steps are removed.
-func (s *seqProp) TimeStep(inSeqs []Sequence) []Sequence {
+func (s *seqProp) TimeStep(inSeqs []Sample) []Sample {
 	if s.MemoryCount() == 0 {
 		inSeqs = removeEmpty(inSeqs)
 	}
@@ -92,7 +93,7 @@ func (s *seqProp) BackPropagate(g autofunc.Gradient, headSize, tailSize int) {
 	if headSize == 0 {
 		return
 	}
-	upstream := &UpstreamGradient{}
+	upstream := &rnn.UpstreamGradient{}
 	lowIdx := s.MemoryCount() - (headSize + tailSize)
 	lowHead := s.MemoryCount() - headSize
 	for i := s.MemoryCount() - 1; i >= 0 && i >= lowIdx; i-- {
@@ -129,7 +130,7 @@ func (s *seqProp) BackPropagate(g autofunc.Gradient, headSize, tailSize int) {
 	}
 }
 
-func (s *seqProp) headInput(seqs []Sequence) *BlockInput {
+func (s *seqProp) headInput(seqs []Sample) *rnn.BlockInput {
 	var lastStates []linalg.Vector
 	if s.MemoryCount() > 0 {
 		lastBlock := s.memory[len(s.memory)-1]
@@ -144,7 +145,7 @@ func (s *seqProp) headInput(seqs []Sequence) *BlockInput {
 		}
 	}
 
-	input := &BlockInput{}
+	input := &rnn.BlockInput{}
 	for lane, seq := range seqs {
 		inVar := &autofunc.Variable{Vector: seq.Inputs[0]}
 		input.Inputs = append(input.Inputs, inVar)
@@ -156,13 +157,13 @@ func (s *seqProp) headInput(seqs []Sequence) *BlockInput {
 
 // seqRProp is like seqProp, but for the R operator.
 type seqRProp struct {
-	Block    Block
+	Block    rnn.Block
 	CostFunc neuralnet.CostFunc
 
 	memory []*seqRPropStep
 }
 
-func (s *seqRProp) TimeStep(v autofunc.RVector, inSeqs []Sequence) []Sequence {
+func (s *seqRProp) TimeStep(v autofunc.RVector, inSeqs []Sample) []Sample {
 	if s.MemoryCount() == 0 {
 		inSeqs = removeEmpty(inSeqs)
 	}
@@ -201,7 +202,7 @@ func (s *seqRProp) BackPropagate(g autofunc.Gradient, rg autofunc.RGradient,
 	if headSize == 0 {
 		return
 	}
-	upstream := &UpstreamRGradient{}
+	upstream := &rnn.UpstreamRGradient{}
 	lowIdx := s.MemoryCount() - (headSize + tailSize)
 	lowHead := s.MemoryCount() - headSize
 	for i := s.MemoryCount() - 1; i >= 0 && i >= lowIdx; i-- {
@@ -248,7 +249,7 @@ func (s *seqRProp) BackPropagate(g autofunc.Gradient, rg autofunc.RGradient,
 	}
 }
 
-func (s *seqRProp) headInput(seqs []Sequence) *BlockRInput {
+func (s *seqRProp) headInput(seqs []Sample) *rnn.BlockRInput {
 	var lastStates []linalg.Vector
 	var lastRStates []linalg.Vector
 	if s.MemoryCount() > 0 {
@@ -265,7 +266,7 @@ func (s *seqRProp) headInput(seqs []Sequence) *BlockRInput {
 			lastRStates = append(lastRStates, dummyState)
 		}
 	}
-	input := &BlockRInput{}
+	input := &rnn.BlockRInput{}
 	zeroInRVec := make(linalg.Vector, len(seqs[0].Inputs[0]))
 	for lane, seq := range seqs {
 		inVar := &autofunc.Variable{Vector: seq.Inputs[0]}
@@ -284,8 +285,8 @@ func (s *seqRProp) headInput(seqs []Sequence) *BlockRInput {
 	return input
 }
 
-func removeEmpty(seqs []Sequence) []Sequence {
-	var res []Sequence
+func removeEmpty(seqs []Sample) []Sample {
+	var res []Sample
 	for _, seq := range seqs {
 		if len(seq.Inputs) != 0 {
 			res = append(res, seq)
@@ -294,13 +295,13 @@ func removeEmpty(seqs []Sequence) []Sequence {
 	return res
 }
 
-func removeFirst(seqs []Sequence) []Sequence {
-	var nextSeqs []Sequence
+func removeFirst(seqs []Sample) []Sample {
+	var nextSeqs []Sample
 	for _, seq := range seqs {
 		if len(seq.Inputs) == 1 {
 			continue
 		}
-		s := Sequence{Inputs: seq.Inputs[1:], Outputs: seq.Outputs[1:]}
+		s := Sample{Inputs: seq.Inputs[1:], Outputs: seq.Outputs[1:]}
 		nextSeqs = append(nextSeqs, s)
 	}
 	return nextSeqs
@@ -309,7 +310,7 @@ func removeFirst(seqs []Sequence) []Sequence {
 // filterContinued filters ins so that input i
 // is only kept if the i-th sequence has more
 // than one input in it.
-func filterContinued(seqs []Sequence, ins []linalg.Vector) []linalg.Vector {
+func filterContinued(seqs []Sample, ins []linalg.Vector) []linalg.Vector {
 	var res []linalg.Vector
 	for i, seq := range seqs {
 		if len(seq.Inputs) > 1 {
@@ -322,7 +323,7 @@ func filterContinued(seqs []Sequence, ins []linalg.Vector) []linalg.Vector {
 // injectDiscontinued injects zeroed slices in
 // a result for every element of seqs which has
 // less than two inputs.
-func injectDiscontinued(seqs []Sequence, outs []linalg.Vector, vecLen int) []linalg.Vector {
+func injectDiscontinued(seqs []Sample, outs []linalg.Vector, vecLen int) []linalg.Vector {
 	var zeroVec linalg.Vector
 	var res []linalg.Vector
 	var takeIdx int

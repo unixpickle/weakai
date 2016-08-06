@@ -1,9 +1,10 @@
-package rnn
+package seqtoseq
 
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
+	"github.com/unixpickle/weakai/rnn"
 )
 
 // TruncatedBPTT is an RGradienter which uses truncated
@@ -27,7 +28,8 @@ import (
 // network still learns to create states that work well
 // across chunks.
 type TruncatedBPTT struct {
-	Learner  BlockLearner
+	Block    rnn.Block
+	Learner  sgd.Learner
 	CostFunc neuralnet.CostFunc
 
 	// MaxLanes specifies the maximum number of lanes
@@ -68,21 +70,21 @@ func (t *TruncatedBPTT) makeHelper() *neuralnet.GradHelper {
 		Learner:        t.Learner,
 
 		CompGrad: func(g autofunc.Gradient, s sgd.SampleSet) {
-			t.runBatch(nil, g, nil, sampleSetSequences(s))
+			t.runBatch(nil, g, nil, sampleSetSlice(s))
 		},
 		CompRGrad: func(rv autofunc.RVector, rg autofunc.RGradient, g autofunc.Gradient,
 			s sgd.SampleSet) {
-			t.runBatch(rv, g, rg, sampleSetSequences(s))
+			t.runBatch(rv, g, rg, sampleSetSlice(s))
 		},
 	}
 	return t.helper
 }
 
 func (t *TruncatedBPTT) runBatch(v autofunc.RVector, g autofunc.Gradient,
-	rg autofunc.RGradient, seqs []Sequence) {
+	rg autofunc.RGradient, seqs []Sample) {
 	if v == nil {
 		prop := seqProp{
-			Block:    t.Learner,
+			Block:    t.Block,
 			CostFunc: t.CostFunc,
 		}
 		headLen := 0
@@ -97,7 +99,7 @@ func (t *TruncatedBPTT) runBatch(v autofunc.RVector, g autofunc.Gradient,
 		}
 	} else {
 		prop := seqRProp{
-			Block:    t.Learner,
+			Block:    t.Block,
 			CostFunc: t.CostFunc,
 		}
 		headLen := 0

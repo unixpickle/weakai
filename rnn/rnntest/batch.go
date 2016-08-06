@@ -13,7 +13,7 @@ import (
 const batchTestPrec = 1e-3
 
 type BatchTest struct {
-	Block          rnn.BlockLearner
+	Block          BlockLearner
 	OutputSize     int
 	GradientParams []*autofunc.Variable
 	Inputs         []*autofunc.Variable

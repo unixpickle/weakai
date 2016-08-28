@@ -125,8 +125,10 @@ func expectedRGradient(v autofunc.RVector, bl rnntest.BlockLearner, cost neuraln
 		if len(seq.Inputs) == 0 {
 			continue
 		}
-		inState := make(linalg.Vector, bl.StateSize())
-		recursiveGrad(v, bl, cost, res, resR, seq, inState, inState)
+		inState := bl.StartStateR(v)
+		upstream, upstreamR := recursiveGrad(v, bl, cost, res, resR, seq,
+			inState.Output(), inState.ROutput())
+		inState.PropagateRGradient(upstream, upstreamR, resR, res)
 	}
 	return res, resR
 }

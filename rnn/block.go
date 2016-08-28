@@ -12,6 +12,16 @@ type Block interface {
 	// state of the Block.
 	StateSize() int
 
+	// StartState returns the initial state for starting
+	// new sequences with this block.
+	// This is an autofunc.Result because it may be
+	// back-propagated through during training.
+	StartState() autofunc.Result
+
+	// StartStateR is like StartState but with r-operator
+	// support.
+	StartStateR(rv autofunc.RVector) autofunc.RResult
+
 	// Batch applies forward propagation to a BlockInput.
 	// The result is valid so long as neither the input
 	// nor the Block is changed.

@@ -13,7 +13,7 @@ import (
 func TestSeqFuncFunc(t *testing.T) {
 	rand.Seed(123)
 	block := rnn.NewLSTM(3, 2)
-	seqFunc := &rnn.RNNSeqFunc{Block: block}
+	seqFunc := &rnn.BlockSeqFunc{Block: block}
 	seqFuncFunc := &rnn.SeqFuncFunc{S: seqFunc, InSize: 3}
 
 	inSeq := &autofunc.Variable{

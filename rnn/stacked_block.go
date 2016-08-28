@@ -43,6 +43,24 @@ func (d StackedBlock) StateSize() int {
 	return res
 }
 
+// StartState generates a concatenated start state.
+func (d StackedBlock) StartState() autofunc.Result {
+	var res []autofunc.Result
+	for _, b := range d {
+		res = append(res, b.StartState())
+	}
+	return autofunc.Concat(res...)
+}
+
+// StartStateR generates a concatenated start state.
+func (d StackedBlock) StartStateR(rv autofunc.RVector) autofunc.RResult {
+	var res []autofunc.RResult
+	for _, b := range d {
+		res = append(res, b.StartStateR(rv))
+	}
+	return autofunc.ConcatR(res...)
+}
+
 func (d StackedBlock) Batch(in *BlockInput) BlockOutput {
 	states := d.subBlockStates(varsToVecs(in.States))
 	result := &stackedBlockOutput{

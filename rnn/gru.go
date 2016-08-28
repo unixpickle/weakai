@@ -1,6 +1,7 @@
 package rnn
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/unixpickle/autofunc"
@@ -16,6 +17,7 @@ type GRU struct {
 	inputValue *lstmGate
 	resetGate  *lstmGate
 	updateGate *lstmGate
+	initState  *autofunc.Variable
 }
 
 // NewGRU creates a GRU with randomly initialized
@@ -26,6 +28,7 @@ func NewGRU(inputSize, hiddenSize int) *GRU {
 		inputValue: newLSTMGate(inputSize, hiddenSize, &neuralnet.HyperbolicTangent{}),
 		resetGate:  newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 		updateGate: newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
+		initState:  &autofunc.Variable{Vector: make(linalg.Vector, hiddenSize)},
 	}
 	return res
 }
@@ -37,28 +40,45 @@ func DeserializeGRU(d []byte) (*GRU, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(slice) != 4 {
+	if len(slice) != 5 {
 		return nil, errors.New("invalid slice length in GRU")
 	}
 	hiddenSize, ok := slice[0].(serializer.Int)
 	inputValue, ok1 := slice[1].(*lstmGate)
 	resetGate, ok2 := slice[2].(*lstmGate)
 	updateGate, ok3 := slice[3].(*lstmGate)
-	if !ok || !ok1 || !ok2 || !ok3 {
+	initStateData, ok4 := slice[4].(serializer.Bytes)
+	if !ok || !ok1 || !ok2 || !ok3 || !ok4 {
 		return nil, errors.New("invalid types in GRU slice")
+	}
+	var initState autofunc.Variable
+	if err := json.Unmarshal(initStateData, &initState); err != nil {
+		return nil, errors.New("invalid init state in GRU slice")
 	}
 	return &GRU{
 		hiddenSize: int(hiddenSize),
 		inputValue: inputValue,
 		resetGate:  resetGate,
 		updateGate: updateGate,
+		initState:  &initState,
 	}, nil
+}
+
+// StartState returns the trainable start state.
+func (g *GRU) StartState() autofunc.Result {
+	return g.initState
+}
+
+// StartStateR is like StartState but with r-operators.
+func (g *GRU) StartStateR(rv autofunc.RVector) autofunc.RResult {
+	return autofunc.NewRVariable(g.initState, rv)
 }
 
 // Parameters returns the GRU's parameters in the
 // following order: input weights, input biases,
 // reset gate weights, reset gate biases, update
-// gate weights, update gate biases.
+// gate weights, update gate biases, initial state
+// biases.
 func (g *GRU) Parameters() []*autofunc.Variable {
 	return []*autofunc.Variable{
 		g.inputValue.Dense.Weights.Data,
@@ -67,6 +87,7 @@ func (g *GRU) Parameters() []*autofunc.Variable {
 		g.resetGate.Dense.Biases.Var,
 		g.updateGate.Dense.Weights.Data,
 		g.updateGate.Dense.Biases.Var,
+		g.initState,
 	}
 }
 
@@ -127,11 +148,16 @@ func (g *GRU) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 }
 
 func (g *GRU) Serialize() ([]byte, error) {
+	initData, err := json.Marshal(g.initState)
+	if err != nil {
+		return nil, err
+	}
 	slist := []serializer.Serializer{
 		serializer.Int(g.hiddenSize),
 		g.inputValue,
 		g.resetGate,
 		g.updateGate,
+		serializer.Bytes(initData),
 	}
 	return serializer.SerializeSlice(slist)
 }

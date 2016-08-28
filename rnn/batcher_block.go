@@ -16,12 +16,40 @@ import (
 type BatcherBlock struct {
 	F            autofunc.RBatcher
 	StateSizeVal int
+
+	StartStateVar *autofunc.Variable
 }
 
+// StateSize returns the state size determined by
+// b.StateSizeVal.
 func (b *BatcherBlock) StateSize() int {
 	return b.StateSizeVal
 }
 
+// StartState returns the initial state, as given by
+// b.StartStateVar.
+// If b.StartStateVar is nil, then a state filled with
+// zeroes is returned.
+func (b *BatcherBlock) StartState() autofunc.Result {
+	if b.StartStateVar != nil {
+		return b.StartStateVar
+	}
+	return &autofunc.Variable{Vector: make(linalg.Vector, b.StateSizeVal)}
+}
+
+// StartStateR is like StartState but with r-operators.
+func (b *BatcherBlock) StartStateR(rv autofunc.RVector) autofunc.RResult {
+	if b.StartStateVar != nil {
+		return autofunc.NewRVariable(b.StartStateVar, rv)
+	}
+	initVec := make(linalg.Vector, b.StateSize())
+	return &autofunc.RVariable{
+		Variable:   &autofunc.Variable{Vector: initVec},
+		ROutputVec: initVec,
+	}
+}
+
+// Batch applies the block to each of the inputs.
 func (b *BatcherBlock) Batch(in *BlockInput) BlockOutput {
 	joined := joinBlockInput(in)
 	output := b.F.Batch(joined, len(in.States))
@@ -32,6 +60,7 @@ func (b *BatcherBlock) Batch(in *BlockInput) BlockOutput {
 	}
 }
 
+// BatchR applies the block to each of the inputs.
 func (b *BatcherBlock) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 	joined := joinBlockRInput(in)
 	output := b.F.BatchR(v, joined, len(in.States))

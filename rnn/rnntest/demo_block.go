@@ -40,6 +40,15 @@ func (d *DemoBlock) StateSize() int {
 	return d.StateSizeVal
 }
 
+func (d *DemoBlock) StartState() autofunc.Result {
+	return &autofunc.Variable{Vector: make(linalg.Vector, d.StateSize())}
+}
+
+func (d *DemoBlock) StartStateR(rv autofunc.RVector) autofunc.RResult {
+	v := &autofunc.Variable{Vector: make(linalg.Vector, d.StateSize())}
+	return autofunc.NewRVariable(v, rv)
+}
+
 func (d *DemoBlock) Batch(in *rnn.BlockInput) rnn.BlockOutput {
 	b := &rnn.BatcherBlock{
 		F:            d.Matrix,

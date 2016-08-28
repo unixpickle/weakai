@@ -8,15 +8,17 @@ import (
 )
 
 type seqPropStep struct {
-	Output   rnn.BlockOutput
-	InStates []*autofunc.Variable
-	InSeqs   []Sample
+	StartState autofunc.Result
+	Output     rnn.BlockOutput
+	InStates   []*autofunc.Variable
+	InSeqs     []Sample
 }
 
 type seqRPropStep struct {
-	Output   rnn.BlockROutput
-	InStates []*autofunc.RVariable
-	InSeqs   []Sample
+	StartState autofunc.RResult
+	Output     rnn.BlockROutput
+	InStates   []*autofunc.RVariable
+	InSeqs     []Sample
 }
 
 // seqProp facilitates back propagation through sequences.
@@ -49,6 +51,9 @@ func (s *seqProp) TimeStep(inSeqs []Sample) []Sample {
 		Output:   output,
 		InStates: input.States,
 		InSeqs:   inSeqs,
+	}
+	if s.MemoryCount() == 0 {
+		step.StartState = s.Block.StartState()
 	}
 	s.memory = append(s.memory, step)
 	return removeFirst(inSeqs)
@@ -90,13 +95,17 @@ func (s *seqProp) Truncate(n int) {
 // than the head size (i.e. to propagate through previous
 // states, but not outputs).
 func (s *seqProp) BackPropagate(g autofunc.Gradient, headSize, tailSize int) {
-	if headSize == 0 {
+	if headSize == 0 || s.MemoryCount() == 0 {
 		return
 	}
 	upstream := &rnn.UpstreamGradient{}
 	lowIdx := s.MemoryCount() - (headSize + tailSize)
 	lowHead := s.MemoryCount() - headSize
-	for i := s.MemoryCount() - 1; i >= 0 && i >= lowIdx; i-- {
+	if lowIdx < 0 {
+		lowIdx = 0
+	}
+	getInitialState := s.memory[lowIdx].StartState != nil
+	for i := s.MemoryCount() - 1; i >= lowIdx; i-- {
 		mem := s.memory[i]
 
 		upstream.Outputs = nil
@@ -109,7 +118,7 @@ func (s *seqProp) BackPropagate(g autofunc.Gradient, headSize, tailSize int) {
 		}
 
 		var stateGrads []linalg.Vector
-		if i > lowIdx && i > 0 {
+		if i > lowIdx || getInitialState {
 			for _, state := range mem.InStates {
 				x := make(linalg.Vector, s.Block.StateSize())
 				g[state] = x
@@ -123,9 +132,21 @@ func (s *seqProp) BackPropagate(g autofunc.Gradient, headSize, tailSize int) {
 			for _, state := range mem.InStates {
 				delete(g, state)
 			}
-			lastSeqs := s.memory[i-1].InSeqs
-			upstream.States = injectDiscontinued(lastSeqs, stateGrads,
-				s.Block.StateSize())
+			if i > 0 {
+				lastSeqs := s.memory[i-1].InSeqs
+				upstream.States = injectDiscontinued(lastSeqs, stateGrads,
+					s.Block.StateSize())
+			} else {
+				upstream.States = stateGrads
+			}
+		}
+	}
+	if getInitialState {
+		startState := s.memory[0].StartState
+		for _, stateUpstream := range upstream.States {
+			if stateUpstream != nil {
+				startState.PropagateGradient(stateUpstream, g)
+			}
 		}
 	}
 }
@@ -139,9 +160,9 @@ func (s *seqProp) headInput(seqs []Sample) *rnn.BlockInput {
 			panic("incorrect number of input sequences")
 		}
 	} else {
-		dummyState := make(linalg.Vector, s.Block.StateSize())
+		initState := s.Block.StartState().Output()
 		for i := 0; i < len(seqs); i++ {
-			lastStates = append(lastStates, dummyState)
+			lastStates = append(lastStates, initState)
 		}
 	}
 
@@ -170,12 +191,15 @@ func (s *seqRProp) TimeStep(v autofunc.RVector, inSeqs []Sample) []Sample {
 	if len(inSeqs) == 0 {
 		return nil
 	}
-	input := s.headInput(inSeqs)
+	input := s.headInput(v, inSeqs)
 	output := s.Block.BatchR(v, input)
 	step := &seqRPropStep{
 		Output:   output,
 		InStates: input.States,
 		InSeqs:   inSeqs,
+	}
+	if s.MemoryCount() == 0 {
+		step.StartState = s.Block.StartStateR(v)
 	}
 	s.memory = append(s.memory, step)
 	return removeFirst(inSeqs)
@@ -199,13 +223,17 @@ func (s *seqRProp) Truncate(n int) {
 
 func (s *seqRProp) BackPropagate(g autofunc.Gradient, rg autofunc.RGradient,
 	headSize, tailSize int) {
-	if headSize == 0 {
+	if headSize == 0 || s.MemoryCount() == 0 {
 		return
 	}
 	upstream := &rnn.UpstreamRGradient{}
 	lowIdx := s.MemoryCount() - (headSize + tailSize)
 	lowHead := s.MemoryCount() - headSize
-	for i := s.MemoryCount() - 1; i >= 0 && i >= lowIdx; i-- {
+	if lowIdx < 0 {
+		lowIdx = 0
+	}
+	getInitialState := s.memory[lowIdx].StartState != nil
+	for i := s.MemoryCount() - 1; i >= lowIdx; i-- {
 		mem := s.memory[i]
 
 		upstream.Outputs = nil
@@ -222,7 +250,7 @@ func (s *seqRProp) BackPropagate(g autofunc.Gradient, rg autofunc.RGradient,
 
 		var stateGrads []linalg.Vector
 		var stateRGrads []linalg.Vector
-		if i > lowIdx && i > 0 {
+		if i > lowIdx || getInitialState {
 			for _, state := range mem.InStates {
 				grad := make(linalg.Vector, s.Block.StateSize())
 				rgrad := make(linalg.Vector, s.Block.StateSize())
@@ -240,16 +268,29 @@ func (s *seqRProp) BackPropagate(g autofunc.Gradient, rg autofunc.RGradient,
 				delete(g, state.Variable)
 				delete(rg, state.Variable)
 			}
-			lastSeqs := s.memory[i-1].InSeqs
-			upstream.States = injectDiscontinued(lastSeqs, stateGrads,
-				s.Block.StateSize())
-			upstream.RStates = injectDiscontinued(lastSeqs, stateRGrads,
-				s.Block.StateSize())
+			if i > 0 {
+				lastSeqs := s.memory[i-1].InSeqs
+				upstream.States = injectDiscontinued(lastSeqs, stateGrads,
+					s.Block.StateSize())
+				upstream.RStates = injectDiscontinued(lastSeqs, stateRGrads,
+					s.Block.StateSize())
+			} else {
+				upstream.States = stateGrads
+				upstream.RStates = stateRGrads
+			}
+		}
+	}
+	if getInitialState {
+		startState := s.memory[0].StartState
+		for i, stateUpstream := range upstream.States {
+			if stateUpstream != nil {
+				startState.PropagateRGradient(stateUpstream, upstream.RStates[i], rg, g)
+			}
 		}
 	}
 }
 
-func (s *seqRProp) headInput(seqs []Sample) *rnn.BlockRInput {
+func (s *seqRProp) headInput(rv autofunc.RVector, seqs []Sample) *rnn.BlockRInput {
 	var lastStates []linalg.Vector
 	var lastRStates []linalg.Vector
 	if s.MemoryCount() > 0 {
@@ -260,10 +301,10 @@ func (s *seqRProp) headInput(seqs []Sample) *rnn.BlockRInput {
 			panic("incorrect number of input sequences")
 		}
 	} else {
-		dummyState := make(linalg.Vector, s.Block.StateSize())
+		startState := s.Block.StartStateR(rv)
 		for i := 0; i < len(seqs); i++ {
-			lastStates = append(lastStates, dummyState)
-			lastRStates = append(lastRStates, dummyState)
+			lastStates = append(lastStates, startState.Output())
+			lastRStates = append(lastRStates, startState.ROutput())
 		}
 	}
 	input := &rnn.BlockRInput{}

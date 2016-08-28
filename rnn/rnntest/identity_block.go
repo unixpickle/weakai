@@ -15,6 +15,15 @@ func (i IdentityBlock) StateSize() int {
 	return i.StateSizeVal
 }
 
+func (i IdentityBlock) StartState() autofunc.Result {
+	return &autofunc.Variable{Vector: make(linalg.Vector, i.StateSize())}
+}
+
+func (i IdentityBlock) StartStateR(rv autofunc.RVector) autofunc.RResult {
+	v := &autofunc.Variable{Vector: make(linalg.Vector, i.StateSize())}
+	return autofunc.NewRVariable(v, rv)
+}
+
 func (i IdentityBlock) Batch(in *rnn.BlockInput) rnn.BlockOutput {
 	return &identityOutput{
 		Inputs:   in.Inputs,

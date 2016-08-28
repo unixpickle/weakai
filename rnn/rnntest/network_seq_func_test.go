@@ -23,16 +23,16 @@ func TestNetworkSeqFuncOutputs(t *testing.T) {
 	networkSeqFuncTestNet.Randomize()
 	seqFunc := &rnn.NetworkSeqFunc{Network: networkSeqFuncTestNet}
 
-	rSeqs := seqsToRVarSeqs(rnnSeqFuncTests)
+	rSeqs := seqsToRVarSeqs(blockSeqFuncTests)
 	rVec := autofunc.RVector{}
 
-	actual := seqFunc.BatchSeqs(seqsToVarSeqs(rnnSeqFuncTests)).OutputSeqs()
+	actual := seqFunc.BatchSeqs(seqsToVarSeqs(blockSeqFuncTests)).OutputSeqs()
 	expected, _ := evaluateNetworkSeqROutputs(rVec, networkSeqFuncTestNet, rSeqs)
 
 	testSequencesEqual(t, "outputs", actual, expected)
 
 	actual = seqFunc.BatchSeqsR(autofunc.RVector{},
-		seqsToRVarSeqs(rnnSeqFuncTests)).OutputSeqs()
+		seqsToRVarSeqs(blockSeqFuncTests)).OutputSeqs()
 
 	testSequencesEqual(t, "outputs (r)", actual, expected)
 }
@@ -42,7 +42,7 @@ func TestNetworkSeqFuncROutputs(t *testing.T) {
 	networkSeqFuncTestNet.Randomize()
 	seqFunc := &rnn.NetworkSeqFunc{Network: networkSeqFuncTestNet}
 
-	rSeqs := seqsToRVarSeqs(rnnSeqFuncTests)
+	rSeqs := seqsToRVarSeqs(blockSeqFuncTests)
 	rVec := autofunc.RVector{}
 	for _, v := range seqFunc.Parameters() {
 		rVec[v] = make(linalg.Vector, len(v.Vector))
@@ -52,7 +52,7 @@ func TestNetworkSeqFuncROutputs(t *testing.T) {
 	}
 
 	_, expectedR := evaluateNetworkSeqROutputs(rVec, networkSeqFuncTestNet, rSeqs)
-	actualR := seqFunc.BatchSeqsR(rVec, seqsToRVarSeqs(rnnSeqFuncTests)).ROutputSeqs()
+	actualR := seqFunc.BatchSeqsR(rVec, seqsToRVarSeqs(blockSeqFuncTests)).ROutputSeqs()
 	testSequencesEqual(t, "r-outputs", actualR, expectedR)
 }
 
@@ -61,7 +61,7 @@ func TestNetworkSeqFuncGradients(t *testing.T) {
 	networkSeqFuncTestNet.Randomize()
 	seqFunc := &rnn.NetworkSeqFunc{Network: networkSeqFuncTestNet}
 
-	rSeqs := seqsToRVarSeqs(rnnSeqFuncTests)
+	rSeqs := seqsToRVarSeqs(blockSeqFuncTests)
 	var nonRSeqs [][]autofunc.Result
 
 	var params []*autofunc.Variable
@@ -84,8 +84,8 @@ func TestNetworkSeqFuncGradients(t *testing.T) {
 		}
 	}
 
-	upstream := randomUpstreamSeqs(rnnSeqFuncTests, 2)
-	upstreamR := randomUpstreamSeqs(rnnSeqFuncTests, 2)
+	upstream := randomUpstreamSeqs(blockSeqFuncTests, 2)
+	upstreamR := randomUpstreamSeqs(blockSeqFuncTests, 2)
 
 	actual := autofunc.NewGradient(params)
 	seqFunc.BatchSeqs(nonRSeqs).Gradient(upstream, actual)

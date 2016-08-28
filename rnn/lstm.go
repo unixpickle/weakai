@@ -1,6 +1,7 @@
 package rnn
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/unixpickle/autofunc"
@@ -19,6 +20,7 @@ type LSTM struct {
 	inputGate    *lstmGate
 	rememberGate *lstmGate
 	outputGate   *lstmGate
+	initState    *autofunc.Variable
 }
 
 // NewLSTM creates an LSTM with randomly initialized
@@ -33,6 +35,7 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 		inputGate:    newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 		rememberGate: newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
 		outputGate:   newLSTMGate(inputSize, hiddenSize, &neuralnet.Sigmoid{}),
+		initState:    &autofunc.Variable{Vector: make(linalg.Vector, hiddenSize*2)},
 	}
 	res.prioritizeRemembering()
 	return res
@@ -45,7 +48,7 @@ func DeserializeLSTM(d []byte) (*LSTM, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(slice) != 5 {
+	if len(slice) != 6 {
 		return nil, errors.New("invalid slice length in LSTM")
 	}
 	hiddenSize, ok := slice[0].(serializer.Int)
@@ -53,8 +56,13 @@ func DeserializeLSTM(d []byte) (*LSTM, error) {
 	inputGate, ok2 := slice[2].(*lstmGate)
 	rememberGate, ok3 := slice[3].(*lstmGate)
 	outputGate, ok4 := slice[4].(*lstmGate)
-	if !ok || !ok1 || !ok2 || !ok3 || !ok4 {
+	initStateData, ok5 := slice[5].(serializer.Bytes)
+	if !ok || !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
 		return nil, errors.New("invalid types in LSTM slice")
+	}
+	var initState autofunc.Variable
+	if err := json.Unmarshal(initStateData, &initState); err != nil {
+		return nil, err
 	}
 	return &LSTM{
 		hiddenSize:   int(hiddenSize),
@@ -62,14 +70,25 @@ func DeserializeLSTM(d []byte) (*LSTM, error) {
 		inputGate:    inputGate,
 		rememberGate: rememberGate,
 		outputGate:   outputGate,
+		initState:    &initState,
 	}, nil
+}
+
+// StartState returns the trainable start state.
+func (l *LSTM) StartState() autofunc.Result {
+	return l.initState
+}
+
+// StartStateR is like StartState but with r-operators.
+func (l *LSTM) StartStateR(rv autofunc.RVector) autofunc.RResult {
+	return autofunc.NewRVariable(l.initState, rv)
 }
 
 // Parameters returns the LSTM's parameters in the
 // following order: input weights, input biases,
 // input gate weights, input gate biases, remember
 // gate weights, remember gate biases, output gate
-// weights, output gate biases.
+// weights, output gate biases, init state biases.
 func (l *LSTM) Parameters() []*autofunc.Variable {
 	return []*autofunc.Variable{
 		l.inputValue.Dense.Weights.Data,
@@ -80,6 +99,7 @@ func (l *LSTM) Parameters() []*autofunc.Variable {
 		l.rememberGate.Dense.Biases.Var,
 		l.outputGate.Dense.Weights.Data,
 		l.outputGate.Dense.Biases.Var,
+		l.initState,
 	}
 }
 
@@ -150,12 +170,17 @@ func (l *LSTM) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
 }
 
 func (l *LSTM) Serialize() ([]byte, error) {
+	initData, err := json.Marshal(l.initState)
+	if err != nil {
+		return nil, err
+	}
 	slist := []serializer.Serializer{
 		serializer.Int(l.hiddenSize),
 		l.inputValue,
 		l.inputGate,
 		l.rememberGate,
 		l.outputGate,
+		serializer.Bytes(initData),
 	}
 	return serializer.SerializeSlice(slist)
 }

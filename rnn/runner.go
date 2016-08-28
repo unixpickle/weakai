@@ -24,7 +24,7 @@ func (r *Runner) Reset() {
 // the output.
 func (r *Runner) StepTime(input linalg.Vector) linalg.Vector {
 	if r.currentState == nil {
-		r.currentState = make(linalg.Vector, r.Block.StateSize())
+		r.currentState = r.Block.StartState().Output()
 	}
 	in := &BlockInput{
 		States: []*autofunc.Variable{
@@ -47,10 +47,10 @@ func (r *Runner) StepTime(input linalg.Vector) linalg.Vector {
 // This does not affect or use the state that Reset
 // and StepTime operate on.
 func (r *Runner) RunAll(inputs [][]linalg.Vector) [][]linalg.Vector {
-	zeroState := make(linalg.Vector, r.Block.StateSize())
+	initState := r.Block.StartState().Output()
 	initStates := make([]linalg.Vector, len(inputs))
 	for i := range initStates {
-		initStates[i] = zeroState
+		initStates[i] = initState
 	}
 	return r.recursiveRunAll(inputs, initStates)
 }

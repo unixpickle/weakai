@@ -9,7 +9,7 @@ const (
 	serializerTypeStackedBlock   = serializerPrefix + "StackedBlock"
 	serializerTypeNetworkBlock   = serializerPrefix + "NetworkBlock"
 	serializerTypeGRU            = serializerPrefix + "GRU"
-	serializerTypeRNNSeqFunc     = serializerPrefix + "RNNSeqFunc"
+	serializerTypeBlockSeqFunc   = serializerPrefix + "BlockSeqFunc"
 	serializerTypeNetworkSeqFunc = serializerPrefix + "NetworkSeqFunc"
 	serializerTypeBidirectional  = serializerPrefix + "Bidirectional"
 )
@@ -20,7 +20,7 @@ func init() {
 	serializer.RegisterTypedDeserializer(serializerTypeStackedBlock, DeserializeStackedBlock)
 	serializer.RegisterTypedDeserializer(serializerTypeNetworkBlock, DeserializeNetworkBlock)
 	serializer.RegisterTypedDeserializer(serializerTypeGRU, DeserializeGRU)
-	serializer.RegisterTypedDeserializer(serializerTypeRNNSeqFunc, DeserializeRNNSeqFunc)
+	serializer.RegisterTypedDeserializer(serializerTypeBlockSeqFunc, DeserializeBlockSeqFunc)
 	serializer.RegisterTypedDeserializer(serializerTypeNetworkSeqFunc, DeserializeNetworkSeqFunc)
 	serializer.RegisterTypedDeserializer(serializerTypeBidirectional, DeserializeBidirectional)
 }

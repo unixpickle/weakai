@@ -17,10 +17,10 @@ func TestBidirectional(t *testing.T) {
 	}
 	outNet.Randomize()
 	bd := &rnn.Bidirectional{
-		Forward: &rnn.RNNSeqFunc{
+		Forward: &rnn.BlockSeqFunc{
 			Block: rnn.NewLSTM(3, 2),
 		},
-		Backward: &rnn.RNNSeqFunc{
+		Backward: &rnn.BlockSeqFunc{
 			Block: rnn.NewLSTM(3, 2),
 		},
 		Output: &rnn.NetworkSeqFunc{
@@ -30,7 +30,7 @@ func TestBidirectional(t *testing.T) {
 	test := SeqFuncTest{
 		S:        bd,
 		Params:   bd.Parameters(),
-		TestSeqs: rnnSeqFuncTests,
+		TestSeqs: blockSeqFuncTests,
 	}
 	test.Run(t)
 }

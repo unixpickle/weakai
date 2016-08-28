@@ -40,8 +40,8 @@ func main() {
 	}
 	outNet.Randomize()
 	bd := &rnn.Bidirectional{
-		Forward:  &rnn.RNNSeqFunc{Block: rnn.NewGRU(2, StateSize)},
-		Backward: &rnn.RNNSeqFunc{Block: rnn.NewGRU(2, StateSize)},
+		Forward:  &rnn.BlockSeqFunc{Block: rnn.NewGRU(2, StateSize)},
+		Backward: &rnn.BlockSeqFunc{Block: rnn.NewGRU(2, StateSize)},
 		Output:   &rnn.NetworkSeqFunc{Network: outNet},
 	}
 	var samples []seqtoseq.Sample

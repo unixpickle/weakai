@@ -9,16 +9,16 @@ import (
 	"github.com/unixpickle/sgd"
 )
 
-// RNNSeqFunc is a SeqFunc which operates by using
+// BlockSeqFunc is a SeqFunc which operates by using
 // a Block as an RNN and running the RNN on input
 // sequences.
-type RNNSeqFunc struct {
+type BlockSeqFunc struct {
 	Block Block
 }
 
-// DeserializeRNNSeqFunc deserializes an RNNSeqFunc
+// DeserializeBlockSeqFunc deserializes an BlockSeqFunc
 // that was serialized.
-func DeserializeRNNSeqFunc(d []byte) (*RNNSeqFunc, error) {
+func DeserializeBlockSeqFunc(d []byte) (*BlockSeqFunc, error) {
 	obj, err := serializer.DeserializeWithType(d)
 	if err != nil {
 		return nil, err
@@ -27,18 +27,18 @@ func DeserializeRNNSeqFunc(d []byte) (*RNNSeqFunc, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected Block but got %T", obj)
 	}
-	return &RNNSeqFunc{Block: block}, nil
+	return &BlockSeqFunc{Block: block}, nil
 }
 
-func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
-	var res rnnSeqFuncOutput
-	res.PackedOut = make([][]linalg.Vector, len(seqs))
-
-	zeroStateVec := make(linalg.Vector, r.Block.StateSize())
+func (r *BlockSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
+	res := &BlockSeqFuncOutput{
+		StartState: r.Block.StartState(),
+		PackedOut:  make([][]linalg.Vector, len(seqs)),
+	}
 
 	var t int
 	for {
-		step := &rnnSeqFuncOutputStep{
+		step := &BlockSeqFuncOutputStep{
 			InStateVars: make([]*autofunc.Variable, len(seqs)),
 			InputVars:   make([]*autofunc.Variable, len(seqs)),
 			Inputs:      make([]autofunc.Result, len(seqs)),
@@ -52,7 +52,7 @@ func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
 			step.LaneToOut[l] = len(input.Inputs)
 			step.Inputs[l] = seq[t]
 			step.InputVars[l] = &autofunc.Variable{Vector: seq[t].Output()}
-			step.InStateVars[l] = &autofunc.Variable{Vector: zeroStateVec}
+			step.InStateVars[l] = &autofunc.Variable{Vector: res.StartState.Output()}
 			if t > 0 {
 				s := res.Steps[t-1]
 				step.InStateVars[l].Vector = s.Outputs.States()[s.LaneToOut[l]]
@@ -71,19 +71,19 @@ func (r *RNNSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
 		t++
 	}
 
-	return &res
+	return res
 }
 
-func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) RResultSeqs {
-	var res rnnSeqFuncROutput
-	res.PackedOut = make([][]linalg.Vector, len(seqs))
-	res.RPackedOut = make([][]linalg.Vector, len(seqs))
-
-	zeroStateVec := make(linalg.Vector, r.Block.StateSize())
+func (r *BlockSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) RResultSeqs {
+	res := &BlockSeqFuncROutput{
+		StartState: r.Block.StartStateR(rv),
+		PackedOut:  make([][]linalg.Vector, len(seqs)),
+		RPackedOut: make([][]linalg.Vector, len(seqs)),
+	}
 
 	var t int
 	for {
-		step := &rnnSeqFuncROutputStep{
+		step := &BlockSeqFuncROutputStep{
 			InStateVars: make([]*autofunc.RVariable, len(seqs)),
 			InputVars:   make([]*autofunc.RVariable, len(seqs)),
 			Inputs:      make([]autofunc.RResult, len(seqs)),
@@ -101,8 +101,8 @@ func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) 
 				ROutputVec: seq[t].ROutput(),
 			}
 			step.InStateVars[l] = &autofunc.RVariable{
-				Variable:   &autofunc.Variable{Vector: zeroStateVec},
-				ROutputVec: zeroStateVec,
+				Variable:   &autofunc.Variable{Vector: res.StartState.Output()},
+				ROutputVec: res.StartState.ROutput(),
 			}
 			if t > 0 {
 				s := res.Steps[t-1]
@@ -125,12 +125,12 @@ func (r *RNNSeqFunc) BatchSeqsR(rv autofunc.RVector, seqs [][]autofunc.RResult) 
 		t++
 	}
 
-	return &res
+	return res
 }
 
 // Parameters returns the underlying block's parameters
 // if it implements sgd.Learner, or nil otherwise.
-func (r *RNNSeqFunc) Parameters() []*autofunc.Variable {
+func (r *BlockSeqFunc) Parameters() []*autofunc.Variable {
 	if l, ok := r.Block.(sgd.Learner); ok {
 		return l.Parameters()
 	} else {
@@ -138,13 +138,13 @@ func (r *RNNSeqFunc) Parameters() []*autofunc.Variable {
 	}
 }
 
-func (r *RNNSeqFunc) SerializerType() string {
-	return serializerTypeRNNSeqFunc
+func (r *BlockSeqFunc) SerializerType() string {
+	return serializerTypeBlockSeqFunc
 }
 
 // Serialize serializes the underlying block if it is
 // a serializer.Serializer (and fails otherwise).
-func (r *RNNSeqFunc) Serialize() ([]byte, error) {
+func (r *BlockSeqFunc) Serialize() ([]byte, error) {
 	s, ok := r.Block.(serializer.Serializer)
 	if !ok {
 		return nil, fmt.Errorf("type is not a Serializer: %T", r.Block)
@@ -152,7 +152,7 @@ func (r *RNNSeqFunc) Serialize() ([]byte, error) {
 	return serializer.SerializeWithType(s)
 }
 
-type rnnSeqFuncOutputStep struct {
+type BlockSeqFuncOutputStep struct {
 	// These three variables always have len equal to
 	// the number of lanes (some entries may be nil).
 	InStateVars []*autofunc.Variable
@@ -165,16 +165,17 @@ type rnnSeqFuncOutputStep struct {
 	LaneToOut map[int]int
 }
 
-type rnnSeqFuncOutput struct {
-	Steps     []*rnnSeqFuncOutputStep
-	PackedOut [][]linalg.Vector
+type BlockSeqFuncOutput struct {
+	StartState autofunc.Result
+	Steps      []*BlockSeqFuncOutputStep
+	PackedOut  [][]linalg.Vector
 }
 
-func (r *rnnSeqFuncOutput) OutputSeqs() [][]linalg.Vector {
+func (r *BlockSeqFuncOutput) OutputSeqs() [][]linalg.Vector {
 	return r.PackedOut
 }
 
-func (r *rnnSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradient) {
+func (r *BlockSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradient) {
 	numLanes := len(r.PackedOut)
 	if len(upstream) != numLanes {
 		panic("incorrect upstream dimensions")
@@ -199,9 +200,7 @@ func (r *rnnSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradi
 				s = make(linalg.Vector, len(stateVar.Vector))
 			}
 			stepUpstream.States = append(stepUpstream.States, s)
-			if t > 0 {
-				g[stateVar] = make(linalg.Vector, len(stateVar.Vector))
-			}
+			g[stateVar] = make(linalg.Vector, len(stateVar.Vector))
 			if !step.Inputs[l].Constant(g) {
 				g[step.InputVars[l]] = make(linalg.Vector, len(step.InputVars[l].Vector))
 			}
@@ -210,11 +209,9 @@ func (r *rnnSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradi
 		step.Outputs.Gradient(&stepUpstream, g)
 
 		loopUsedLanes(step.LaneToOut, func(l int) {
-			if t > 0 {
-				stateVar := step.InStateVars[l]
-				stateUpstreams[l] = g[stateVar]
-				delete(g, stateVar)
-			}
+			stateVar := step.InStateVars[l]
+			stateUpstreams[l] = g[stateVar]
+			delete(g, stateVar)
 			if input := step.Inputs[l]; !input.Constant(g) {
 				upstream := g[step.InputVars[l]]
 				delete(g, step.InputVars[l])
@@ -222,9 +219,14 @@ func (r *rnnSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradi
 			}
 		})
 	}
+	for _, upstream := range stateUpstreams {
+		if upstream != nil {
+			r.StartState.PropagateGradient(upstream, g)
+		}
+	}
 }
 
-type rnnSeqFuncROutputStep struct {
+type BlockSeqFuncROutputStep struct {
 	InStateVars []*autofunc.RVariable
 	InputVars   []*autofunc.RVariable
 	Inputs      []autofunc.RResult
@@ -234,21 +236,22 @@ type rnnSeqFuncROutputStep struct {
 	LaneToOut map[int]int
 }
 
-type rnnSeqFuncROutput struct {
-	Steps      []*rnnSeqFuncROutputStep
+type BlockSeqFuncROutput struct {
+	StartState autofunc.RResult
+	Steps      []*BlockSeqFuncROutputStep
 	PackedOut  [][]linalg.Vector
 	RPackedOut [][]linalg.Vector
 }
 
-func (r *rnnSeqFuncROutput) OutputSeqs() [][]linalg.Vector {
+func (r *BlockSeqFuncROutput) OutputSeqs() [][]linalg.Vector {
 	return r.PackedOut
 }
 
-func (r *rnnSeqFuncROutput) ROutputSeqs() [][]linalg.Vector {
+func (r *BlockSeqFuncROutput) ROutputSeqs() [][]linalg.Vector {
 	return r.RPackedOut
 }
 
-func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
+func (r *BlockSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 	rg autofunc.RGradient, g autofunc.Gradient) {
 	// g is used for temporary variables.
 	if g == nil {
@@ -285,10 +288,8 @@ func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 			}
 			stepUpstream.States = append(stepUpstream.States, s)
 			stepUpstream.RStates = append(stepUpstream.RStates, sR)
-			if t > 0 {
-				g[stateVar] = make(linalg.Vector, len(stateVar.Vector))
-				rg[stateVar] = make(linalg.Vector, len(stateVar.Vector))
-			}
+			g[stateVar] = make(linalg.Vector, len(stateVar.Vector))
+			rg[stateVar] = make(linalg.Vector, len(stateVar.Vector))
 			if !step.Inputs[l].Constant(rg, g) {
 				v := step.InputVars[l].Variable
 				g[v] = make(linalg.Vector, len(v.Vector))
@@ -299,13 +300,11 @@ func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 		step.Outputs.RGradient(&stepUpstream, rg, g)
 
 		loopUsedLanes(step.LaneToOut, func(l int) {
-			if t > 0 {
-				stateVar := step.InStateVars[l].Variable
-				stateUpstreams[l] = g[stateVar]
-				stateRUpstreams[l] = rg[stateVar]
-				delete(g, stateVar)
-				delete(rg, stateVar)
-			}
+			stateVar := step.InStateVars[l].Variable
+			stateUpstreams[l] = g[stateVar]
+			stateRUpstreams[l] = rg[stateVar]
+			delete(g, stateVar)
+			delete(rg, stateVar)
 			if input := step.Inputs[l]; !input.Constant(rg, g) {
 				v := step.InputVars[l].Variable
 				upstream := g[v]
@@ -315,6 +314,12 @@ func (r *rnnSeqFuncROutput) RGradient(upstream, upstreamR [][]linalg.Vector,
 				input.PropagateRGradient(upstream, upstreamR, rg, g)
 			}
 		})
+	}
+
+	for i, upstream := range stateUpstreams {
+		if upstream != nil {
+			r.StartState.PropagateRGradient(upstream, stateRUpstreams[i], rg, g)
+		}
 	}
 }
 

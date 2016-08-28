@@ -21,6 +21,26 @@ Here are some demo programs I've created:
  * [nearestneighbors](demos/nearestneighbors) - a simple search engine that uses Nearest Neighbors. The search engine itself is far from useful, but at least it demonstrates a technique of Nearest Neighbors learning.
  * [minimax](demos/minimax) - checkers AI that uses the minimax algorithm. This is an HTML+CSS+SVG+JavaScript application.
 
+# Projects which use this
+
+Here are the projects I have created which use something in the `weakai` repository.
+
+ * [char-rnn](https://github.com/unixpickle/char-rnn) - train RNNs to create text
+ * [seqtasks](https://github.com/unixpickle/seqtasks) - benchmarks for RNNs
+ * [neuralstruct](https://github.com/unixpickle/neuralstruct) - attach data structures to RNNs
+ * [whichlang](https://github.com/unixpickle/whichlang) - classify programming languages
+ * [samepic](https://github.com/unixpickle/samepic) - tell if images are of the same thing
+ * [neuraltree](https://github.com/unixpickle/neuraltree) - tree-based neural architecture
+ * [spacesplice](https://github.com/unixpickle/spacesplice) - add spaces to text without spaces
+ * [haar](https://github.com/unixpickle/haar) - visual object detection
+ * [speechrecog](https://github.com/unixpickle/speechrecog) - general RNN-based speech recognition
+   * [cubewhisper](https://github.com/unixpickle/cubewhisper) - speech recognition for Rubik's cube moves
+ * [mnistdemo](https://github.com/unixpickle/mnistdemo) - MNIST classifiers in action
+ * [svm-playground](https://github.com/unixpickle/svm-playground) - SVMs in action
+ * [statebrain](https://github.com/unixpickle/statebrain) - trainable Markov models
+ * [humancube](https://github.com/unixpickle/humancube) - generate human-like Rubik's cube moves
+ * [sentigraph](https://github.com/unixpickle/sentigraph) - graph sentiment over a piece of text
+
 # Sources
 
  * SVMs, ANNs, idtrees, boosting, minimax, constraints, object recognition, and kNN

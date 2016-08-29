@@ -12,6 +12,7 @@ const (
 	serializerTypeBlockSeqFunc   = serializerPrefix + "BlockSeqFunc"
 	serializerTypeNetworkSeqFunc = serializerPrefix + "NetworkSeqFunc"
 	serializerTypeBidirectional  = serializerPrefix + "Bidirectional"
+	serializerTypeStateOutBlock  = serializerPrefix + "StateOutBlock"
 )
 
 func init() {
@@ -23,4 +24,5 @@ func init() {
 	serializer.RegisterTypedDeserializer(serializerTypeBlockSeqFunc, DeserializeBlockSeqFunc)
 	serializer.RegisterTypedDeserializer(serializerTypeNetworkSeqFunc, DeserializeNetworkSeqFunc)
 	serializer.RegisterTypedDeserializer(serializerTypeBidirectional, DeserializeBidirectional)
+	serializer.RegisterTypedDeserializer(serializerTypeStateOutBlock, DeserializeStateOutBlock)
 }

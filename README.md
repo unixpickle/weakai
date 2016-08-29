@@ -56,3 +56,4 @@ Here are the projects I have created which use something in the `weakai` reposit
    * [GRU Paper](http://arxiv.org/pdf/1406.1078v3.pdf)
    * [Karpathy's char-rnn](http://karpathy.github.io/2015/05/21/rnn-effectiveness/)
    * [Bidirectional RNNs](http://arxiv.org/pdf/1303.5778.pdf)
+   * [Identity RNNs](https://arxiv.org/pdf/1504.00941v2.pdf)

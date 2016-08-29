@@ -32,7 +32,7 @@ func DeserializeStateOutBlock(d []byte) (*StateOutBlock, error) {
 
 // StateSize returns the state size of the wrapped Block.
 func (s *StateOutBlock) StateSize() int {
-	return s.StateSize()
+	return s.Block.StateSize()
 }
 
 // StartState returns the wrapped Block's start state.

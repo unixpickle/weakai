@@ -6,11 +6,12 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
-	"github.com/unixpickle/num-analysis/linalg/eigen"
 	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 )
+
+const npPowerIterations = 1000
 
 // NPRNN is an RNN that implements the architecture
 // described in http://arxiv.org/pdf/1511.03771v3.pdf.
@@ -51,9 +52,7 @@ func NewNPRNN(inputSize, hiddenSize int) NPRNN {
 	for i := 0; i < hiddenSize; i++ {
 		normalMat.Set(i, i, 1+normalMat.Get(i, i))
 	}
-	eigs, _ := eigen.Symmetric(normalMat)
-	maxEig := linalg.Vector(eigs).MaxAbs()
-	normalMat.Scale(1 / maxEig)
+	normalMat.Scale(1 / maxEigenvalue(normalMat))
 
 	for i := 0; i < hiddenSize; i++ {
 		for j := 0; j < hiddenSize; j++ {
@@ -77,4 +76,19 @@ func NewNPRNN(inputSize, hiddenSize int) NPRNN {
 	return &StateOutBlock{
 		Block: NewNetworkBlock(network, hiddenSize),
 	}
+}
+
+func maxEigenvalue(m *linalg.Matrix) float64 {
+	inVec := make(linalg.Vector, m.Rows)
+	for i := range inVec {
+		inVec[i] = rand.NormFloat64()
+	}
+	inMat := linalg.NewMatrixColumn(inVec)
+	for i := 0; i < npPowerIterations; i++ {
+		inMat = m.MulFast(inMat)
+		vec := linalg.Vector(inMat.Data)
+		vec.Scale(1 / vec.Mag())
+	}
+	outVec := linalg.Vector(m.MulFast(inMat).Data)
+	return outVec.Mag()
 }

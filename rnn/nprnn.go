@@ -46,9 +46,10 @@ func NewNPRNN(inputSize, hiddenSize int) NPRNN {
 
 	normalMat := linalg.NewMatrix(hiddenSize, hiddenSize)
 	for i := range normalMat.Data {
-		normalMat.Data[i] = rand.NormFloat64() / float64(hiddenSize)
+		normalMat.Data[i] = rand.NormFloat64()
 	}
 	normalMat = normalMat.Mul(normalMat.Transpose())
+	normalMat.Scale(1 / float64(hiddenSize))
 	for i := 0; i < hiddenSize; i++ {
 		normalMat.Set(i, i, 1+normalMat.Get(i, i))
 	}

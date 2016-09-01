@@ -3,8 +3,6 @@ package neuralnet
 import (
 	"math"
 	"math/rand"
-
-	"github.com/unixpickle/num-analysis/kahan"
 )
 
 // Tensor3 represents a 3D tensor, with
@@ -67,18 +65,17 @@ func (t *Tensor3) Convolve(x1, y1 int, t1 *Tensor3) float64 {
 		panic("depths must match")
 	}
 
-	sum := kahan.NewSummer64()
+	var sum float64
 	for y := 0; y < t.Height; y++ {
 		for x := 0; x < t.Width; x++ {
 			for z := 0; z < t.Depth; z++ {
 				tVal := t.Get(x, y, z)
 				t1Val := t1.Get(x+x1, y+y1, z)
-				sum.Add(tVal * t1Val)
+				sum += tVal * t1Val
 			}
 		}
 	}
-
-	return sum.Sum()
+	return sum
 }
 
 // MulAdd adds the tensor t1, shifted

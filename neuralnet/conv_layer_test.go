@@ -186,6 +186,55 @@ func TestConvLayerRProp(t *testing.T) {
 	funcTest.Run(t)
 }
 
+func BenchmarkConvLayerForward(b *testing.B) {
+	layer := &ConvLayer{
+		FilterCount:  48,
+		FilterWidth:  11,
+		FilterHeight: 11,
+		Stride:       4,
+		InputWidth:   300,
+		InputHeight:  300,
+		InputDepth:   3,
+	}
+	layer.Randomize()
+	testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
+	for i := range testInput.Data {
+		testInput.Data[i] = rand.NormFloat64()
+	}
+	inputVar := &autofunc.Variable{Vector: testInput.Data}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		layer.Apply(inputVar)
+	}
+}
+
+func BenchmarkConvLayerBackward(b *testing.B) {
+	layer := &ConvLayer{
+		FilterCount:  48,
+		FilterWidth:  11,
+		FilterHeight: 11,
+		Stride:       4,
+		InputWidth:   300,
+		InputHeight:  300,
+		InputDepth:   3,
+	}
+	layer.Randomize()
+	testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
+	for i := range testInput.Data {
+		testInput.Data[i] = rand.NormFloat64()
+	}
+	inputVar := &autofunc.Variable{Vector: testInput.Data}
+	upstream := make(linalg.Vector, len(layer.Apply(inputVar).Output()))
+	for i := range upstream {
+		upstream[i] = rand.NormFloat64()
+	}
+	grad := autofunc.NewGradient(layer.Parameters())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		layer.Apply(inputVar).PropagateGradient(upstream, grad)
+	}
+}
+
 func convLayerTestInfo() (network Network, input *autofunc.Variable, outGrad linalg.Vector) {
 	layer := &ConvLayer{
 		FilterCount:  2,

@@ -186,8 +186,8 @@ func TestConvLayerRProp(t *testing.T) {
 	funcTest.Run(t)
 }
 
-func BenchmarkConvLayerForward(b *testing.B) {
-	layer := &ConvLayer{
+func BenchmarkShallowConvLayer(b *testing.B) {
+	benchmarkConvLayer(b, &ConvLayer{
 		FilterCount:  48,
 		FilterWidth:  11,
 		FilterHeight: 11,
@@ -195,7 +195,31 @@ func BenchmarkConvLayerForward(b *testing.B) {
 		InputWidth:   300,
 		InputHeight:  300,
 		InputDepth:   3,
-	}
+	})
+}
+
+func BenchmarkDeepConvLayer(b *testing.B) {
+	benchmarkConvLayer(b, &ConvLayer{
+		FilterCount:  128,
+		FilterWidth:  3,
+		FilterHeight: 3,
+		Stride:       1,
+		InputWidth:   64,
+		InputHeight:  64,
+		InputDepth:   128,
+	})
+}
+
+func benchmarkConvLayer(b *testing.B, layer *ConvLayer) {
+	b.Run("Forward", func(b *testing.B) {
+		benchmarkConvLayerForward(b, layer)
+	})
+	b.Run("Backward", func(b *testing.B) {
+		benchmarkConvLayerBackward(b, layer)
+	})
+}
+
+func benchmarkConvLayerForward(b *testing.B, layer *ConvLayer) {
 	layer.Randomize()
 	testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
 	for i := range testInput.Data {
@@ -208,16 +232,7 @@ func BenchmarkConvLayerForward(b *testing.B) {
 	}
 }
 
-func BenchmarkConvLayerBackward(b *testing.B) {
-	layer := &ConvLayer{
-		FilterCount:  48,
-		FilterWidth:  11,
-		FilterHeight: 11,
-		Stride:       4,
-		InputWidth:   300,
-		InputHeight:  300,
-		InputDepth:   3,
-	}
+func benchmarkConvLayerBackward(b *testing.B, layer *ConvLayer) {
 	layer.Randomize()
 	testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
 	for i := range testInput.Data {

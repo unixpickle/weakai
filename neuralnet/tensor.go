@@ -3,7 +3,21 @@ package neuralnet
 import (
 	"math"
 	"math/rand"
+
+	"github.com/gonum/blas/blas64"
 )
+
+// minOptimizeTensorRowSize is the minimum row-size in
+// a tensor required to have that tensor be effectively
+// optimized with a BLAS package.
+//
+// This was chosen based on experiments on an Intel
+// Core i7 using Go 1.7 and a CPU-based native BLAS.
+// Results may vary.
+//
+// To test optimizations properly, it may be necessary
+// to reduce this to 0.
+const minOptimizeTensorRowSize = 16
 
 // Tensor3 represents a 3D tensor, with
 // values along an x, y, and z axis.
@@ -66,13 +80,24 @@ func (t *Tensor3) Convolve(x1, y1 int, t1 *Tensor3) float64 {
 	}
 
 	var sum float64
-	for y := 0; y < t.Height; y++ {
-		for x := 0; x < t.Width; x++ {
-			for z := 0; z < t.Depth; z++ {
-				tVal := t.Get(x, y, z)
-				t1Val := t1.Get(x+x1, y+y1, z)
-				sum += tVal * t1Val
+	if rowSize := t.Width * t.Depth; rowSize < minOptimizeTensorRowSize {
+		for y := 0; y < t.Height; y++ {
+			for x := 0; x < t.Width; x++ {
+				for z := 0; z < t.Depth; z++ {
+					tVal := t.Get(x, y, z)
+					t1Val := t1.Get(x+x1, y+y1, z)
+					sum += tVal * t1Val
+				}
 			}
+		}
+	} else {
+		tVec := t.Data
+		for y := 0; y < t.Height; y++ {
+			t1Vec := t1.Data[(t1.Width*(y+y1)+x1)*t1.Depth:]
+			v := blas64.Vector{Inc: 1, Data: tVec}
+			v1 := blas64.Vector{Inc: 1, Data: t1Vec}
+			sum += blas64.Dot(rowSize, v, v1)
+			tVec = tVec[rowSize:]
 		}
 	}
 	return sum
@@ -117,13 +142,23 @@ func (t *Tensor3) MulAdd(x, y int, t1 *Tensor3, s float64) {
 		xCount = sourceLimit
 	}
 
-	for y := 0; y < yCount; y++ {
-		for x := 0; x < xCount; x++ {
-			for z := 0; z < t.Depth; z++ {
-				val1 := t.Get(x+targetStartX, y+targetStartY, z)
-				val2 := t1.Get(x+sourceStartX, y+sourceStartY, z)
-				t.Set(x+targetStartX, y+targetStartY, z, val1+(val2*s))
+	if rowSize := xCount * t.Depth; rowSize < minOptimizeTensorRowSize {
+		for y := 0; y < yCount; y++ {
+			for x := 0; x < xCount; x++ {
+				for z := 0; z < t.Depth; z++ {
+					val1 := t.Get(x+targetStartX, y+targetStartY, z)
+					val2 := t1.Get(x+sourceStartX, y+sourceStartY, z)
+					t.Set(x+targetStartX, y+targetStartY, z, val1+(val2*s))
+				}
 			}
+		}
+	} else {
+		for y := 0; y < yCount; y++ {
+			target := t.Data[((y+targetStartY)*t.Width+targetStartX)*t.Depth:]
+			source := t1.Data[((y+sourceStartY)*t1.Width+sourceStartX)*t1.Depth:]
+			targetVec := blas64.Vector{Inc: 1, Data: target}
+			sourceVec := blas64.Vector{Inc: 1, Data: source}
+			blas64.Axpy(rowSize, s, sourceVec, targetVec)
 		}
 	}
 }

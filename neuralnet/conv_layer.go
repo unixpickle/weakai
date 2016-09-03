@@ -300,21 +300,54 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 			c.Layer.InputDepth)
 	}
 
+	var tempInputGrad *Tensor3
+	if inputGrad != nil {
+		tempInputGrad = NewTensor3(c.Layer.FilterWidth, c.Layer.FilterHeight,
+			c.Layer.InputDepth)
+	}
+	croppedInput := NewTensor3(c.Layer.FilterWidth, c.Layer.FilterHeight,
+		c.Layer.InputDepth)
+
 	for y := 0; y < c.OutputTensor.Height; y++ {
 		inputY := y * c.Layer.Stride
 		for x := 0; x < c.OutputTensor.Width; x++ {
 			inputX := x * c.Layer.Stride
+			if tempInputGrad != nil {
+				for i := range tempInputGrad.Data {
+					tempInputGrad.Data[i] = 0
+				}
+			}
+			inputTensor.Crop(inputX, inputY, croppedInput)
 			for z, filter := range c.Layer.Filters {
 				sumPartial := downstreamTensor.Get(x, y, z)
 				if filterGrad := filterGrads[z]; filterGrad != nil {
-					filterGrad.MulAdd(-inputX, -inputY, inputTensor, sumPartial)
+					inTens := blas64.Vector{
+						Inc:  1,
+						Data: croppedInput.Data,
+					}
+					dest := blas64.Vector{
+						Inc:  1,
+						Data: filterGrad.Data,
+					}
+					blas64.Axpy(len(dest.Data), sumPartial, inTens, dest)
 				}
 				if biasGrad != nil {
 					biasGrad[z] += sumPartial
 				}
 				if inputGrad != nil {
-					inputGrad.MulAdd(inputX, inputY, filter, sumPartial)
+					temp := blas64.Vector{
+						Inc:  1,
+						Data: tempInputGrad.Data,
+					}
+					filterVec := blas64.Vector{
+						Inc:  1,
+						Data: filter.Data,
+					}
+					blas64.Axpy(len(temp.Data), sumPartial, filterVec, temp)
 				}
+			}
+			if tempInputGrad != nil {
+				inputGrad.MulAdd(inputX, inputY, tempInputGrad, 1)
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package neuralnet
 import (
 	"math"
 	"math/rand"
+	"runtime"
 	"testing"
 
 	"github.com/unixpickle/autofunc"
@@ -217,6 +218,31 @@ func benchmarkConvLayer(b *testing.B, layer *ConvLayer) {
 	b.Run("Backward", func(b *testing.B) {
 		benchmarkConvLayerBackward(b, layer)
 	})
+	b.Run("Parallel", func(b *testing.B) {
+		parallelism := runtime.GOMAXPROCS(0)
+		inputs := make(chan *autofunc.Variable, parallelism)
+		upstreams := make(chan linalg.Vector, parallelism)
+		grads := make(chan autofunc.Gradient, parallelism)
+		for i := 0; i < parallelism; i++ {
+			testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
+			for i := range testInput.Data {
+				testInput.Data[i] = rand.NormFloat64()
+			}
+			inputVar := &autofunc.Variable{Vector: testInput.Data}
+			inputs <- inputVar
+			upstream := make(linalg.Vector, len(layer.Apply(inputVar).Output()))
+			for i := range upstream {
+				upstream[i] = rand.NormFloat64()
+			}
+			upstreams <- upstream
+			grad := autofunc.NewGradient(layer.Parameters())
+			grads <- grad
+		}
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			benchmarkConvLayerParallel(pb, layer, <-inputs, <-upstreams, <-grads)
+		})
+	})
 }
 
 func benchmarkConvLayerForward(b *testing.B, layer *ConvLayer) {
@@ -247,6 +273,13 @@ func benchmarkConvLayerBackward(b *testing.B, layer *ConvLayer) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		layer.Apply(inputVar).PropagateGradient(upstream, grad)
+	}
+}
+
+func benchmarkConvLayerParallel(pb *testing.PB, layer *ConvLayer, input *autofunc.Variable,
+	upstream linalg.Vector, grad autofunc.Gradient) {
+	for pb.Next() {
+		layer.Apply(input).PropagateGradient(upstream, grad)
 	}
 }
 

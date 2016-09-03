@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/rand"
 
+	"github.com/gonum/blas/blas64"
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 )
@@ -126,16 +127,25 @@ func (c *ConvLayer) SerializerType() string {
 
 func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
+	croppedInput := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
 	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
 
 	for y := 0; y < outTensor.Height; y++ {
 		inputY := y * c.Stride
 		for x := 0; x < outTensor.Width; x++ {
 			inputX := x * c.Stride
+			inTensor.Crop(inputX, inputY, croppedInput)
+			croppedVec := blas64.Vector{
+				Inc:  1,
+				Data: croppedInput.Data,
+			}
 			for z, filter := range c.Filters {
-				convolution := filter.Convolve(inputX, inputY, inTensor)
-				convolution += c.Biases.Vector[z]
-				outTensor.Set(x, y, z, convolution)
+				filterVec := blas64.Vector{
+					Inc:  1,
+					Data: filter.Data,
+				}
+				dot := blas64.Dot(len(filterVec.Data), filterVec, croppedVec)
+				outTensor.Set(x, y, z, dot+c.Biases.Vector[z])
 			}
 		}
 	}
@@ -146,6 +156,8 @@ func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
 	inTensorR := c.inputToTensor(inputR)
+	croppedInput := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
+	croppedInputR := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
 	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
 
 	filtersR := c.filtersR(v)
@@ -155,10 +167,28 @@ func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *
 		inputY := y * c.Stride
 		for x := 0; x < outTensor.Width; x++ {
 			inputX := x * c.Stride
+			inTensor.Crop(inputX, inputY, croppedInput)
+			inTensorR.Crop(inputX, inputY, croppedInputR)
+			croppedVec := blas64.Vector{
+				Inc:  1,
+				Data: croppedInput.Data,
+			}
+			croppedVecR := blas64.Vector{
+				Inc:  1,
+				Data: croppedInputR.Data,
+			}
 			for z, filter := range c.Filters {
-				convolution := filter.Convolve(inputX, inputY, inTensorR)
+				filterVec := blas64.Vector{
+					Inc:  1,
+					Data: filter.Data,
+				}
+				convolution := blas64.Dot(len(filter.Data), filterVec, croppedVecR)
 				if rfilter := filtersR[z]; rfilter != nil {
-					convolution += rfilter.Convolve(inputX, inputY, inTensor)
+					filterVecR := blas64.Vector{
+						Inc:  1,
+						Data: rfilter.Data,
+					}
+					convolution += blas64.Dot(len(rfilter.Data), filterVecR, croppedVec)
 				}
 				if biasR != nil {
 					convolution += biasR[z]

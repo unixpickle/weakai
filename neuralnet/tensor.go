@@ -69,38 +69,26 @@ func (t *Tensor3) Set(x, y, z int, val float64) {
 	t.Data[(x+y*t.Width)*t.Depth+z] = val
 }
 
-// Convolve convolves the filter t
-// with a tensor t1, starting at x1,
-// y1 in t1.
-//
-// Both tensors must have the same depth.
-func (t *Tensor3) Convolve(x1, y1 int, t1 *Tensor3) float64 {
-	if t.Depth != t1.Depth {
+// Crop extracts a sub-region of t and puts it into t1.
+// The sub-region starts at x,y in t and has the
+// dimensions of t1.
+// The sub-region must not go out of t's bounds.
+// The two tensors must have the same depth.
+func (t *Tensor3) Crop(x, y int, dest *Tensor3) {
+	if t.Depth != dest.Depth {
 		panic("depths must match")
+	} else if x+dest.Width > t.Width || y+dest.Height > t.Height {
+		panic("cropped region goes out of bounds")
 	}
 
-	var sum float64
-	if rowSize := t.Width * t.Depth; rowSize < minOptimizeTensorRowSize {
-		for y := 0; y < t.Height; y++ {
-			for x := 0; x < t.Width; x++ {
-				for z := 0; z < t.Depth; z++ {
-					tVal := t.Get(x, y, z)
-					t1Val := t1.Get(x+x1, y+y1, z)
-					sum += tVal * t1Val
-				}
-			}
-		}
-	} else {
-		tVec := t.Data
-		for y := 0; y < t.Height; y++ {
-			t1Vec := t1.Data[(t1.Width*(y+y1)+x1)*t1.Depth:]
-			v := blas64.Vector{Inc: 1, Data: tVec}
-			v1 := blas64.Vector{Inc: 1, Data: t1Vec}
-			sum += blas64.Dot(rowSize, v, v1)
-			tVec = tVec[rowSize:]
-		}
+	outData := dest.Data
+	rowSize := dest.Width * dest.Depth
+	for subY := 0; subY < dest.Height; subY++ {
+		start := ((y+subY)*t.Width + x) * t.Depth
+		end := start + rowSize
+		copy(outData, t.Data[start:end])
+		outData = outData[rowSize:]
 	}
-	return sum
 }
 
 // MulAdd adds the tensor t1, shifted

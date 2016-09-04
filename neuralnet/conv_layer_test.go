@@ -57,12 +57,10 @@ func TestConvBackward(t *testing.T) {
 
 	convLayer := layer[0].(*ConvLayer)
 	expectedGrad := autofunc.Gradient{
-		convLayer.FilterVars[0]: []float64{
+		convLayer.FilterVar: []float64{
 			9.181420449e-02, 6.070772494e-02, 4.831743717e-02, 6.140456075e-02,
 			4.619374891e-02, 9.677697371e-02, 5.711791144e-02, 5.124701355e-02,
 			8.690832544e-02, 2.255616739e-02, 9.041001878e-02, 4.383411433e-02,
-		},
-		convLayer.FilterVars[1]: []float64{
 			1.725619176e-01, 1.501485079e-01, 1.396596513e-01, 8.822688174e-02,
 			1.043560711e-01, 1.851411351e-01, 1.769153948e-01, 1.366024735e-01,
 			1.678136736e-01, 6.694391158e-02, 1.517132408e-01, 8.335992965e-02,
@@ -79,10 +77,9 @@ func TestConvBackward(t *testing.T) {
 		},
 	}
 	varNames := map[*autofunc.Variable]string{
-		convLayer.FilterVars[0]: "filter 0",
-		convLayer.FilterVars[1]: "filter 1",
-		convLayer.Biases:        "biases",
-		input:                   "input",
+		convLayer.FilterVar: "filters",
+		convLayer.Biases:    "biases",
+		input:               "input",
 	}
 
 	for variable, expected := range expectedGrad {
@@ -313,8 +310,6 @@ func convLayerTestInfo() (network Network, input *autofunc.Variable, outGrad lin
 		0.905, 0.047, 0.395, 0.808,
 		0.648, 0.892, 0.154, 0.786,
 	})
-
-	layer.Randomize()
 
 	copy(layer.Filters[0].Data, []float64{
 		0.348, 0.299, 0.946, 0.806,

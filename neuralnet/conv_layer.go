@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/rand"
 
+	"github.com/gonum/blas"
 	"github.com/gonum/blas/blas64"
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
@@ -21,9 +22,14 @@ type ConvLayer struct {
 	InputHeight int
 	InputDepth  int
 
-	Filters    []*Tensor3
-	FilterVars []*autofunc.Variable `json:"-"`
-	Biases     *autofunc.Variable
+	Filters []*Tensor3
+	Biases  *autofunc.Variable
+
+	// FilterVar must contain the data for all of the
+	// filters in Filters, arranged one after the other.
+	// The array behind the slice in FilterVar should
+	// be re-used in Filters.
+	FilterVar *autofunc.Variable `json:"-"`
 }
 
 func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
@@ -32,10 +38,15 @@ func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
 		return nil, err
 	}
 
-	for _, x := range c.Filters {
-		v := &autofunc.Variable{Vector: x.Data}
-		c.FilterVars = append(c.FilterVars, v)
+	filterSize := c.FilterWidth * c.FilterHeight * c.InputDepth
+	weightCount := c.FilterCount * filterSize
+	weightSlice := make(linalg.Vector, weightCount)
+	for i, x := range c.Filters {
+		subSlice := weightSlice[i*filterSize : (i+1)*filterSize]
+		copy(subSlice, x.Data)
+		x.Data = subSlice
 	}
+	c.FilterVar = &autofunc.Variable{Vector: weightSlice}
 
 	return &c, nil
 }
@@ -69,11 +80,19 @@ func (c *ConvLayer) OutputDepth() int {
 // c.FilterVars, and c.BiasVars if needed.
 func (c *ConvLayer) Randomize() {
 	if c.Filters == nil {
+		filterSize := c.FilterWidth * c.FilterHeight * c.InputDepth
+		weightCount := c.FilterCount * filterSize
+		c.FilterVar = &autofunc.Variable{
+			Vector: make(linalg.Vector, weightCount),
+		}
 		for i := 0; i < c.FilterCount; i++ {
-			filter := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
-			filterVar := &autofunc.Variable{Vector: linalg.Vector(filter.Data)}
+			filter := &Tensor3{
+				Width:  c.FilterWidth,
+				Height: c.FilterHeight,
+				Depth:  c.InputDepth,
+				Data:   c.FilterVar.Vector[i*filterSize : (i+1)*filterSize],
+			}
 			c.Filters = append(c.Filters, filter)
-			c.FilterVars = append(c.FilterVars, filterVar)
 		}
 	}
 	if c.Biases == nil {
@@ -87,22 +106,19 @@ func (c *ConvLayer) Randomize() {
 }
 
 // Parameters returns a slice containing the bias
-// variable and all the filter variables.
+// and filter variables.
 func (c *ConvLayer) Parameters() []*autofunc.Variable {
-	if c.Filters == nil || c.Biases == nil || c.FilterVars == nil {
+	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
-	res := make([]*autofunc.Variable, len(c.FilterVars)+1)
-	res[0] = c.Biases
-	copy(res[1:], c.FilterVars)
-	return res
+	return []*autofunc.Variable{c.Biases, c.FilterVar}
 }
 
 // Apply computes convolutions on the input.
 // The result is only valid as long as the ConvLayer
 // that produced it (c, in this case) is not modified.
 func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
-	if c.Filters == nil || c.Biases == nil || c.FilterVars == nil {
+	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
 	return &convLayerResult{
@@ -114,7 +130,7 @@ func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
 
 // ApplyR is like Apply, but for autofunc.RResults.
 func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResult {
-	if c.Filters == nil || c.Biases == nil || c.FilterVars == nil {
+	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
 	return &convLayerRResult{
@@ -136,27 +152,33 @@ func (c *ConvLayer) SerializerType() string {
 
 func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 	inTensor := c.inputToTensor(input)
-	croppedInput := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
 	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
 
-	for y := 0; y < outTensor.Height; y++ {
-		inputY := y * c.Stride
-		for x := 0; x < outTensor.Width; x++ {
-			inputX := x * c.Stride
-			inTensor.Crop(inputX, inputY, croppedInput)
-			croppedVec := blas64.Vector{
-				Inc:  1,
-				Data: croppedInput.Data,
-			}
-			for z, filter := range c.Filters {
-				filterVec := blas64.Vector{
-					Inc:  1,
-					Data: filter.Data,
-				}
-				dot := blas64.Dot(len(filterVec.Data), filterVec, croppedVec)
-				outTensor.Set(x, y, z, dot+c.Biases.Vector[z])
-			}
-		}
+	inMat := blas64.General{
+		Rows:   outTensor.Width * outTensor.Height,
+		Cols:   c.FilterWidth * c.FilterHeight * c.InputDepth,
+		Stride: c.FilterWidth * c.FilterHeight * c.InputDepth,
+		Data:   inTensor.ToCol(c.FilterWidth, c.FilterHeight, c.Stride),
+	}
+	filterMat := blas64.General{
+		Rows:   c.FilterCount,
+		Cols:   inMat.Cols,
+		Stride: inMat.Stride,
+		Data:   c.FilterVar.Vector,
+	}
+	outMat := blas64.General{
+		Rows:   outTensor.Width * outTensor.Height,
+		Cols:   outTensor.Depth,
+		Stride: outTensor.Depth,
+		Data:   outTensor.Data,
+	}
+	blas64.Gemm(blas.NoTrans, blas.Trans, 1, inMat, filterMat, 0, outMat)
+
+	biasVec := blas64.Vector{Inc: 1, Data: c.Biases.Vector}
+	for i := 0; i < len(outTensor.Data); i += outMat.Cols {
+		outRow := outTensor.Data[i : i+outMat.Cols]
+		outVec := blas64.Vector{Inc: 1, Data: outRow}
+		blas64.Axpy(len(outRow), 1, biasVec, outVec)
 	}
 
 	return outTensor
@@ -213,20 +235,20 @@ func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *
 func (c *ConvLayer) gradsFromMap(m map[*autofunc.Variable]linalg.Vector) (bias linalg.Vector,
 	filters []*Tensor3) {
 	if m == nil {
-		for _ = range c.FilterVars {
-			filters = append(filters, nil)
-		}
+		filters = make([]*Tensor3, len(c.Filters))
 		return
 	}
 
 	bias = m[c.Biases]
 
-	for _, v := range c.FilterVars {
-		if gradVec := m[v]; gradVec == nil {
-			filters = append(filters, nil)
-		} else {
-			filters = append(filters, c.filterToTensor(gradVec))
+	if filtersGrad := m[c.FilterVar]; filtersGrad != nil {
+		for _, f := range c.Filters {
+			gradData := filtersGrad[:f.Width*f.Height*f.Depth]
+			filters = append(filters, c.filterToTensor(gradData))
+			filtersGrad = filtersGrad[f.Width*f.Height*f.Depth:]
 		}
+	} else {
+		filters = make([]*Tensor3, len(c.Filters))
 	}
 
 	return
@@ -234,13 +256,14 @@ func (c *ConvLayer) gradsFromMap(m map[*autofunc.Variable]linalg.Vector) (bias l
 
 func (c *ConvLayer) filtersR(v autofunc.RVector) []*Tensor3 {
 	var filtersR []*Tensor3
-	for _, filterVar := range c.FilterVars {
-		data := v[filterVar]
-		if data == nil {
-			filtersR = append(filtersR, nil)
-		} else {
-			filtersR = append(filtersR, c.filterToTensor(data))
+	if filtersGrad := v[c.FilterVar]; filtersGrad != nil {
+		for _, f := range c.Filters {
+			gradData := filtersGrad[:f.Width*f.Height*f.Depth]
+			filtersR = append(filtersR, c.filterToTensor(gradData))
+			filtersGrad = filtersGrad[f.Width*f.Height*f.Depth:]
 		}
+	} else {
+		filtersR = make([]*Tensor3, len(c.Filters))
 	}
 	return filtersR
 }
@@ -289,12 +312,7 @@ func (c *convLayerResult) Constant(g autofunc.Gradient) bool {
 	if !c.Input.Constant(g) {
 		return false
 	}
-	for _, x := range c.Layer.FilterVars {
-		if !x.Constant(g) {
-			return false
-		}
-	}
-	return true
+	return c.Layer.FilterVar.Constant(g)
 }
 
 func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
@@ -393,12 +411,10 @@ func (c *convLayerRResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) 
 		return false
 	}
 
-	for _, x := range c.Layer.FilterVars {
-		if !x.Constant(g) {
-			return false
-		} else if _, ok := rg[x]; ok {
-			return false
-		}
+	if !c.Layer.FilterVar.Constant(g) {
+		return false
+	} else if _, ok := rg[c.Layer.FilterVar]; ok {
+		return false
 	}
 
 	return true

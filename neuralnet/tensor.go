@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/gonum/blas/blas64"
+	"github.com/unixpickle/num-analysis/linalg"
 )
 
 // minOptimizeTensorRowSize is the minimum row-size in
@@ -67,6 +68,32 @@ func (t *Tensor3) Get(x, y, z int) float64 {
 // the given indices.
 func (t *Tensor3) Set(x, y, z int, val float64) {
 	t.Data[(x+y*t.Width)*t.Depth+z] = val
+}
+
+// ToCol converts the 3D tensor to a 2D vector of
+// overlapping convolutional regions.
+// The 2D vector may contain an element from the tensor
+// multiple times.
+func (t *Tensor3) ToCol(width, height, stride int) linalg.Vector {
+	w := 1 + (t.Width-width)/stride
+	h := 1 + (t.Height-height)/stride
+	if w < 0 || h < 0 {
+		return nil
+	}
+	resVec := make(linalg.Vector, w*h*width*height*t.Depth)
+	destTensor := &Tensor3{
+		Width:  width,
+		Height: height,
+		Depth:  t.Depth,
+		Data:   resVec,
+	}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			t.Crop(x*stride, y*stride, destTensor)
+			destTensor.Data = destTensor.Data[width*height*t.Depth:]
+		}
+	}
+	return resVec
 }
 
 // Crop extracts a sub-region of t and puts it into t1.

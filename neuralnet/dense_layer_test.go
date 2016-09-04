@@ -1,6 +1,7 @@
 package neuralnet
 
 import (
+	"encoding/json"
 	"math"
 	"math/rand"
 	"testing"
@@ -122,40 +123,44 @@ func TestDenseSerialize(t *testing.T) {
 	network, _, _ := denseTestInfo()
 	layer := network[0].(*DenseLayer)
 
-	encoded, err := layer.Serialize()
+	normalEncoded, err := layer.Serialize()
 	if err != nil {
 		t.Fatal(err)
 	}
+	jsonEncoded, _ := json.Marshal(layer)
 	layerType := layer.SerializerType()
 
-	decoded, err := serializer.GetDeserializer(layerType)(encoded)
-	if err != nil {
-		t.Fatal(err)
-	}
+	for i, encoded := range [][]byte{normalEncoded, jsonEncoded} {
+		decoded, err := serializer.GetDeserializer(layerType)(encoded)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	layer, ok := decoded.(*DenseLayer)
-	if !ok {
-		t.Fatalf("decoded layer was not a *DenseLayer, but a %T", decoded)
-	}
+		layer, ok := decoded.(*DenseLayer)
+		if !ok {
+			t.Fatalf("%d: decoded layer was not a *DenseLayer, but a %T", i, decoded)
+		}
 
-	expLists := [][]float64{
-		{1, 2, 3, -3, 2, -1},
-		{-6, 9},
-	}
-	actualLists := [][]float64{layer.Weights.Data.Vector, layer.Biases.Var.Vector}
+		expLists := [][]float64{
+			{1, 2, 3, -3, 2, -1},
+			{-6, 9},
+		}
+		actualLists := [][]float64{layer.Weights.Data.Vector, layer.Biases.Var.Vector}
 
-	for i, x := range expLists {
-		actual := actualLists[i]
-		equal := true
-		for j, v := range x {
-			if actual[j] != v {
-				equal = false
+		for k, x := range expLists {
+			actual := actualLists[k]
+			equal := true
+			for j, v := range x {
+				if actual[j] != v {
+					equal = false
+				}
+			}
+			if !equal {
+				t.Errorf("%d: list %d does not match", i, k)
 			}
 		}
-		if !equal {
-			t.Errorf("list %d does not match", i)
-		}
 	}
+
 }
 
 func denseTestInfo() (network Network, input *autofunc.Variable, grad linalg.Vector) {

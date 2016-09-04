@@ -40,6 +40,34 @@ func NewTensor3(width, height, depth int) *Tensor3 {
 	}
 }
 
+// NewTensor3Col creates a Tensor3 by adding overlapping
+// convolutional regions in a vector.
+// This can be used to invert Tensor3.ToCol().
+func NewTensor3Col(width, height, depth int, col linalg.Vector,
+	convWidth, convHeight, convStride int) *Tensor3 {
+	res := NewTensor3(width, height, depth)
+	w := 1 + (width-convWidth)/convStride
+	h := 1 + (height-convHeight)/convStride
+	if w < 0 || h < 0 {
+		return res
+	}
+	tempTensor := &Tensor3{
+		Width:  convWidth,
+		Height: convHeight,
+		Depth:  depth,
+	}
+	convSize := tempTensor.Width * tempTensor.Height * tempTensor.Depth
+	var idx int
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			tempTensor.Data = col[idx : idx+convSize]
+			res.MulAdd(x*convStride, y*convStride, tempTensor, 1)
+			idx += convSize
+		}
+	}
+	return res
+}
+
 // Reset sets all entries to zero.
 func (t *Tensor3) Reset() {
 	for i := range t.Data {

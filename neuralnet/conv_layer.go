@@ -121,8 +121,10 @@ func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
 	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
+	inMatrix, out := c.convolve(in.Output())
 	return &convLayerResult{
-		OutputTensor: c.convolve(in.Output()),
+		OutputTensor: out,
+		InMatrix:     inMatrix,
 		Input:        in,
 		Layer:        c,
 	}
@@ -133,8 +135,9 @@ func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RRe
 	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
+	_, outTensor := c.convolve(in.Output())
 	return &convLayerRResult{
-		OutputTensor:  c.convolve(in.Output()),
+		OutputTensor:  outTensor,
 		ROutputTensor: c.convolveR(v, in.Output(), in.ROutput()),
 		Input:         in,
 		Layer:         c,
@@ -150,7 +153,7 @@ func (c *ConvLayer) SerializerType() string {
 	return serializerTypeConvLayer
 }
 
-func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
+func (c *ConvLayer) convolve(input linalg.Vector) (in blas64.General, out *Tensor3) {
 	inTensor := c.inputToTensor(input)
 	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
 
@@ -181,7 +184,7 @@ func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 		blas64.Axpy(len(outRow), 1, biasVec, outVec)
 	}
 
-	return outTensor
+	return inMat, outTensor
 }
 
 func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *Tensor3 {
@@ -297,6 +300,7 @@ func (c *ConvLayer) filterToTensor(filter linalg.Vector) *Tensor3 {
 
 type convLayerResult struct {
 	OutputTensor *Tensor3
+	InMatrix     blas64.General
 	Input        autofunc.Result
 	Layer        *ConvLayer
 }
@@ -316,71 +320,48 @@ func (c *convLayerResult) Constant(g autofunc.Gradient) bool {
 }
 
 func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
-	inputTensor := c.Layer.inputToTensor(c.Input.Output())
-	downstreamTensor := c.Layer.outputToTensor(upstream)
-
-	biasGrad, filterGrads := c.Layer.gradsFromMap(grad)
-
-	var inputGrad *Tensor3
-	if !c.Input.Constant(grad) {
-		inputGrad = NewTensor3(c.Layer.InputWidth, c.Layer.InputHeight,
-			c.Layer.InputDepth)
+	upstreamMat := blas64.General{
+		Rows:   c.OutputTensor.Width * c.OutputTensor.Height,
+		Cols:   c.OutputTensor.Depth,
+		Stride: c.OutputTensor.Depth,
+		Data:   upstream,
 	}
 
-	var tempInputGrad *Tensor3
-	if inputGrad != nil {
-		tempInputGrad = NewTensor3(c.Layer.FilterWidth, c.Layer.FilterHeight,
-			c.Layer.InputDepth)
-	}
-	croppedInput := NewTensor3(c.Layer.FilterWidth, c.Layer.FilterHeight,
-		c.Layer.InputDepth)
-
-	for y := 0; y < c.OutputTensor.Height; y++ {
-		inputY := y * c.Layer.Stride
-		for x := 0; x < c.OutputTensor.Width; x++ {
-			inputX := x * c.Layer.Stride
-			if tempInputGrad != nil {
-				for i := range tempInputGrad.Data {
-					tempInputGrad.Data[i] = 0
-				}
+	if biasGrad, ok := grad[c.Layer.Biases]; ok {
+		biasGradVec := blas64.Vector{Inc: 1, Data: biasGrad}
+		for i := 0; i < len(upstreamMat.Data); i += upstreamMat.Cols {
+			row := blas64.Vector{
+				Inc:  1,
+				Data: upstreamMat.Data[i : i+upstreamMat.Cols],
 			}
-			inputTensor.Crop(inputX, inputY, croppedInput)
-			for z, filter := range c.Layer.Filters {
-				sumPartial := downstreamTensor.Get(x, y, z)
-				if filterGrad := filterGrads[z]; filterGrad != nil {
-					inTens := blas64.Vector{
-						Inc:  1,
-						Data: croppedInput.Data,
-					}
-					dest := blas64.Vector{
-						Inc:  1,
-						Data: filterGrad.Data,
-					}
-					blas64.Axpy(len(dest.Data), sumPartial, inTens, dest)
-				}
-				if biasGrad != nil {
-					biasGrad[z] += sumPartial
-				}
-				if inputGrad != nil {
-					temp := blas64.Vector{
-						Inc:  1,
-						Data: tempInputGrad.Data,
-					}
-					filterVec := blas64.Vector{
-						Inc:  1,
-						Data: filter.Data,
-					}
-					blas64.Axpy(len(temp.Data), sumPartial, filterVec, temp)
-				}
-			}
-			if tempInputGrad != nil {
-				inputGrad.MulAdd(inputX, inputY, tempInputGrad, 1)
-			}
+			blas64.Axpy(len(biasGrad), 1, row, biasGradVec)
 		}
 	}
 
-	if inputGrad != nil {
-		c.Input.PropagateGradient(inputGrad.Data, grad)
+	if !c.Input.Constant(grad) {
+		inDeriv := c.InMatrix
+		inDeriv.Data = make([]float64, len(c.InMatrix.Data))
+		filterMat := blas64.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   c.Layer.FilterVar.Vector,
+		}
+		blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 0, inDeriv)
+		flattened := NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
+			c.Layer.FilterHeight, c.Layer.Stride)
+		c.Input.PropagateGradient(flattened.Data, grad)
+	}
+
+	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
+		destMat := blas64.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   filterGrad,
+		}
+		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, c.InMatrix, 1, destMat)
 	}
 }
 

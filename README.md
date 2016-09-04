@@ -45,8 +45,11 @@ Here are the projects I have created which use something in the `weakai` reposit
 
  * SVMs, ANNs, idtrees, boosting, minimax, constraints, object recognition, and kNN
    * [MIT's OpenCourseware AI lectures](http://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-034-artificial-intelligence-fall-2010/)
+ * Convolutional networks
    * [deeplearning.net on ConvNets](http://deeplearning.net/tutorial/lenet.html#lenet)
    * [AlexNet paper](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf)
+   * [CNN Paper from 2015](https://arxiv.org/pdf/1409.1556.pdf)
+   * [CNN Paper from 2013](http://arxiv.org/pdf/1311.2901v3.pdf)
  * Restricted Boltzmann Machines
    * [RBM lecture](https://www.youtube.com/watch?v=FJ0z3Ubagt4)
    * [Geoffrey Hinton lecture](https://www.youtube.com/watch?v=tt-PQNstYp4)
@@ -58,3 +61,4 @@ Here are the projects I have created which use something in the `weakai` reposit
    * [Karpathy's char-rnn](http://karpathy.github.io/2015/05/21/rnn-effectiveness/)
    * [Bidirectional RNNs](http://arxiv.org/pdf/1303.5778.pdf)
    * [Identity RNNs](https://arxiv.org/pdf/1504.00941v2.pdf)
+   * [npRNNs](http://arxiv.org/pdf/1511.03771v3.pdf)

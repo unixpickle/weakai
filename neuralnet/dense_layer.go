@@ -126,28 +126,46 @@ func (d *DenseLayer) Randomize() {
 // The first variable contains the weight matrix.
 // The second variable contains the bias vector.
 func (d *DenseLayer) Parameters() []*autofunc.Variable {
+	if d.Weights == nil || d.Biases == nil {
+		panic(uninitPanicMessage)
+	}
 	return []*autofunc.Variable{d.Weights.Data, d.Biases.Var}
 }
 
 func (d *DenseLayer) Apply(in autofunc.Result) autofunc.Result {
+	if d.Weights == nil || d.Biases == nil {
+		panic(uninitPanicMessage)
+	}
 	return d.Biases.Apply(d.Weights.Apply(in))
 }
 
 func (d *DenseLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResult {
+	if d.Weights == nil || d.Biases == nil {
+		panic(uninitPanicMessage)
+	}
 	return d.Biases.ApplyR(v, d.Weights.ApplyR(v, in))
 }
 
 func (d *DenseLayer) Batch(v autofunc.Result, n int) autofunc.Result {
+	if d.Weights == nil || d.Biases == nil {
+		panic(uninitPanicMessage)
+	}
 	biasBatcher := &autofunc.FuncBatcher{F: d.Biases}
 	return biasBatcher.Batch(d.Weights.Batch(v, n), n)
 }
 
 func (d *DenseLayer) BatchR(rv autofunc.RVector, v autofunc.RResult, n int) autofunc.RResult {
+	if d.Weights == nil || d.Biases == nil {
+		panic(uninitPanicMessage)
+	}
 	biasBatcher := &autofunc.RFuncBatcher{F: d.Biases}
 	return biasBatcher.BatchR(rv, d.Weights.BatchR(rv, v, n), n)
 }
 
 func (d *DenseLayer) Serialize() ([]byte, error) {
+	if d.Weights == nil || d.Biases == nil {
+		panic(uninitPanicMessage)
+	}
 	weightCount := d.InputCount * d.OutputCount
 	biasCount := d.OutputCount
 	b := make([]byte, 0, 17+8*(weightCount+biasCount))

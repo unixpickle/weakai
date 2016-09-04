@@ -89,6 +89,9 @@ func (c *ConvLayer) Randomize() {
 // Parameters returns a slice containing the bias
 // variable and all the filter variables.
 func (c *ConvLayer) Parameters() []*autofunc.Variable {
+	if c.Filters == nil || c.Biases == nil || c.FilterVars == nil {
+		panic(uninitPanicMessage)
+	}
 	res := make([]*autofunc.Variable, len(c.FilterVars)+1)
 	res[0] = c.Biases
 	copy(res[1:], c.FilterVars)
@@ -99,6 +102,9 @@ func (c *ConvLayer) Parameters() []*autofunc.Variable {
 // The result is only valid as long as the ConvLayer
 // that produced it (c, in this case) is not modified.
 func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
+	if c.Filters == nil || c.Biases == nil || c.FilterVars == nil {
+		panic(uninitPanicMessage)
+	}
 	return &convLayerResult{
 		OutputTensor: c.convolve(in.Output()),
 		Input:        in,
@@ -108,6 +114,9 @@ func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
 
 // ApplyR is like Apply, but for autofunc.RResults.
 func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResult {
+	if c.Filters == nil || c.Biases == nil || c.FilterVars == nil {
+		panic(uninitPanicMessage)
+	}
 	return &convLayerRResult{
 		OutputTensor:  c.convolve(in.Output()),
 		ROutputTensor: c.convolveR(v, in.Output(), in.ROutput()),

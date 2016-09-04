@@ -1,10 +1,14 @@
 package neuralnet
 
 import (
+	"errors"
+
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/sgd"
 )
+
+var uninitPanicMessage = errors.New("layer has uninitialized parameters")
 
 // A Layer represents any differentiable function
 // that can be used as a layer in a neural net.

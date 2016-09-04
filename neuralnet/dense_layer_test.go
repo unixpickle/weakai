@@ -39,6 +39,19 @@ func BenchmarkDenseLayerBackProp(b *testing.B) {
 	}
 }
 
+func BenchmarkDenseLayerSerialization(b *testing.B) {
+	dl := &DenseLayer{
+		InputCount:  128 * 8 * 8,
+		OutputCount: 128,
+	}
+	dl.Randomize()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		data, _ := dl.Serialize()
+		DeserializeDenseLayer(data)
+	}
+}
+
 func TestDenseForward(t *testing.T) {
 	network, input, _ := denseTestInfo()
 	output := network.Apply(input)

@@ -281,15 +281,6 @@ func (c *ConvLayer) outputToTensor(out linalg.Vector) *Tensor3 {
 	}
 }
 
-func (c *ConvLayer) filterToTensor(filter linalg.Vector) *Tensor3 {
-	return &Tensor3{
-		Width:  c.FilterWidth,
-		Height: c.FilterHeight,
-		Depth:  c.InputDepth,
-		Data:   filter,
-	}
-}
-
 type convLayerResult struct {
 	OutputVec linalg.Vector
 	Input     autofunc.Result

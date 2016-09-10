@@ -136,6 +136,52 @@ func TestMaxPoolingBackward(t *testing.T) {
 	}
 }
 
+func TestMaxPoolingBatch(t *testing.T) {
+	layer := &MaxPoolingLayer{
+		XSpan:       5,
+		YSpan:       4,
+		InputWidth:  17,
+		InputHeight: 19,
+		InputDepth:  3,
+	}
+
+	n := 3
+	batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
+	for i := range batchInput {
+		batchInput[i] = rand.NormFloat64()
+	}
+	batchRes := &autofunc.Variable{Vector: batchInput}
+
+	testBatcher(t, layer, batchRes, n, []*autofunc.Variable{batchRes})
+}
+
+func TestMaxPoolingBatchR(t *testing.T) {
+	layer := &MaxPoolingLayer{
+		XSpan:       5,
+		YSpan:       4,
+		InputWidth:  17,
+		InputHeight: 19,
+		InputDepth:  3,
+	}
+
+	n := 3
+	batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
+	for i := range batchInput {
+		batchInput[i] = rand.NormFloat64()
+	}
+	batchRes := &autofunc.Variable{Vector: batchInput}
+
+	rVec := autofunc.RVector{
+		batchRes: make(linalg.Vector, len(batchInput)),
+	}
+	for i := range rVec[batchRes] {
+		rVec[batchRes][i] = rand.NormFloat64()
+	}
+
+	testRBatcher(t, rVec, layer, autofunc.NewRVariable(batchRes, rVec),
+		n, []*autofunc.Variable{batchRes})
+}
+
 func TestMaxPoolingSerialize(t *testing.T) {
 	layer := &MaxPoolingLayer{3, 3, 10, 11, 2}
 	encoded, err := layer.Serialize()

@@ -184,6 +184,62 @@ func TestConvLayerRProp(t *testing.T) {
 	funcTest.Run(t)
 }
 
+func TestConvLayerBatch(t *testing.T) {
+	layer := &ConvLayer{
+		FilterCount:  3,
+		FilterWidth:  2,
+		FilterHeight: 4,
+		Stride:       2,
+		InputHeight:  17,
+		InputWidth:   19,
+		InputDepth:   5,
+	}
+	layer.Randomize()
+
+	n := 3
+	batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
+	for i := range batchInput {
+		batchInput[i] = rand.NormFloat64()
+	}
+	batchRes := &autofunc.Variable{Vector: batchInput}
+
+	testBatcher(t, layer, batchRes, n, []*autofunc.Variable{batchRes, layer.Biases,
+		layer.FilterVar})
+}
+
+func TestConvLayerBatchR(t *testing.T) {
+	layer := &ConvLayer{
+		FilterCount:  3,
+		FilterWidth:  2,
+		FilterHeight: 4,
+		Stride:       2,
+		InputHeight:  17,
+		InputWidth:   19,
+		InputDepth:   5,
+	}
+	layer.Randomize()
+
+	n := 3
+	batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
+	for i := range batchInput {
+		batchInput[i] = rand.NormFloat64()
+	}
+	batchRes := &autofunc.Variable{Vector: batchInput}
+
+	params := []*autofunc.Variable{batchRes, layer.Biases, layer.FilterVar}
+
+	rVec := autofunc.RVector{}
+	for _, param := range params {
+		vec := make(linalg.Vector, len(param.Vector))
+		for i := range vec {
+			vec[i] = rand.NormFloat64()
+		}
+		rVec[param] = vec
+	}
+
+	testRBatcher(t, rVec, layer, autofunc.NewRVariable(batchRes, rVec), n, params)
+}
+
 func BenchmarkShallowConvLayer(b *testing.B) {
 	benchmarkConvLayer(b, &ConvLayer{
 		FilterCount:  48,

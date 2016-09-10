@@ -145,6 +145,19 @@ func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RRe
 	}
 }
 
+// Batch applies the layer to inputs in batch.
+func (c *ConvLayer) Batch(in autofunc.Result, n int) autofunc.Result {
+	f := autofunc.FuncBatcher{F: c}
+	return f.Batch(in, n)
+}
+
+// BatchR is like Batch, but for RResults.
+func (c *ConvLayer) BatchR(rv autofunc.RVector, in autofunc.RResult,
+	n int) autofunc.RResult {
+	f := autofunc.RFuncBatcher{F: c}
+	return f.BatchR(rv, in, n)
+}
+
 // Serialize serializes the layer.
 func (c *ConvLayer) Serialize() ([]byte, error) {
 	return json.Marshal(c)

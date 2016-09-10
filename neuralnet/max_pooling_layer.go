@@ -89,6 +89,19 @@ func (m *MaxPoolingLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofu
 	}
 }
 
+// Batch applies the layer to inputs in batch.
+func (m *MaxPoolingLayer) Batch(in autofunc.Result, n int) autofunc.Result {
+	f := autofunc.FuncBatcher{F: m}
+	return f.Batch(in, n)
+}
+
+// BatchR is like Batch, but for RResults.
+func (m *MaxPoolingLayer) BatchR(rv autofunc.RVector, in autofunc.RResult,
+	n int) autofunc.RResult {
+	f := autofunc.RFuncBatcher{F: m}
+	return f.BatchR(rv, in, n)
+}
+
 // Serialize serializes the layer.
 func (m *MaxPoolingLayer) Serialize() ([]byte, error) {
 	return json.Marshal(m)

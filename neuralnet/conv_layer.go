@@ -121,10 +121,9 @@ func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
 	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
-	inMatrix, out := c.convolve(in.Output())
+	out := c.convolve(in.Output())
 	return &convLayerResult{
 		OutputTensor: out,
-		InMatrix:     inMatrix,
 		Input:        in,
 		Layer:        c,
 	}
@@ -135,7 +134,7 @@ func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RRe
 	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
 		panic(uninitPanicMessage)
 	}
-	_, outTensor := c.convolve(in.Output())
+	outTensor := c.convolve(in.Output())
 	return &convLayerRResult{
 		OutputTensor:  outTensor,
 		ROutputTensor: c.convolveR(v, in.Output(), in.ROutput()),
@@ -153,16 +152,9 @@ func (c *ConvLayer) SerializerType() string {
 	return serializerTypeConvLayer
 }
 
-func (c *ConvLayer) convolve(input linalg.Vector) (in blas64.General, out *Tensor3) {
-	inTensor := c.inputToTensor(input)
+func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
-
-	inMat := blas64.General{
-		Rows:   outTensor.Width * outTensor.Height,
-		Cols:   c.FilterWidth * c.FilterHeight * c.InputDepth,
-		Stride: c.FilterWidth * c.FilterHeight * c.InputDepth,
-		Data:   inTensor.ToCol(c.FilterWidth, c.FilterHeight, c.Stride),
-	}
+	inMat := c.inputToMatrix(input)
 	filterMat := blas64.General{
 		Rows:   c.FilterCount,
 		Cols:   inMat.Cols,
@@ -184,7 +176,7 @@ func (c *ConvLayer) convolve(input linalg.Vector) (in blas64.General, out *Tenso
 		blas64.Axpy(len(outRow), 1, biasVec, outVec)
 	}
 
-	return inMat, outTensor
+	return outTensor
 }
 
 func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *Tensor3 {
@@ -280,6 +272,16 @@ func (c *ConvLayer) inputToTensor(in linalg.Vector) *Tensor3 {
 	}
 }
 
+func (c *ConvLayer) inputToMatrix(in linalg.Vector) blas64.General {
+	inTensor := c.inputToTensor(in)
+	return blas64.General{
+		Rows:   c.OutputWidth() * c.OutputHeight(),
+		Cols:   c.FilterWidth * c.FilterHeight * c.InputDepth,
+		Stride: c.FilterWidth * c.FilterHeight * c.InputDepth,
+		Data:   inTensor.ToCol(c.FilterWidth, c.FilterHeight, c.Stride),
+	}
+}
+
 func (c *ConvLayer) outputToTensor(out linalg.Vector) *Tensor3 {
 	return &Tensor3{
 		Width:  c.OutputWidth(),
@@ -300,7 +302,6 @@ func (c *ConvLayer) filterToTensor(filter linalg.Vector) *Tensor3 {
 
 type convLayerResult struct {
 	OutputTensor *Tensor3
-	InMatrix     blas64.General
 	Input        autofunc.Result
 	Layer        *ConvLayer
 }
@@ -327,6 +328,8 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 		Data:   upstream,
 	}
 
+	var inMatrix blas64.General
+
 	if biasGrad, ok := grad[c.Layer.Biases]; ok {
 		biasGradVec := blas64.Vector{Inc: 1, Data: biasGrad}
 		for i := 0; i < len(upstreamMat.Data); i += upstreamMat.Cols {
@@ -339,8 +342,11 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 	}
 
 	if !c.Input.Constant(grad) {
-		inDeriv := c.InMatrix
-		inDeriv.Data = make([]float64, len(c.InMatrix.Data))
+		if inMatrix.Data == nil {
+			inMatrix = c.Layer.inputToMatrix(c.Input.Output())
+		}
+		inDeriv := inMatrix
+		inDeriv.Data = make([]float64, len(inMatrix.Data))
 		filterMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
@@ -355,13 +361,16 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 	}
 
 	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
+		if inMatrix.Data == nil {
+			inMatrix = c.Layer.inputToMatrix(c.Input.Output())
+		}
 		destMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
 			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
 			Data:   filterGrad,
 		}
-		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, c.InMatrix, 1, destMat)
+		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrix, 1, destMat)
 	}
 }
 

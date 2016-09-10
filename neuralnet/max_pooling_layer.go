@@ -34,6 +34,7 @@ type MaxPoolingLayer struct {
 	InputDepth int
 }
 
+// DeserializeMaxPoolingLayer deserializes a MaxPoolingLayer.
 func DeserializeMaxPoolingLayer(d []byte) (*MaxPoolingLayer, error) {
 	var res MaxPoolingLayer
 	if err := json.Unmarshal(d, &res); err != nil {
@@ -42,6 +43,7 @@ func DeserializeMaxPoolingLayer(d []byte) (*MaxPoolingLayer, error) {
 	return &res, nil
 }
 
+// OutputWidth returns the output tensor width.
 func (m *MaxPoolingLayer) OutputWidth() int {
 	w := m.InputWidth / m.XSpan
 	if (m.InputWidth % m.XSpan) != 0 {
@@ -50,6 +52,7 @@ func (m *MaxPoolingLayer) OutputWidth() int {
 	return w
 }
 
+// OutputHeight returns the output tensor height.
 func (m *MaxPoolingLayer) OutputHeight() int {
 	h := m.InputHeight / m.YSpan
 	if (m.InputHeight % m.YSpan) != 0 {
@@ -58,6 +61,8 @@ func (m *MaxPoolingLayer) OutputHeight() int {
 	return h
 }
 
+// Apply applies the layer to an input, which is treated
+// as a tensor.
 func (m *MaxPoolingLayer) Apply(in autofunc.Result) autofunc.Result {
 	inTensor := m.inputTensor(in.Output())
 	out, choices := m.evaluate(inTensor)
@@ -69,6 +74,7 @@ func (m *MaxPoolingLayer) Apply(in autofunc.Result) autofunc.Result {
 	}
 }
 
+// ApplyR is like Apply, but for RResults.
 func (m *MaxPoolingLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResult {
 	inTensor := m.inputTensor(in.Output())
 	inTensorR := m.inputTensor(in.ROutput())
@@ -83,10 +89,13 @@ func (m *MaxPoolingLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofu
 	}
 }
 
+// Serialize serializes the layer.
 func (m *MaxPoolingLayer) Serialize() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// SerializerType returns the unique ID used to serialize
+// this layer with the serializer package.
 func (m *MaxPoolingLayer) SerializerType() string {
 	return serializerTypeMaxPoolingLayer
 }

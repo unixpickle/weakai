@@ -32,6 +32,7 @@ type ConvLayer struct {
 	FilterVar *autofunc.Variable `json:"-"`
 }
 
+// DeserializeConvLayer deserializes a ConvLayer.
 func DeserializeConvLayer(data []byte) (*ConvLayer, error) {
 	var c ConvLayer
 	if err := json.Unmarshal(data, &c); err != nil {
@@ -144,10 +145,13 @@ func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RRe
 	}
 }
 
+// Serialize serializes the layer.
 func (c *ConvLayer) Serialize() ([]byte, error) {
 	return json.Marshal(c)
 }
 
+// SerializerType returns the unique ID used to serialize
+// this layer with the serializer package.
 func (c *ConvLayer) SerializerType() string {
 	return serializerTypeConvLayer
 }

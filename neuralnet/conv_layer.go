@@ -119,43 +119,67 @@ func (c *ConvLayer) Parameters() []*autofunc.Variable {
 // The result is only valid as long as the ConvLayer
 // that produced it (c, in this case) is not modified.
 func (c *ConvLayer) Apply(in autofunc.Result) autofunc.Result {
-	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
-		panic(uninitPanicMessage)
-	}
-	out := c.convolve(in.Output())
-	return &convLayerResult{
-		OutputTensor: out,
-		Input:        in,
-		Layer:        c,
-	}
+	return c.Batch(in, 1)
 }
 
 // ApplyR is like Apply, but for autofunc.RResults.
 func (c *ConvLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResult {
-	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
-		panic(uninitPanicMessage)
-	}
-	outTensor := c.convolve(in.Output())
-	return &convLayerRResult{
-		OutputTensor:  outTensor,
-		ROutputTensor: c.convolveR(v, in.Output(), in.ROutput()),
-		Input:         in,
-		Layer:         c,
-		RV:            v,
-	}
+	return c.BatchR(v, in, 1)
 }
 
 // Batch applies the layer to inputs in batch.
 func (c *ConvLayer) Batch(in autofunc.Result, n int) autofunc.Result {
-	f := autofunc.FuncBatcher{F: c}
-	return f.Batch(in, n)
+	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
+		panic(uninitPanicMessage)
+	}
+	outSize := c.OutputWidth() * c.OutputHeight() * c.OutputDepth()
+	inSize := c.InputWidth * c.InputHeight * c.InputDepth
+	if len(in.Output()) != n*inSize {
+		panic("invalid input size")
+	}
+	res := &convLayerResult{
+		OutputVec: make(linalg.Vector, outSize*n),
+		Input:     in,
+		N:         n,
+		Layer:     c,
+	}
+	for i := 0; i < n; i++ {
+		subIn := in.Output()[i*inSize : (i+1)*inSize]
+		subOut := res.OutputVec[i*outSize : (i+1)*outSize]
+		c.convolve(subIn, c.outputToTensor(subOut))
+	}
+	return res
 }
 
 // BatchR is like Batch, but for RResults.
 func (c *ConvLayer) BatchR(rv autofunc.RVector, in autofunc.RResult,
 	n int) autofunc.RResult {
-	f := autofunc.RFuncBatcher{F: c}
-	return f.BatchR(rv, in, n)
+	if c.Filters == nil || c.Biases == nil || c.FilterVar == nil {
+		panic(uninitPanicMessage)
+	}
+	outSize := c.OutputWidth() * c.OutputHeight() * c.OutputDepth()
+	inSize := c.InputWidth * c.InputHeight * c.InputDepth
+	if len(in.Output()) != n*inSize {
+		panic("invalid input size")
+	}
+	res := &convLayerRResult{
+		OutputVec:  make(linalg.Vector, outSize*n),
+		ROutputVec: make(linalg.Vector, outSize*n),
+		Input:      in,
+		FiltersR:   rv[c.FilterVar],
+		N:          n,
+		Layer:      c,
+	}
+	for i := 0; i < n; i++ {
+		subIn := in.Output()[i*inSize : (i+1)*inSize]
+		subOut := res.OutputVec[i*outSize : (i+1)*outSize]
+		c.convolve(subIn, c.outputToTensor(subOut))
+
+		subInR := in.ROutput()[i*inSize : (i+1)*inSize]
+		subOutR := res.ROutputVec[i*outSize : (i+1)*outSize]
+		c.convolveR(rv, subIn, subInR, c.outputToTensor(subOutR))
+	}
+	return res
 }
 
 // Serialize serializes the layer.
@@ -169,9 +193,8 @@ func (c *ConvLayer) SerializerType() string {
 	return serializerTypeConvLayer
 }
 
-func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
-	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
-	inMat := c.inputToMatrix(input)
+func (c *ConvLayer) convolve(in linalg.Vector, out *Tensor3) {
+	inMat := c.inputToMatrix(in)
 	filterMat := blas64.General{
 		Rows:   c.FilterCount,
 		Cols:   inMat.Cols,
@@ -179,105 +202,55 @@ func (c *ConvLayer) convolve(input linalg.Vector) *Tensor3 {
 		Data:   c.FilterVar.Vector,
 	}
 	outMat := blas64.General{
-		Rows:   outTensor.Width * outTensor.Height,
-		Cols:   outTensor.Depth,
-		Stride: outTensor.Depth,
-		Data:   outTensor.Data,
+		Rows:   out.Width * out.Height,
+		Cols:   out.Depth,
+		Stride: out.Depth,
+		Data:   out.Data,
 	}
 	blas64.Gemm(blas.NoTrans, blas.Trans, 1, inMat, filterMat, 0, outMat)
 
 	biasVec := blas64.Vector{Inc: 1, Data: c.Biases.Vector}
-	for i := 0; i < len(outTensor.Data); i += outMat.Cols {
-		outRow := outTensor.Data[i : i+outMat.Cols]
+	for i := 0; i < len(out.Data); i += outMat.Cols {
+		outRow := out.Data[i : i+outMat.Cols]
 		outVec := blas64.Vector{Inc: 1, Data: outRow}
 		blas64.Axpy(len(outRow), 1, biasVec, outVec)
 	}
-
-	return outTensor
 }
 
-func (c *ConvLayer) convolveR(v autofunc.RVector, input, inputR linalg.Vector) *Tensor3 {
-	inTensor := c.inputToTensor(input)
-	inTensorR := c.inputToTensor(inputR)
-	croppedInput := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
-	croppedInputR := NewTensor3(c.FilterWidth, c.FilterHeight, c.InputDepth)
-	outTensor := NewTensor3(c.OutputWidth(), c.OutputHeight(), c.OutputDepth())
+func (c *ConvLayer) convolveR(v autofunc.RVector, in, inR linalg.Vector, out *Tensor3) {
+	inMat := c.inputToMatrix(in)
+	inMatR := c.inputToMatrix(inR)
+	filterMat := blas64.General{
+		Rows:   c.FilterCount,
+		Cols:   inMat.Cols,
+		Stride: inMat.Stride,
+		Data:   c.FilterVar.Vector,
+	}
+	outMat := blas64.General{
+		Rows:   out.Width * out.Height,
+		Cols:   out.Depth,
+		Stride: out.Depth,
+		Data:   out.Data,
+	}
+	blas64.Gemm(blas.NoTrans, blas.Trans, 1, inMatR, filterMat, 0, outMat)
+	if filterRV, ok := v[c.FilterVar]; ok {
+		filterMatR := blas64.General{
+			Rows:   c.FilterCount,
+			Cols:   inMat.Cols,
+			Stride: inMat.Stride,
+			Data:   filterRV,
+		}
+		blas64.Gemm(blas.NoTrans, blas.Trans, 1, inMat, filterMatR, 1, outMat)
+	}
 
-	filtersR := c.filtersR(v)
-	biasR := v[c.Biases]
-
-	for y := 0; y < outTensor.Height; y++ {
-		inputY := y * c.Stride
-		for x := 0; x < outTensor.Width; x++ {
-			inputX := x * c.Stride
-			inTensor.Crop(inputX, inputY, croppedInput)
-			inTensorR.Crop(inputX, inputY, croppedInputR)
-			croppedVec := blas64.Vector{
-				Inc:  1,
-				Data: croppedInput.Data,
-			}
-			croppedVecR := blas64.Vector{
-				Inc:  1,
-				Data: croppedInputR.Data,
-			}
-			for z, filter := range c.Filters {
-				filterVec := blas64.Vector{
-					Inc:  1,
-					Data: filter.Data,
-				}
-				convolution := blas64.Dot(len(filter.Data), filterVec, croppedVecR)
-				if rfilter := filtersR[z]; rfilter != nil {
-					filterVecR := blas64.Vector{
-						Inc:  1,
-						Data: rfilter.Data,
-					}
-					convolution += blas64.Dot(len(rfilter.Data), filterVecR, croppedVec)
-				}
-				if biasR != nil {
-					convolution += biasR[z]
-				}
-				outTensor.Set(x, y, z, convolution)
-			}
+	if biasRV, ok := v[c.Biases]; ok {
+		biasVec := blas64.Vector{Inc: 1, Data: biasRV}
+		for i := 0; i < len(out.Data); i += outMat.Cols {
+			outRow := out.Data[i : i+outMat.Cols]
+			outVec := blas64.Vector{Inc: 1, Data: outRow}
+			blas64.Axpy(len(outRow), 1, biasVec, outVec)
 		}
 	}
-
-	return outTensor
-}
-
-func (c *ConvLayer) gradsFromMap(m map[*autofunc.Variable]linalg.Vector) (bias linalg.Vector,
-	filters []*Tensor3) {
-	if m == nil {
-		filters = make([]*Tensor3, len(c.Filters))
-		return
-	}
-
-	bias = m[c.Biases]
-
-	if filtersGrad := m[c.FilterVar]; filtersGrad != nil {
-		for _, f := range c.Filters {
-			gradData := filtersGrad[:f.Width*f.Height*f.Depth]
-			filters = append(filters, c.filterToTensor(gradData))
-			filtersGrad = filtersGrad[f.Width*f.Height*f.Depth:]
-		}
-	} else {
-		filters = make([]*Tensor3, len(c.Filters))
-	}
-
-	return
-}
-
-func (c *ConvLayer) filtersR(v autofunc.RVector) []*Tensor3 {
-	var filtersR []*Tensor3
-	if filtersGrad := v[c.FilterVar]; filtersGrad != nil {
-		for _, f := range c.Filters {
-			gradData := filtersGrad[:f.Width*f.Height*f.Depth]
-			filtersR = append(filtersR, c.filterToTensor(gradData))
-			filtersGrad = filtersGrad[f.Width*f.Height*f.Depth:]
-		}
-	} else {
-		filtersR = make([]*Tensor3, len(c.Filters))
-	}
-	return filtersR
 }
 
 func (c *ConvLayer) inputToTensor(in linalg.Vector) *Tensor3 {
@@ -318,13 +291,14 @@ func (c *ConvLayer) filterToTensor(filter linalg.Vector) *Tensor3 {
 }
 
 type convLayerResult struct {
-	OutputTensor *Tensor3
-	Input        autofunc.Result
-	Layer        *ConvLayer
+	OutputVec linalg.Vector
+	Input     autofunc.Result
+	N         int
+	Layer     *ConvLayer
 }
 
 func (c *convLayerResult) Output() linalg.Vector {
-	return c.OutputTensor.Data
+	return c.OutputVec
 }
 
 func (c *convLayerResult) Constant(g autofunc.Gradient) bool {
@@ -338,32 +312,54 @@ func (c *convLayerResult) Constant(g autofunc.Gradient) bool {
 }
 
 func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofunc.Gradient) {
-	upstreamMat := blas64.General{
-		Rows:   c.OutputTensor.Width * c.OutputTensor.Height,
-		Cols:   c.OutputTensor.Depth,
-		Stride: c.OutputTensor.Depth,
-		Data:   upstream,
+	c.propagateBiases(upstream, grad)
+
+	var inputDownstream linalg.Vector
+	if !c.Input.Constant(grad) {
+		inputDownstream = make(linalg.Vector, len(c.Input.Output()))
 	}
 
-	var inMatrix blas64.General
+	subUpstreamSize := len(upstream) / c.N
+	subDownstreamSize := len(c.Input.Output()) / c.N
+	for i := 0; i < c.N; i++ {
+		subUpstream := upstream[i*subUpstreamSize : (i+1)*subUpstreamSize]
+		var subDownstream linalg.Vector
+		if inputDownstream != nil {
+			subDownstream = inputDownstream[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		}
+		subInput := c.Input.Output()[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		c.propagateSingle(subInput, subUpstream, subDownstream, grad)
+	}
 
+	if !c.Input.Constant(grad) {
+		c.Input.PropagateGradient(inputDownstream, grad)
+	}
+}
+
+func (c *convLayerResult) propagateBiases(upstream linalg.Vector, grad autofunc.Gradient) {
 	if biasGrad, ok := grad[c.Layer.Biases]; ok {
 		biasGradVec := blas64.Vector{Inc: 1, Data: biasGrad}
-		for i := 0; i < len(upstreamMat.Data); i += upstreamMat.Cols {
+		for i := 0; i < len(upstream); i += c.Layer.OutputDepth() {
 			row := blas64.Vector{
 				Inc:  1,
-				Data: upstreamMat.Data[i : i+upstreamMat.Cols],
+				Data: upstream[i : i+c.Layer.OutputDepth()],
 			}
 			blas64.Axpy(len(biasGrad), 1, row, biasGradVec)
 		}
 	}
+}
 
-	if !c.Input.Constant(grad) {
-		if inMatrix.Data == nil {
-			inMatrix = c.Layer.inputToMatrix(c.Input.Output())
-		}
-		inDeriv := inMatrix
-		inDeriv.Data = make([]float64, len(inMatrix.Data))
+func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vector,
+	grad autofunc.Gradient) {
+	upstreamMat := blas64.General{
+		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
+		Cols:   c.Layer.OutputDepth(),
+		Stride: c.Layer.OutputDepth(),
+		Data:   upstream,
+	}
+
+	if downstream != nil {
+		inDeriv := c.Layer.inputToMatrix(input)
 		filterMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
@@ -374,13 +370,11 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 		flattened := NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
 			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
 			c.Layer.FilterHeight, c.Layer.Stride)
-		c.Input.PropagateGradient(flattened.Data, grad)
+		copy(downstream, flattened.Data)
 	}
 
 	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
-		if inMatrix.Data == nil {
-			inMatrix = c.Layer.inputToMatrix(c.Input.Output())
-		}
+		inMatrix := c.Layer.inputToMatrix(input)
 		destMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
@@ -392,26 +386,23 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 }
 
 type convLayerRResult struct {
-	OutputTensor  *Tensor3
-	ROutputTensor *Tensor3
-	Input         autofunc.RResult
-	Layer         *ConvLayer
-	RV            autofunc.RVector
+	OutputVec  linalg.Vector
+	ROutputVec linalg.Vector
+	Input      autofunc.RResult
+	FiltersR   linalg.Vector
+	N          int
+	Layer      *ConvLayer
 }
 
 func (c *convLayerRResult) Output() linalg.Vector {
-	return c.OutputTensor.Data
+	return c.OutputVec
 }
 
 func (c *convLayerRResult) ROutput() linalg.Vector {
-	return c.ROutputTensor.Data
+	return c.ROutputVec
 }
 
 func (c *convLayerRResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) bool {
-	if !c.Input.Constant(rg, g) {
-		return false
-	}
-
 	if !c.Layer.Biases.Constant(g) {
 		return false
 	} else if _, ok := rg[c.Layer.Biases]; ok {
@@ -424,61 +415,137 @@ func (c *convLayerRResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) 
 		return false
 	}
 
+	if !c.Input.Constant(rg, g) {
+		return false
+	}
 	return true
 }
 
 func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 	rgrad autofunc.RGradient, grad autofunc.Gradient) {
-	inputTensor := c.Layer.inputToTensor(c.Input.Output())
-	inputTensorR := c.Layer.inputToTensor(c.Input.ROutput())
-	downstreamTensor := c.Layer.outputToTensor(upstream)
-	downstreamTensorR := c.Layer.outputToTensor(upstreamR)
+	if grad == nil {
+		grad = autofunc.Gradient{}
+	}
+	c.propagateBiases(upstream, upstreamR, rgrad, grad)
 
-	biasGrad, filterGrads := c.Layer.gradsFromMap(grad)
-	biasGradR, filterGradsR := c.Layer.gradsFromMap(rgrad)
+	var inputDownstream, inputDownstreamR linalg.Vector
+	if !c.Input.Constant(rgrad, grad) {
+		inputDownstream = make(linalg.Vector, len(c.Input.Output()))
+		inputDownstreamR = make(linalg.Vector, len(c.Input.Output()))
+	}
 
-	var inputGrad *Tensor3
-	var inputGradR *Tensor3
+	subUpstreamSize := len(upstream) / c.N
+	subDownstreamSize := len(c.Input.Output()) / c.N
+	for i := 0; i < c.N; i++ {
+		subUpstream := upstream[i*subUpstreamSize : (i+1)*subUpstreamSize]
+		subUpstreamR := upstreamR[i*subUpstreamSize : (i+1)*subUpstreamSize]
+		var subDownstream, subDownstreamR linalg.Vector
+		if inputDownstream != nil {
+			subDownstream = inputDownstream[i*subDownstreamSize : (i+1)*subDownstreamSize]
+			subDownstreamR = inputDownstreamR[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		}
+		subInput := c.Input.Output()[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		subInputR := c.Input.ROutput()[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		c.propagateSingle(subInput, subInputR, subUpstream, subUpstreamR,
+			subDownstream, subDownstreamR, rgrad, grad)
+	}
 
 	if !c.Input.Constant(rgrad, grad) {
-		inputGrad = NewTensor3(c.Layer.InputWidth, c.Layer.InputHeight, c.Layer.InputDepth)
-		inputGradR = NewTensor3(c.Layer.InputWidth, c.Layer.InputHeight, c.Layer.InputDepth)
+		c.Input.PropagateRGradient(inputDownstream, inputDownstreamR, rgrad, grad)
 	}
+}
 
-	filtersR := c.Layer.filtersR(c.RV)
-
-	for y := 0; y < c.OutputTensor.Height; y++ {
-		inputY := y * c.Layer.Stride
-		for x := 0; x < c.OutputTensor.Width; x++ {
-			inputX := x * c.Layer.Stride
-			for z, filter := range c.Layer.Filters {
-				sumPartial := downstreamTensor.Get(x, y, z)
-				sumPartialR := downstreamTensorR.Get(x, y, z)
-				if filterGrad := filterGrads[z]; filterGrad != nil {
-					filterGrad.MulAdd(-inputX, -inputY, inputTensor, sumPartial)
-				}
-				if filterGradR := filterGradsR[z]; filterGradR != nil {
-					filterGradR.MulAdd(-inputX, -inputY, inputTensor, sumPartialR)
-					filterGradR.MulAdd(-inputX, -inputY, inputTensorR, sumPartial)
-				}
-				if biasGrad != nil {
-					biasGrad[z] += sumPartial
-				}
-				if biasGradR != nil {
-					biasGradR[z] += sumPartialR
-				}
-				if inputGrad != nil {
-					inputGrad.MulAdd(inputX, inputY, filter, sumPartial)
-					inputGradR.MulAdd(inputX, inputY, filter, sumPartialR)
-					if rfilter := filtersR[z]; rfilter != nil {
-						inputGradR.MulAdd(inputX, inputY, rfilter, sumPartial)
-					}
-				}
+func (c *convLayerRResult) propagateBiases(upstream, upstreamR linalg.Vector,
+	rgrad autofunc.RGradient, grad autofunc.Gradient) {
+	if biasGrad, ok := grad[c.Layer.Biases]; ok {
+		biasGradVec := blas64.Vector{Inc: 1, Data: biasGrad}
+		for i := 0; i < len(upstream); i += c.Layer.OutputDepth() {
+			row := blas64.Vector{
+				Inc:  1,
+				Data: upstream[i : i+c.Layer.OutputDepth()],
 			}
+			blas64.Axpy(len(biasGrad), 1, row, biasGradVec)
 		}
 	}
+	if biasRGrad, ok := rgrad[c.Layer.Biases]; ok {
+		biasRGradVec := blas64.Vector{Inc: 1, Data: biasRGrad}
+		for i := 0; i < len(upstream); i += c.Layer.OutputDepth() {
+			row := blas64.Vector{
+				Inc:  1,
+				Data: upstreamR[i : i+c.Layer.OutputDepth()],
+			}
+			blas64.Axpy(len(biasRGrad), 1, row, biasRGradVec)
+		}
+	}
+}
 
-	if inputGrad != nil {
-		c.Input.PropagateRGradient(inputGrad.Data, inputGradR.Data, rgrad, grad)
+func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, downstream,
+	downstreamR linalg.Vector, rgrad autofunc.RGradient, grad autofunc.Gradient) {
+	upstreamMat := blas64.General{
+		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
+		Cols:   c.Layer.OutputDepth(),
+		Stride: c.Layer.OutputDepth(),
+		Data:   upstream,
+	}
+	upstreamMatR := blas64.General{
+		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
+		Cols:   c.Layer.OutputDepth(),
+		Stride: c.Layer.OutputDepth(),
+		Data:   upstreamR,
+	}
+
+	if downstream != nil {
+		inDeriv := c.Layer.inputToMatrix(input)
+		filterMat := blas64.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   c.Layer.FilterVar.Vector,
+		}
+		blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 0, inDeriv)
+		flattened := NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
+			c.Layer.FilterHeight, c.Layer.Stride)
+		copy(downstream, flattened.Data)
+
+		blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMatR, filterMat, 0, inDeriv)
+		if c.FiltersR != nil {
+			filterMat.Data = c.FiltersR
+			blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 1, inDeriv)
+		}
+		flattened = NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
+			c.Layer.FilterHeight, c.Layer.Stride)
+		copy(downstreamR, flattened.Data)
+	}
+
+	filterGrad, hasFilterGrad := grad[c.Layer.FilterVar]
+	filterRGrad, hasFilterRGrad := rgrad[c.Layer.FilterVar]
+
+	var inMatrix blas64.General
+	if hasFilterGrad || hasFilterRGrad {
+		inMatrix = c.Layer.inputToMatrix(input)
+	}
+
+	if hasFilterGrad {
+		destMat := blas64.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   filterGrad,
+		}
+		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrix, 1, destMat)
+	}
+
+	if hasFilterRGrad {
+		inMatrixR := c.Layer.inputToMatrix(inputR)
+		destMat := blas64.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   filterRGrad,
+		}
+		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMatR, inMatrix, 1, destMat)
+		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrixR, 1, destMat)
 	}
 }

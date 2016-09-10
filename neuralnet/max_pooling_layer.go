@@ -64,42 +64,60 @@ func (m *MaxPoolingLayer) OutputHeight() int {
 // Apply applies the layer to an input, which is treated
 // as a tensor.
 func (m *MaxPoolingLayer) Apply(in autofunc.Result) autofunc.Result {
-	inTensor := m.inputTensor(in.Output())
-	out, choices := m.evaluate(inTensor)
-	return &maxPoolingResult{
-		OutputTensor: out,
-		Choices:      choices,
-		Input:        in,
-		Layer:        m,
-	}
+	return m.Batch(in, 1)
 }
 
 // ApplyR is like Apply, but for RResults.
-func (m *MaxPoolingLayer) ApplyR(v autofunc.RVector, in autofunc.RResult) autofunc.RResult {
-	inTensor := m.inputTensor(in.Output())
-	inTensorR := m.inputTensor(in.ROutput())
-	out, choices := m.evaluate(inTensor)
-	outR := choices.ForwardPropagate(inTensorR)
-	return &maxPoolingRResult{
-		OutputTensor:  out,
-		ROutputTensor: outR,
-		Choices:       choices,
-		Input:         in,
-		Layer:         m,
-	}
+func (m *MaxPoolingLayer) ApplyR(rv autofunc.RVector, in autofunc.RResult) autofunc.RResult {
+	return m.BatchR(rv, in, 1)
 }
 
 // Batch applies the layer to inputs in batch.
 func (m *MaxPoolingLayer) Batch(in autofunc.Result, n int) autofunc.Result {
-	f := autofunc.FuncBatcher{F: m}
-	return f.Batch(in, n)
+	outSize := m.OutputWidth() * m.OutputHeight() * m.InputDepth
+	inSize := m.InputWidth * m.InputHeight * m.InputDepth
+	if len(in.Output()) != n*inSize {
+		panic("invalid input size")
+	}
+	res := &maxPoolingResult{
+		OutputVec: make(linalg.Vector, outSize*n),
+		Input:     in,
+		Layer:     m,
+	}
+	for i := 0; i < n; i++ {
+		outTensor := m.outputTensor(res.OutputVec[i*outSize : (i+1)*outSize])
+		inTensor := m.inputTensor(in.Output()[i*inSize : (i+1)*inSize])
+		choices := m.evaluate(inTensor, outTensor)
+		res.Choices = append(res.Choices, choices)
+	}
+	return res
 }
 
 // BatchR is like Batch, but for RResults.
 func (m *MaxPoolingLayer) BatchR(rv autofunc.RVector, in autofunc.RResult,
 	n int) autofunc.RResult {
-	f := autofunc.RFuncBatcher{F: m}
-	return f.BatchR(rv, in, n)
+	outSize := m.OutputWidth() * m.OutputHeight() * m.InputDepth
+	inSize := m.InputWidth * m.InputHeight * m.InputDepth
+	if len(in.Output()) != n*inSize {
+		panic("invalid input size")
+	}
+	res := &maxPoolingRResult{
+		OutputVec:  make(linalg.Vector, outSize*n),
+		ROutputVec: make(linalg.Vector, outSize*n),
+		Input:      in,
+		Layer:      m,
+	}
+	for i := 0; i < n; i++ {
+		outTensor := m.outputTensor(res.OutputVec[i*outSize : (i+1)*outSize])
+		inTensor := m.inputTensor(in.Output()[i*inSize : (i+1)*inSize])
+		choices := m.evaluate(inTensor, outTensor)
+		res.Choices = append(res.Choices, choices)
+
+		outTensorR := m.outputTensor(res.ROutputVec[i*outSize : (i+1)*outSize])
+		inTensorR := m.inputTensor(in.ROutput()[i*inSize : (i+1)*inSize])
+		choices.ForwardPropagate(inTensorR, outTensorR)
+	}
+	return res
 }
 
 // Serialize serializes the layer.
@@ -113,29 +131,28 @@ func (m *MaxPoolingLayer) SerializerType() string {
 	return serializerTypeMaxPoolingLayer
 }
 
-func (m *MaxPoolingLayer) evaluate(inTensor *Tensor3) (*Tensor3, poolChoiceMap) {
-	outTensor := NewTensor3(m.OutputWidth(), m.OutputHeight(), m.InputDepth)
+func (m *MaxPoolingLayer) evaluate(in *Tensor3, out *Tensor3) poolChoiceMap {
 	choices := newPoolChoiceMap(m.OutputWidth(), m.OutputHeight(), m.InputDepth)
-	for y := 0; y < outTensor.Height; y++ {
+	for y := 0; y < out.Height; y++ {
 		poolY := y * m.YSpan
 		maxY := poolY + m.YSpan - 1
-		if maxY >= inTensor.Height {
-			maxY = inTensor.Height - 1
+		if maxY >= in.Height {
+			maxY = in.Height - 1
 		}
-		for x := 0; x < outTensor.Width; x++ {
+		for x := 0; x < out.Width; x++ {
 			poolX := x * m.XSpan
 			maxX := poolX + m.XSpan - 1
-			if maxX >= inTensor.Width {
-				maxX = inTensor.Width - 1
+			if maxX >= in.Width {
+				maxX = in.Width - 1
 			}
-			for z := 0; z < outTensor.Depth; z++ {
-				output, bestX, bestY := maxInput(inTensor, poolX, maxX, poolY, maxY, z)
-				outTensor.Set(x, y, z, output)
+			for z := 0; z < out.Depth; z++ {
+				output, bestX, bestY := maxInput(in, poolX, maxX, poolY, maxY, z)
+				out.Set(x, y, z, output)
 				choices[y][x][z] = [2]int{bestX, bestY}
 			}
 		}
 	}
-	return outTensor, choices
+	return choices
 }
 
 func (m *MaxPoolingLayer) inputTensor(inVec linalg.Vector) *Tensor3 {
@@ -157,14 +174,14 @@ func (m *MaxPoolingLayer) outputTensor(outVec linalg.Vector) *Tensor3 {
 }
 
 type maxPoolingResult struct {
-	OutputTensor *Tensor3
-	Choices      poolChoiceMap
-	Input        autofunc.Result
-	Layer        *MaxPoolingLayer
+	OutputVec linalg.Vector
+	Choices   []poolChoiceMap
+	Input     autofunc.Result
+	Layer     *MaxPoolingLayer
 }
 
 func (m *maxPoolingResult) Output() linalg.Vector {
-	return m.OutputTensor.Data
+	return m.OutputVec
 }
 
 func (m *maxPoolingResult) Constant(g autofunc.Gradient) bool {
@@ -175,26 +192,32 @@ func (m *maxPoolingResult) PropagateGradient(upstream linalg.Vector, grad autofu
 	if m.Input.Constant(grad) {
 		return
 	}
-	ut := m.Layer.outputTensor(upstream)
-	downstream := m.Choices.BackPropagate(ut, m.Layer.InputWidth,
-		m.Layer.InputHeight)
-	m.Input.PropagateGradient(downstream.Data, grad)
+	downstream := make(linalg.Vector, len(m.Input.Output()))
+	subUpstreamSize := len(m.OutputVec) / len(m.Choices)
+	subDownstreamSize := len(downstream) / len(m.Choices)
+	for i, choices := range m.Choices {
+		subUp := upstream[i*subUpstreamSize : (i+1)*subUpstreamSize]
+		subDown := downstream[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		choices.BackPropagate(m.Layer.outputTensor(subUp),
+			m.Layer.inputTensor(subDown))
+	}
+	m.Input.PropagateGradient(downstream, grad)
 }
 
 type maxPoolingRResult struct {
-	OutputTensor  *Tensor3
-	ROutputTensor *Tensor3
-	Choices       poolChoiceMap
-	Input         autofunc.RResult
-	Layer         *MaxPoolingLayer
+	OutputVec  linalg.Vector
+	ROutputVec linalg.Vector
+	Choices    []poolChoiceMap
+	Input      autofunc.RResult
+	Layer      *MaxPoolingLayer
 }
 
 func (m *maxPoolingRResult) Output() linalg.Vector {
-	return m.OutputTensor.Data
+	return m.OutputVec
 }
 
 func (m *maxPoolingRResult) ROutput() linalg.Vector {
-	return m.ROutputTensor.Data
+	return m.ROutputVec
 }
 
 func (m *maxPoolingRResult) Constant(rg autofunc.RGradient, g autofunc.Gradient) bool {
@@ -206,11 +229,22 @@ func (m *maxPoolingRResult) PropagateRGradient(upstream, upstreamR linalg.Vector
 	if m.Input.Constant(rgrad, grad) {
 		return
 	}
-	ut := m.Layer.outputTensor(upstream)
-	utR := m.Layer.outputTensor(upstreamR)
-	downstream := m.Choices.BackPropagate(ut, m.Layer.InputWidth, m.Layer.InputHeight)
-	downstreamR := m.Choices.BackPropagate(utR, m.Layer.InputWidth, m.Layer.InputHeight)
-	m.Input.PropagateRGradient(downstream.Data, downstreamR.Data, rgrad, grad)
+	downstream := make(linalg.Vector, len(m.Input.Output()))
+	downstreamR := make(linalg.Vector, len(m.Input.Output()))
+	subUpstreamSize := len(m.OutputVec) / len(m.Choices)
+	subDownstreamSize := len(downstream) / len(m.Choices)
+	for i, choices := range m.Choices {
+		subUp := upstream[i*subUpstreamSize : (i+1)*subUpstreamSize]
+		subDown := downstream[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		choices.BackPropagate(m.Layer.outputTensor(subUp),
+			m.Layer.inputTensor(subDown))
+
+		subUpR := upstreamR[i*subUpstreamSize : (i+1)*subUpstreamSize]
+		subDownR := downstreamR[i*subDownstreamSize : (i+1)*subDownstreamSize]
+		choices.BackPropagate(m.Layer.outputTensor(subUpR),
+			m.Layer.inputTensor(subDownR))
+	}
+	m.Input.PropagateRGradient(downstream, downstreamR, rgrad, grad)
 }
 
 func maxInput(t *Tensor3, x1, x2, y1, y2, z int) (value float64, bestX, bestY int) {
@@ -243,30 +277,26 @@ func newPoolChoiceMap(width, height, depth int) poolChoiceMap {
 	return res
 }
 
-func (p poolChoiceMap) ForwardPropagate(in *Tensor3) *Tensor3 {
-	output := NewTensor3(p.Width(), p.Height(), in.Depth)
+func (p poolChoiceMap) ForwardPropagate(in *Tensor3, out *Tensor3) {
 	for y, list := range p {
 		for x, list1 := range list {
 			for z, point := range list1 {
 				val := in.Get(point[0], point[1], z)
-				output.Set(x, y, z, val)
+				out.Set(x, y, z, val)
 			}
 		}
 	}
-	return output
 }
 
-func (p poolChoiceMap) BackPropagate(in *Tensor3, outWidth, outHeight int) *Tensor3 {
-	output := NewTensor3(outWidth, outHeight, in.Depth)
+func (p poolChoiceMap) BackPropagate(downstream *Tensor3, upstream *Tensor3) {
 	for y, list := range p {
 		for x, list1 := range list {
 			for z, point := range list1 {
-				val := in.Get(x, y, z)
-				output.Set(point[0], point[1], z, val)
+				val := downstream.Get(x, y, z)
+				upstream.Set(point[0], point[1], z, val)
 			}
 		}
 	}
-	return output
 }
 
 func (p poolChoiceMap) Width() int {

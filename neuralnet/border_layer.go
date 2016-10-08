@@ -37,7 +37,7 @@ func (b *BorderLayer) Apply(in autofunc.Result) autofunc.Result {
 	}
 }
 
-func (b *BorderLayer) ApplyR(in autofunc.RResult) autofunc.RResult {
+func (b *BorderLayer) ApplyR(rv autofunc.RVector, in autofunc.RResult) autofunc.RResult {
 	return &borderRResult{
 		OutputVec:  b.addBorder(in.Output()),
 		ROutputVec: b.addBorder(in.ROutput()),

@@ -7,8 +7,9 @@ import (
 	"github.com/unixpickle/num-analysis/linalg"
 )
 
-// BorderLayer stores parameters used
-// to configure a BorderLayer.
+// A BorderLayer adds padding around its input tensor,
+// thus creating a larger tensor with 0's around the
+// perimeter.
 type BorderLayer struct {
 	InputWidth  int
 	InputHeight int

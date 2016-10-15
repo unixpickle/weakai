@@ -75,11 +75,11 @@ func TestUnstackLayerRProp(t *testing.T) {
 		InverseStride: 3,
 	}
 
-	funcTest := &functest.RFuncTest{
+	funcTest := &functest.RFuncChecker{
 		F:     layer,
 		Vars:  []*autofunc.Variable{variable},
 		Input: variable,
 		RV:    rVec,
 	}
-	funcTest.Run(t)
+	funcTest.FullCheck(t)
 }

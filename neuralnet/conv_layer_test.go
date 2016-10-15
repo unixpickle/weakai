@@ -175,13 +175,13 @@ func TestConvLayerRProp(t *testing.T) {
 			rVector[variable][i] = rand.Float64()*2 - 1
 		}
 	}
-	funcTest := &functest.RFuncTest{
+	funcTest := &functest.RFuncChecker{
 		F:     layer,
 		Vars:  variables,
 		Input: inVar,
 		RV:    rVector,
 	}
-	funcTest.Run(t)
+	funcTest.FullCheck(t)
 }
 
 func TestConvLayerBatch(t *testing.T) {

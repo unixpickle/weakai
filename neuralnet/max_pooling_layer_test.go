@@ -211,11 +211,11 @@ func TestMaxPoolingRProp(t *testing.T) {
 	inputVar := &autofunc.Variable{input}
 	rVector := autofunc.RVector{inputVar: inputR}
 
-	funcTest := &functest.RFuncTest{
+	funcTest := &functest.RFuncChecker{
 		F:     layer,
 		Vars:  []*autofunc.Variable{inputVar},
 		Input: inputVar,
 		RV:    rVector,
 	}
-	funcTest.Run(t)
+	funcTest.FullCheck(t)
 }

@@ -21,26 +21,26 @@ func TestSeqFuncFunc(t *testing.T) {
 			0.90732, -0.63026, -0.14004, 0.77829},
 	}
 
-	ft := &functest.FuncTest{
+	fc := &functest.FuncChecker{
 		F:     seqFuncFunc,
 		Vars:  append(block.Parameters(), inSeq),
 		Input: inSeq,
 	}
-	ft.Run(t)
+	fc.FullCheck(t)
 
 	rv := autofunc.RVector{}
-	for _, variable := range ft.Vars {
+	for _, variable := range fc.Vars {
 		rv[variable] = make(linalg.Vector, len(variable.Vector))
 		for i := range rv[variable] {
 			rv[variable][i] = rand.NormFloat64()
 		}
 	}
 
-	rft := &functest.RFuncTest{
+	rfc := &functest.RFuncChecker{
 		F:     seqFuncFunc,
 		Vars:  append(block.Parameters(), inSeq),
 		Input: inSeq,
 		RV:    rv,
 	}
-	rft.Run(t)
+	rfc.FullCheck(t)
 }

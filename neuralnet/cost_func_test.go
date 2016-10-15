@@ -28,12 +28,12 @@ func TestMeanSquaredCostGradient(t *testing.T) {
 		expected[i] = rand.Float64()
 		actual.Vector[i] = rand.Float64()
 	}
-	funcTest := &functest.FuncTest{
+	funcTest := &functest.FuncChecker{
 		F:     meanSquaredTestFunc{expected},
 		Vars:  []*autofunc.Variable{actual},
 		Input: actual,
 	}
-	funcTest.Run(t)
+	funcTest.FullCheck(t)
 }
 
 func TestMeanSquaredCostRGradient(t *testing.T) {
@@ -45,11 +45,11 @@ func TestMeanSquaredCostRGradient(t *testing.T) {
 		actual.Vector[i] = rand.Float64()
 		rVector[actual][i] = rand.Float64()
 	}
-	funcTest := &functest.RFuncTest{
+	funcTest := &functest.RFuncChecker{
 		F:     meanSquaredTestFunc{expected},
 		Vars:  []*autofunc.Variable{actual},
 		Input: actual,
 		RV:    rVector,
 	}
-	funcTest.Run(t)
+	funcTest.FullCheck(t)
 }

@@ -21,6 +21,7 @@ type Block interface {
 
 	// PropagateStartR is like PropagateStart, but for an
 	// RStateGrad.
+	// The g argument may be nil.
 	PropagateStartR(r []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient)
 
 	// ApplyBlock applies the block to a batch of inputs.
@@ -51,6 +52,8 @@ type BlockResult interface {
 	//
 	// A nil argument stands for a 0 gradient.
 	// Upstream, s, and/or some entries in s may be nil.
+	//
+	// This should not modify the upstream information.
 	PropagateGradient(upstream []linalg.Vector, s []StateGrad, g autofunc.Gradient) []StateGrad
 }
 
@@ -74,6 +77,8 @@ type BlockRResult interface {
 	// Upstream, s, and/or some entries in s may be nil.
 	// The g argument may also be nil if the gradients are
 	// not desired.
+	//
+	// This should not modify the upstream information.
 	PropagateGradient(upstream []linalg.Vector, s []RStateGrad, rg autofunc.RGradient,
 		g autofunc.Gradient) []RStateGrad
 }

@@ -50,8 +50,8 @@ func (s StackedBlock) StartState() State {
 	return res
 }
 
-// StartStateR is like StartState.
-func (s StackedBlock) StartStateR(rv autofunc.RVector) RState {
+// StartRState is like StartState.
+func (s StackedBlock) StartRState(rv autofunc.RVector) RState {
 	if len(s) == 0 {
 		panic("cannot use an empty StackedBlock")
 	}
@@ -154,6 +154,7 @@ func (s StackedBlock) ApplyBlockR(v autofunc.RVector, states []RState,
 		}
 		if i+1 == len(s) {
 			res.OutVecs = out.Outputs()
+			res.ROutVecs = out.ROutputs()
 		} else {
 			in = make([]autofunc.RResult, len(out.Outputs()))
 			for j, outVec := range out.Outputs() {

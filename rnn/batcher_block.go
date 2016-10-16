@@ -159,7 +159,7 @@ func (b *batcherBlockResult) PropagateGradient(upstream []linalg.Vector, s []Sta
 		if upstream != nil {
 			joinedUpstream = append(joinedUpstream, upstream[i]...)
 		} else {
-			zeroUpstream := make(linalg.Vector, len(outVec)-b.StateSize)
+			zeroUpstream := make(linalg.Vector, len(outVec))
 			joinedUpstream = append(joinedUpstream, zeroUpstream...)
 		}
 		if s != nil && s[i] != nil {
@@ -224,7 +224,7 @@ func (b *batcherBlockRResult) PropagateRGradient(u, uR []linalg.Vector, s []RSta
 			joinedUpstream = append(joinedUpstream, u[i]...)
 			joinedUpstreamR = append(joinedUpstreamR, uR[i]...)
 		} else {
-			zeroUpstream := make(linalg.Vector, len(outVec)-b.StateSize)
+			zeroUpstream := make(linalg.Vector, len(outVec))
 			joinedUpstream = append(joinedUpstream, zeroUpstream...)
 			joinedUpstreamR = append(joinedUpstreamR, zeroUpstream...)
 		}

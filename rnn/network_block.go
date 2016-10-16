@@ -10,6 +10,11 @@ import (
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
+func init() {
+	var n NetworkBlock
+	serializer.RegisterTypedDeserializer(n.SerializerType(), DeserializeNetworkBlock)
+}
+
 // NetworkBlock is a Block that wraps a neuralnet.Network.
 // Unlike a BatcherBlock, a NetworkBlock can return a list
 // of learnable parameters and can serialize itself.
@@ -18,17 +23,19 @@ type NetworkBlock struct {
 	batcherBlock *BatcherBlock
 }
 
+// NewNetworkBlock creates a NetworkBlock.
 func NewNetworkBlock(n neuralnet.Network, stateSize int) *NetworkBlock {
 	return &NetworkBlock{
 		batcherBlock: &BatcherBlock{
-			F:             n.BatchLearner(),
-			StateSizeVal:  stateSize,
-			StartStateVar: &autofunc.Variable{Vector: make(linalg.Vector, stateSize)},
+			B:         n.BatchLearner(),
+			StateSize: stateSize,
+			Start:     &autofunc.Variable{Vector: make(linalg.Vector, stateSize)},
 		},
 		network: n,
 	}
 }
 
+// DeserializeNetworkBlock deserializes a NetworkBlock.
 func DeserializeNetworkBlock(d []byte) (*NetworkBlock, error) {
 	list, err := serializer.DeserializeSlice(d)
 	if err != nil {
@@ -47,49 +54,62 @@ func DeserializeNetworkBlock(d []byte) (*NetworkBlock, error) {
 		return nil, err
 	}
 	res := NewNetworkBlock(network, int(stateSize))
-	res.batcherBlock.StartStateVar = &initState
+	res.batcherBlock.Start = &initState
 	return res, nil
 }
 
+// Network returns the wrapped network.
 func (n *NetworkBlock) Network() neuralnet.Network {
 	return n.network
 }
 
-func (n *NetworkBlock) StartState() autofunc.Result {
+// StartState returns the initial state.
+func (n *NetworkBlock) StartState() State {
 	return n.batcherBlock.StartState()
 }
 
-func (n *NetworkBlock) StartStateR(rv autofunc.RVector) autofunc.RResult {
-	return n.batcherBlock.StartStateR(rv)
+// StartRState returns the initial state.
+func (n *NetworkBlock) StartRState(rv autofunc.RVector) RState {
+	return n.batcherBlock.StartRState(rv)
 }
 
-func (n *NetworkBlock) StateSize() int {
-	return n.batcherBlock.StateSize()
+// PropagateStart propagates through the start state.
+func (n *NetworkBlock) PropagateStart(u []StateGrad, g autofunc.Gradient) {
+	n.batcherBlock.PropagateStart(u, g)
 }
 
-func (n *NetworkBlock) Batch(in *BlockInput) BlockOutput {
-	return n.batcherBlock.Batch(in)
+// PropagateStartR propagates through the start state.
+func (n *NetworkBlock) PropagateStartR(u []RStateGrad, rg autofunc.RGradient,
+	g autofunc.Gradient) {
+	n.batcherBlock.PropagateStartR(u, rg, g)
 }
 
-func (n *NetworkBlock) BatchR(v autofunc.RVector, in *BlockRInput) BlockROutput {
-	return n.batcherBlock.BatchR(v, in)
+// ApplyBlock applies the block to an input.
+func (n *NetworkBlock) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
+	return n.batcherBlock.ApplyBlock(s, in)
+}
+
+// ApplyBlockR applies the block to an input.
+func (n *NetworkBlock) ApplyBlockR(rv autofunc.RVector, s []RState,
+	in []autofunc.RResult) BlockRResult {
+	return n.batcherBlock.ApplyBlockR(rv, s, in)
 }
 
 // Parameters returns the a slice first containing the
 // initial bias variable, then containing the parameters
 // of the underlying network.
 func (n *NetworkBlock) Parameters() []*autofunc.Variable {
-	return append([]*autofunc.Variable{n.batcherBlock.StartStateVar},
+	return append([]*autofunc.Variable{n.batcherBlock.Start},
 		n.network.Parameters()...)
 }
 
 func (n *NetworkBlock) Serialize() ([]byte, error) {
-	initData, err := json.Marshal(n.batcherBlock.StartStateVar)
+	initData, err := json.Marshal(n.batcherBlock.Start)
 	if err != nil {
 		return nil, err
 	}
 	serializers := []serializer.Serializer{
-		serializer.Int(n.batcherBlock.StateSizeVal),
+		serializer.Int(n.batcherBlock.StateSize),
 		n.network,
 		serializer.Bytes(initData),
 	}
@@ -97,5 +117,5 @@ func (n *NetworkBlock) Serialize() ([]byte, error) {
 }
 
 func (n *NetworkBlock) SerializerType() string {
-	return serializerTypeNetworkBlock
+	return "github.com/unixpickle/weakai/rnn.NetworkBlock"
 }

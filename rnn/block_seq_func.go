@@ -79,8 +79,53 @@ func (b *BlockSeqFunc) ApplySeqs(in seqfunc.Result) seqfunc.Result {
 
 // ApplySeqsR is like ApplySeqs but for RResults.
 func (b *BlockSeqFunc) ApplySeqsR(rv autofunc.RVector, in seqfunc.RResult) seqfunc.RResult {
-	// TODO: this.
-	return nil
+	res := &blockSeqFuncRResult{
+		B:       b.B,
+		Input:   in,
+		InPool:  make([][]*autofunc.Variable, len(in.OutputSeqs())),
+		Output:  make([][]linalg.Vector, len(in.OutputSeqs())),
+		ROutput: make([][]linalg.Vector, len(in.OutputSeqs())),
+	}
+	maxLen := maxSeqLength(in.OutputSeqs())
+	inStates := map[int]RState{}
+	for i := range in.OutputSeqs() {
+		inStates[i] = b.B.StartRState(rv)
+	}
+	for t := 0; t < maxLen; t++ {
+		var stateIn []RState
+		var resIn []autofunc.RResult
+		for lane, seq := range in.OutputSeqs() {
+			if len(seq) <= t {
+				continue
+			}
+			inVar := &autofunc.Variable{Vector: seq[t]}
+			res.InPool[lane] = append(res.InPool[lane], inVar)
+			stateIn = append(stateIn, inStates[lane])
+
+			inRVar := &autofunc.RVariable{
+				Variable:   inVar,
+				ROutputVec: in.ROutputSeqs()[lane][t],
+			}
+			resIn = append(resIn, inRVar)
+		}
+		out := b.B.ApplyBlockR(rv, stateIn, resIn)
+		res.StepOuts = append(res.StepOuts, out)
+		outVecs := out.Outputs()
+		outVecsR := out.ROutputs()
+		outStates := out.RStates()
+		for lane, seq := range in.OutputSeqs() {
+			if len(seq) <= t {
+				continue
+			}
+			res.Output[lane] = append(res.Output[lane], outVecs[0])
+			res.ROutput[lane] = append(res.ROutput[lane], outVecsR[0])
+			inStates[lane] = outStates[0]
+			outVecs = outVecs[1:]
+			outVecsR = outVecsR[1:]
+			outStates = outStates[1:]
+		}
+	}
+	return res
 }
 
 // Parameters returns the underlying Block's parameters
@@ -164,6 +209,81 @@ func (b *blockSeqFuncResult) PropagateGradient(u [][]linalg.Vector, g autofunc.G
 		}
 	}
 	b.Input.PropagateGradient(downstream, g)
+}
+
+type blockSeqFuncRResult struct {
+	B        Block
+	Input    seqfunc.RResult
+	InPool   [][]*autofunc.Variable
+	Output   [][]linalg.Vector
+	ROutput  [][]linalg.Vector
+	StepOuts []BlockRResult
+}
+
+func (b *blockSeqFuncRResult) OutputSeqs() [][]linalg.Vector {
+	return b.Output
+}
+
+func (b *blockSeqFuncRResult) ROutputSeqs() [][]linalg.Vector {
+	return b.ROutput
+}
+
+func (b *blockSeqFuncRResult) PropagateRGradient(u, uR [][]linalg.Vector, rg autofunc.RGradient,
+	g autofunc.Gradient) {
+	if g == nil {
+		g = autofunc.Gradient{}
+	}
+
+	for _, poolSeq := range b.InPool {
+		for _, poolVar := range poolSeq {
+			g[poolVar] = make(linalg.Vector, len(poolVar.Vector))
+			rg[poolVar] = make(linalg.Vector, len(poolVar.Vector))
+		}
+	}
+
+	maxLen := maxSeqLength(b.Output)
+
+	upstreamMap := map[int]RStateGrad{}
+	for t := maxLen - 1; t >= 0; t-- {
+		var upstreamStates []RStateGrad
+		var upstreamVecs []linalg.Vector
+		var upstreamVecsR []linalg.Vector
+		for lane, outSeq := range b.Output {
+			if len(outSeq) > t {
+				upstreamStates = append(upstreamStates, upstreamMap[lane])
+				upstreamVecs = append(upstreamVecs, u[lane][t])
+				upstreamVecsR = append(upstreamVecsR, uR[lane][t])
+			}
+		}
+		downStates := b.StepOuts[t].PropagateRGradient(upstreamVecs, upstreamVecsR,
+			upstreamStates, rg, g)
+		for lane, outSeq := range b.Output {
+			if len(outSeq) > t {
+				upstreamMap[lane] = downStates[0]
+				downStates = downStates[1:]
+			}
+		}
+	}
+
+	startUpstream := make([]RStateGrad, len(upstreamMap))
+	for i, x := range upstreamMap {
+		startUpstream[i] = x
+	}
+	b.B.PropagateStartR(startUpstream, rg, g)
+
+	downstream := make([][]linalg.Vector, len(b.InPool))
+	downstreamR := make([][]linalg.Vector, len(b.InPool))
+	for i, poolSeq := range b.InPool {
+		downstream[i] = make([]linalg.Vector, len(poolSeq))
+		downstreamR[i] = make([]linalg.Vector, len(poolSeq))
+		for j, poolVar := range poolSeq {
+			downstream[i][j] = g[poolVar]
+			downstreamR[i][j] = rg[poolVar]
+			delete(g, poolVar)
+			delete(rg, poolVar)
+		}
+	}
+	b.Input.PropagateRGradient(downstream, downstreamR, rg, g)
 }
 
 func maxSeqLength(vecs [][]linalg.Vector) int {

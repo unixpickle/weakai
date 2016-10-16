@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/functest"
 	"github.com/unixpickle/autofunc/seqfunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/neuralnet"
@@ -12,9 +13,9 @@ import (
 )
 
 const (
-	BaselineSeqCount  = 10
+	BaselineSeqCount  = 5
 	BaselineSeqMinLen = 1
-	BaselineSeqMaxLen = 20
+	BaselineSeqMaxLen = 5
 )
 
 // TestBaselineOutput makes sure that the BatcherBlock +
@@ -80,6 +81,47 @@ func TestBaselineOutput(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestBaselineChecks(t *testing.T) {
+	network := neuralnet.Network{
+		&neuralnet.DenseLayer{
+			InputCount:  4,
+			OutputCount: 6,
+		},
+		neuralnet.HyperbolicTangent{},
+	}
+	network.Randomize()
+
+	for stateSize := 0; stateSize < 4; stateSize++ {
+		start := &autofunc.Variable{Vector: make(linalg.Vector, stateSize)}
+		for i := range start.Vector {
+			start.Vector[i] = rand.NormFloat64()
+		}
+		toTest := &rnn.BlockSeqFunc{
+			B: &rnn.BatcherBlock{
+				B:         network.BatchLearner(),
+				StateSize: stateSize,
+				Start:     start,
+			},
+		}
+		seqs, rv := randBaselineTestSeqs(4 - stateSize)
+		rv[start] = make(linalg.Vector, len(start.Vector))
+		for i := range rv[start] {
+			rv[start][i] = rand.NormFloat64()
+		}
+		vars := make([]*autofunc.Variable, 0, len(rv))
+		for v := range rv {
+			vars = append(vars, v)
+		}
+		checker := &functest.SeqRFuncChecker{
+			F:     toTest,
+			Vars:  vars,
+			Input: seqs,
+			RV:    rv,
+		}
+		checker.FullCheck(t)
 	}
 }
 

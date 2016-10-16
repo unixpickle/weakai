@@ -194,9 +194,9 @@ func (b *blockSeqFuncResult) PropagateGradient(u [][]linalg.Vector, g autofunc.G
 		}
 	}
 
-	startUpstream := make([]StateGrad, len(upstreamMap))
-	for i, x := range upstreamMap {
-		startUpstream[i] = x
+	startUpstream := make([]StateGrad, 0, len(upstreamMap))
+	for _, x := range upstreamMap {
+		startUpstream = append(startUpstream, x)
 	}
 	b.B.PropagateStart(startUpstream, g)
 
@@ -265,9 +265,9 @@ func (b *blockSeqFuncRResult) PropagateRGradient(u, uR [][]linalg.Vector, rg aut
 		}
 	}
 
-	startUpstream := make([]RStateGrad, len(upstreamMap))
-	for i, x := range upstreamMap {
-		startUpstream[i] = x
+	startUpstream := make([]RStateGrad, 0, len(upstreamMap))
+	for _, x := range upstreamMap {
+		startUpstream = append(startUpstream, x)
 	}
 	b.B.PropagateStartR(startUpstream, rg, g)
 

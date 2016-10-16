@@ -73,8 +73,35 @@ func (b *BatcherBlock) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
 // ApplyBlockR is like ApplyBlock with RResults.
 func (b *BatcherBlock) ApplyBlockR(rv autofunc.RVector, s []RState,
 	in []autofunc.RResult) BlockRResult {
-	// TODO: this.
-	return nil
+	res := &batcherBlockRResult{
+		StateSize: b.StateSize,
+		Ins:       in,
+	}
+	var pool, poolR linalg.Vector
+	for i, state := range s {
+		inVec := in[i].Output()
+		pool = append(pool, inVec...)
+		poolR = append(poolR, in[i].ROutput()...)
+		pool = append(pool, state.(VecRState).State...)
+		poolR = append(poolR, state.(VecRState).RState...)
+	}
+	res.InPool = &autofunc.Variable{Vector: pool}
+	inRVar := &autofunc.RVariable{
+		Variable:   res.InPool,
+		ROutputVec: poolR,
+	}
+	res.BatcherOut = b.B.BatchR(rv, inRVar, len(in))
+
+	outs, states := splitBatcherOuts(len(in), b.StateSize, res.BatcherOut.Output())
+	outsR, statesR := splitBatcherOuts(len(in), b.StateSize, res.BatcherOut.ROutput())
+	res.OutVecs = outs
+	res.ROutVecs = outsR
+	res.OutStates = make([]RState, len(states))
+	for i, x := range states {
+		res.OutStates[i] = VecRState{State: x, RState: statesR[i]}
+	}
+
+	return res
 }
 
 type batcherBlockResult struct {
@@ -128,6 +155,78 @@ func (b *batcherBlockResult) PropagateGradient(upstream []linalg.Vector, s []Sta
 	var res []StateGrad
 	for _, x := range downStates {
 		res = append(res, VecStateGrad(x))
+	}
+	return res
+}
+
+type batcherBlockRResult struct {
+	StateSize  int
+	Ins        []autofunc.RResult
+	InPool     *autofunc.Variable
+	BatcherOut autofunc.RResult
+	OutVecs    []linalg.Vector
+	ROutVecs   []linalg.Vector
+	OutStates  []RState
+}
+
+func (b *batcherBlockRResult) Outputs() []linalg.Vector {
+	return b.OutVecs
+}
+
+func (b *batcherBlockRResult) ROutputs() []linalg.Vector {
+	return b.ROutVecs
+}
+
+func (b *batcherBlockRResult) RStates() []RState {
+	return b.OutStates
+}
+
+func (b *batcherBlockRResult) PropagateRGradient(u, uR []linalg.Vector, s []RStateGrad,
+	rg autofunc.RGradient, g autofunc.Gradient) []RStateGrad {
+	if g == nil {
+		g = autofunc.Gradient{}
+	}
+
+	var joinedUpstream, joinedUpstreamR linalg.Vector
+	for i, outVec := range b.OutVecs {
+		if u != nil {
+			joinedUpstream = append(joinedUpstream, u[i]...)
+			joinedUpstreamR = append(joinedUpstreamR, uR[i]...)
+		} else {
+			zeroUpstream := make(linalg.Vector, len(outVec)-b.StateSize)
+			joinedUpstream = append(joinedUpstream, zeroUpstream...)
+			joinedUpstreamR = append(joinedUpstreamR, zeroUpstream...)
+		}
+		if s != nil && s[i] != nil {
+			joinedUpstream = append(joinedUpstream, s[i].(VecRStateGrad).State...)
+			joinedUpstreamR = append(joinedUpstreamR, s[i].(VecRStateGrad).RState...)
+		} else {
+			zeroUpstream := make(linalg.Vector, b.StateSize)
+			joinedUpstream = append(joinedUpstream, zeroUpstream...)
+			joinedUpstreamR = append(joinedUpstreamR, zeroUpstream...)
+		}
+	}
+
+	g[b.InPool] = make(linalg.Vector, len(b.InPool.Vector))
+	rg[b.InPool] = make(linalg.Vector, len(b.InPool.Vector))
+	b.BatcherOut.PropagateRGradient(joinedUpstream, joinedUpstreamR, rg, g)
+
+	joined := g[b.InPool]
+	joinedR := rg[b.InPool]
+	delete(g, b.InPool)
+	delete(rg, b.InPool)
+
+	downIns, downStates := splitBatcherOuts(len(b.OutVecs), b.StateSize, joined)
+	downInsR, downStatesR := splitBatcherOuts(len(b.OutVecs), b.StateSize, joinedR)
+	for i, in := range b.Ins {
+		if !in.Constant(rg, g) {
+			in.PropagateRGradient(downIns[i], downInsR[i], rg, g)
+		}
+	}
+
+	var res []RStateGrad
+	for i, x := range downStates {
+		res = append(res, VecRStateGrad{State: x, RState: downStatesR[i]})
 	}
 	return res
 }

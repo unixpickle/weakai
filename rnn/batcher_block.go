@@ -29,8 +29,8 @@ func (b *BatcherBlock) StartState() State {
 	return VecState(make(linalg.Vector, b.StateSize))
 }
 
-// StartStateR is like StartState but with an RState.
-func (b *BatcherBlock) StartStateR(rv autofunc.RVector) RState {
+// StartRState is like StartState but with an RState.
+func (b *BatcherBlock) StartRState(rv autofunc.RVector) RState {
 	if b.Start != nil {
 		rVar := autofunc.NewRVariable(b.Start, rv)
 		return VecRState{
@@ -42,6 +42,37 @@ func (b *BatcherBlock) StartStateR(rv autofunc.RVector) RState {
 	return VecRState{
 		State:  zero,
 		RState: zero,
+	}
+}
+
+// PropagateStart propagates a gradient through the start.
+func (b *BatcherBlock) PropagateStart(u []StateGrad, g autofunc.Gradient) {
+	if b.Start == nil || b.Start.Constant(g) {
+		return
+	}
+	outGrad := g[b.Start]
+	for _, x := range u {
+		outGrad.Add(linalg.Vector(x.(VecStateGrad)))
+	}
+}
+
+// PropagateStartR propagates a gradient through the start
+// with r-operator support.
+func (b *BatcherBlock) PropagateStartR(u []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient) {
+	if b.Start == nil {
+		return
+	}
+	if g != nil {
+		if outGrad := g[b.Start]; outGrad != nil {
+			for _, x := range u {
+				outGrad.Add(x.(VecRStateGrad).State)
+			}
+		}
+	}
+	if outRGrad := rg[b.Start]; outRGrad != nil {
+		for _, x := range u {
+			outRGrad.Add(x.(VecRStateGrad).RState)
+		}
 	}
 }
 
@@ -236,7 +267,7 @@ func splitBatcherOuts(n, stateSize int, joined linalg.Vector) (ins, states []lin
 	for i := 0; i < n; i++ {
 		sub := joined[i*subSize : (i+1)*subSize]
 		ins = append(ins, sub[:len(sub)-stateSize])
-		states = append(states, sub[stateSize:])
+		states = append(states, sub[len(sub)-stateSize:])
 	}
 	return
 }

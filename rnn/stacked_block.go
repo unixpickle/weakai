@@ -197,8 +197,14 @@ func (s *stackedBlockResult) PropagateGradient(u []linalg.Vector, su []StateGrad
 				poolVar := poolVec[layer-1]
 				g[poolVar] = make(linalg.Vector, len(poolVar.Vector))
 			}
-			laneSU := su[lane].([]StateGrad)
-			stateUpstream = append(stateUpstream, laneSU[layer])
+			if su != nil {
+				if su[lane] != nil {
+					laneSU := su[lane].([]StateGrad)
+					stateUpstream = append(stateUpstream, laneSU[layer])
+				} else {
+					stateUpstream = append(stateUpstream, nil)
+				}
+			}
 		}
 		downstream := s.Outs[layer].PropagateGradient(u, stateUpstream, g)
 		if layer > 0 {

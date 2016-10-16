@@ -73,7 +73,7 @@ type BlockRResult interface {
 	// It returns the gradient with respect to the input
 	// states.
 	//
-	// A nil argument stands for a 0 gradient.
+	// A nil upstream or s stands for a 0 gradient.
 	// Upstream, s, and/or some entries in s may be nil.
 	// The g argument may also be nil if the gradients are
 	// not desired.

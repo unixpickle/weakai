@@ -9,6 +9,11 @@ import (
 	"github.com/unixpickle/sgd"
 )
 
+func init() {
+	var s StateOutBlock
+	serializer.RegisterTypedDeserializer(s.SerializerType(), DeserializeStateOutBlock)
+}
+
 // A StateOutBlock wraps another Block and uses the
 // block's state as output.
 // The output from the wrapped Block is discarded.

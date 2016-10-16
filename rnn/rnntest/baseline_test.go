@@ -1,4 +1,4 @@
-package rnn
+package rnntest
 
 import (
 	"math/rand"

@@ -3,8 +3,14 @@ package rnn
 import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/autofunc/seqfunc"
+	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/weakai/neuralnet"
 )
+
+func init() {
+	var n NetworkSeqFunc
+	serializer.RegisterTypedDeserializer(n.SerializerType(), DeserializeNetworkSeqFunc)
+}
 
 // A NetworkSeqFunc is a seqfunc.RFunc which applies a
 // neuralnet.Network to each input to generate an output.

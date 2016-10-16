@@ -75,10 +75,12 @@ type BlockRResult interface {
 	//
 	// A nil upstream or s stands for a 0 gradient.
 	// Upstream, s, and/or some entries in s may be nil.
+	// The upstream argument may be nil if and only if the
+	// upstreamR argument is also nil.
 	// The g argument may also be nil if the gradients are
 	// not desired.
 	//
 	// This should not modify the upstream information.
-	PropagateGradient(upstream []linalg.Vector, s []RStateGrad, rg autofunc.RGradient,
-		g autofunc.Gradient) []RStateGrad
+	PropagateRGradient(upstream, upstreamR []linalg.Vector, s []RStateGrad,
+		rg autofunc.RGradient, g autofunc.Gradient) []RStateGrad
 }

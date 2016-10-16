@@ -134,8 +134,44 @@ func (s StackedBlock) ApplyBlockR(v autofunc.RVector, states []RState,
 	if len(s) == 0 {
 		panic("cannot use an empty StackedBlock")
 	}
-	// TODO: this.
-	return nil
+	if len(s) == 0 {
+		panic("cannot use an empty StackedBlock")
+	}
+	res := &stackedBlockRResult{
+		Depth: len(s),
+		Pools: make([][]*autofunc.Variable, len(in)),
+	}
+	outStates := make([][]RState, len(states))
+	for i, layer := range s {
+		var inState []RState
+		for _, stateList := range states {
+			inState = append(inState, stateList.([]RState)[i])
+		}
+		out := layer.ApplyBlockR(v, inState, in)
+		res.Outs = append(res.Outs, out)
+		for j, state := range out.RStates() {
+			outStates[j] = append(outStates[j], state)
+		}
+		if i+1 == len(s) {
+			res.OutVecs = out.Outputs()
+		} else {
+			in = make([]autofunc.RResult, len(out.Outputs()))
+			for j, outVec := range out.Outputs() {
+				poolVar := &autofunc.Variable{Vector: outVec}
+				res.Pools[j] = append(res.Pools[j], poolVar)
+				poolRVar := &autofunc.RVariable{
+					Variable:   poolVar,
+					ROutputVec: out.ROutputs()[j],
+				}
+				in[j] = poolRVar
+			}
+		}
+	}
+	res.OutStates = make([]RState, len(outStates))
+	for i, x := range outStates {
+		res.OutStates[i] = x
+	}
+	return res
 }
 
 // Parameters returns the parameters of every Learner
@@ -221,6 +257,79 @@ func (s *stackedBlockResult) PropagateGradient(u []linalg.Vector, su []StateGrad
 	}
 
 	var res []StateGrad
+	for _, x := range stateDownstream {
+		res = append(res, x)
+	}
+	return res
+}
+
+type stackedBlockRResult struct {
+	Depth int
+	Outs  []BlockRResult
+
+	// One index in each of the following slices corresponds
+	// to one of the input vectors.
+	Pools     [][]*autofunc.Variable
+	OutVecs   []linalg.Vector
+	ROutVecs  []linalg.Vector
+	OutStates []RState
+}
+
+func (s *stackedBlockRResult) Outputs() []linalg.Vector {
+	return s.OutVecs
+}
+
+func (s *stackedBlockRResult) ROutputs() []linalg.Vector {
+	return s.ROutVecs
+}
+
+func (s *stackedBlockRResult) RStates() []RState {
+	return s.OutStates
+}
+
+func (s *stackedBlockRResult) PropagateRGradient(u, uR []linalg.Vector, su []RStateGrad,
+	rg autofunc.RGradient, g autofunc.Gradient) []RStateGrad {
+	if g == nil {
+		g = autofunc.Gradient{}
+	}
+	if (u == nil) != (uR == nil) {
+		panic("upstream and upstreamR must match in nil-ness")
+	}
+	stateDownstream := make([][]RStateGrad, len(s.Pools))
+	for layer := s.Depth - 1; layer >= 0; layer-- {
+		var stateUpstream []RStateGrad
+		for lane, poolVec := range s.Pools {
+			if layer > 0 {
+				poolVar := poolVec[layer-1]
+				g[poolVar] = make(linalg.Vector, len(poolVar.Vector))
+				rg[poolVar] = make(linalg.Vector, len(poolVar.Vector))
+			}
+			if su != nil {
+				if su[lane] != nil {
+					laneSU := su[lane].([]RStateGrad)
+					stateUpstream = append(stateUpstream, laneSU[layer])
+				} else {
+					stateUpstream = append(stateUpstream, nil)
+				}
+			}
+		}
+		downstream := s.Outs[layer].PropagateRGradient(u, uR, stateUpstream, rg, g)
+		if layer > 0 {
+			u, uR = nil, nil
+			for _, poolVec := range s.Pools {
+				poolVar := poolVec[layer-1]
+				u = append(u, g[poolVar])
+				uR = append(uR, rg[poolVar])
+				delete(g, poolVar)
+				delete(rg, poolVar)
+			}
+		}
+		for lane, sg := range downstream {
+			stateDownstream[lane] = append([]RStateGrad{sg}, stateDownstream[lane]...)
+		}
+	}
+
+	var res []RStateGrad
 	for _, x := range stateDownstream {
 		res = append(res, x)
 	}

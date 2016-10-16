@@ -4,20 +4,19 @@ import (
 	"fmt"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/seqfunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/sgd"
 )
 
-// BlockSeqFunc is a SeqFunc which operates by using
-// a Block as an RNN and running the RNN on input
-// sequences.
+// BlockSeqFunc is a seqfunc.RFunc which applies a block
+// to a batch of sequences.
 type BlockSeqFunc struct {
 	Block Block
 }
 
-// DeserializeBlockSeqFunc deserializes an BlockSeqFunc
-// that was serialized.
+// DeserializeBlockSeqFunc deserializes a BlockSeqFunc.
 func DeserializeBlockSeqFunc(d []byte) (*BlockSeqFunc, error) {
 	obj, err := serializer.DeserializeWithType(d)
 	if err != nil {
@@ -30,7 +29,7 @@ func DeserializeBlockSeqFunc(d []byte) (*BlockSeqFunc, error) {
 	return &BlockSeqFunc{Block: block}, nil
 }
 
-func (r *BlockSeqFunc) BatchSeqs(seqs [][]autofunc.Result) ResultSeqs {
+func (r *BlockSeqFunc) ApplySeqs(in seqfunc.Result) seqfunc.Result {
 	res := &BlockSeqFuncOutput{
 		StartState: r.Block.StartState(),
 		PackedOut:  make([][]linalg.Vector, len(seqs)),
@@ -152,12 +151,11 @@ func (r *BlockSeqFunc) Serialize() ([]byte, error) {
 	return serializer.SerializeWithType(s)
 }
 
-type BlockSeqFuncOutputStep struct {
+type blockSeqFuncResStep struct {
 	// These three variables always have len equal to
 	// the number of lanes (some entries may be nil).
 	InStateVars []*autofunc.Variable
 	InputVars   []*autofunc.Variable
-	Inputs      []autofunc.Result
 
 	Outputs BlockOutput
 
@@ -165,17 +163,18 @@ type BlockSeqFuncOutputStep struct {
 	LaneToOut map[int]int
 }
 
-type BlockSeqFuncOutput struct {
+type blockSeqFuncRes struct {
 	StartState autofunc.Result
-	Steps      []*BlockSeqFuncOutputStep
-	PackedOut  [][]linalg.Vector
+	Steps      []*blockSeqFuncResStep
+	Input      seqfunc.Result
+	Output     [][]linalg.Vector
 }
 
-func (r *BlockSeqFuncOutput) OutputSeqs() [][]linalg.Vector {
-	return r.PackedOut
+func (r *blockSeqFuncRes) OutputSeqs() [][]linalg.Vector {
+	return r.Output
 }
 
-func (r *BlockSeqFuncOutput) Gradient(upstream [][]linalg.Vector, g autofunc.Gradient) {
+func (r *blockSeqFuncRes) PropagateGradient(u [][]linalg.Vector, g autofunc.Gradient) {
 	numLanes := len(r.PackedOut)
 	if len(upstream) != numLanes {
 		panic("incorrect upstream dimensions")

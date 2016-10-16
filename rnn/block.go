@@ -17,16 +17,16 @@ type Block interface {
 
 	// PropagateStart performs back-propagation through the
 	// start state.
-	PropagateStart(s StateGrad, g autofunc.Gradient)
+	PropagateStart(s []StateGrad, g autofunc.Gradient)
 
 	// PropagateStartR is like PropagateStart, but for an
 	// RStateGrad.
-	PropagateStartR(r RStateGrad, rg autofunc.RGradient, g autofunc.Gradient)
+	PropagateStartR(r []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient)
 
 	// ApplyBlock applies the block to a batch of inputs.
 	// The result is valid so long as neither the inputs
 	// nor the Block are changed.
-	ApplyBlock(s State, in []autofunc.Result) BlockResult
+	ApplyBlock(s []State, in []autofunc.Result) BlockResult
 
 	// ApplyBlockR is like ApplyBlock, but with support for
 	// the R operator.
@@ -34,7 +34,7 @@ type Block interface {
 	// It is necessary to provide an RVector so that the
 	// block knows how much each of its hidden parameters
 	// changes with respect to R.
-	ApplyBlockR(v autofunc.RVector, s RState, in []autofunc.RResult) BlockROutput
+	ApplyBlockR(v autofunc.RVector, s []RState, in []autofunc.RResult) BlockRResult
 }
 
 // A State represents some internal, recurrent state.
@@ -58,15 +58,16 @@ type BlockResult interface {
 	// Outputs returns the vector outputs of the block.
 	Outputs() []linalg.Vector
 
-	// State returns the new state of the block.
-	State() State
+	// States returns the new states of the block.
+	States() []State
 
-	// PropagateGradient performs back-propagation through
-	// the block and the inputs.
-	// It returns the downstream gradient with respect to the
-	// previous state.
-	// Either upstream or s may be nil, but not both.
-	PropagateGradient(upstream []linalg.Vector, s StateGrad, g autofunc.Gradient) StateGrad
+	// PropagateGradient performs back-propagation.
+	// It returns the gradient with respect to the input
+	// states.
+	//
+	// A nil argument stands for a 0 gradient.
+	// Upstream, s, and/or some entries in s may be nil.
+	PropagateGradient(upstream []linalg.Vector, s []StateGrad, g autofunc.Gradient) []StateGrad
 }
 
 // A BlockRResult is like a BlockResult, but for RStates.
@@ -78,15 +79,17 @@ type BlockRResult interface {
 	// respect to R.
 	ROutputs() []linalg.Vector
 
-	// RState returns the new state of the block.
-	RState() RState
+	// RStates returns the new states of the block.
+	RStates() []RState
 
-	// PropagateRGradient performs back-propagation through
-	// the block and the inputs.
-	// It returns the downstream gradient with respect to the
-	// previous state.
-	// Either upstream or s may be nil, but not both.
-	// For convenience, g may be nil.
-	PropagateRGradient(upstream []linalg.Vector, s RStateGrad, rg autofunc.RGradient,
-		g autofunc.Gradient) RStateGrad
+	// PropagateRGradient performs back-propagation.
+	// It returns the gradient with respect to the input
+	// states.
+	//
+	// A nil argument stands for a 0 gradient.
+	// Upstream, s, and/or some entries in s may be nil.
+	// The g argument may also be nil if the gradients are
+	// not desired.
+	PropagateGradient(upstream []linalg.Vector, s []RStateGrad, rg autofunc.RGradient,
+		g autofunc.Gradient) []RStateGrad
 }

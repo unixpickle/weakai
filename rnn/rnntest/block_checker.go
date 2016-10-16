@@ -38,7 +38,7 @@ type BlockChecker struct {
 
 // FullCheck performs gradient checking and checks  for
 // some edge cases.
-func (b *BlockChecker) FullChecker(t *testing.T) {
+func (b *BlockChecker) FullCheck(t *testing.T) {
 	seqChecker := &functest.SeqRFuncChecker{
 		F:     &rnn.BlockSeqFunc{B: b.B},
 		Input: b.Input,

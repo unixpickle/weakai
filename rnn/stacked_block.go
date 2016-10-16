@@ -107,6 +107,10 @@ func (s StackedBlock) ApplyBlock(states []State, in []autofunc.Result) BlockResu
 			inState = append(inState, stateList.([]State)[i])
 		}
 		out := layer.ApplyBlock(inState, in)
+		res.Outs = append(res.Outs, out)
+		for j, state := range out.States() {
+			outStates[j] = append(outStates[j], state)
+		}
 		if i+1 == len(s) {
 			res.OutVecs = out.Outputs()
 		} else {
@@ -116,9 +120,6 @@ func (s StackedBlock) ApplyBlock(states []State, in []autofunc.Result) BlockResu
 				res.Pools[j] = append(res.Pools[j], poolVar)
 				in[j] = poolVar
 			}
-		}
-		for j, state := range out.States() {
-			outStates[j] = append(outStates[j], state)
 		}
 	}
 	res.OutStates = make([]State, len(outStates))

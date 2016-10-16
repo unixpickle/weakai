@@ -103,6 +103,7 @@ func (n *NetworkBlock) Parameters() []*autofunc.Variable {
 		n.network.Parameters()...)
 }
 
+// Serialize serializes the block.
 func (n *NetworkBlock) Serialize() ([]byte, error) {
 	initData, err := json.Marshal(n.batcherBlock.Start)
 	if err != nil {
@@ -116,6 +117,8 @@ func (n *NetworkBlock) Serialize() ([]byte, error) {
 	return serializer.SerializeSlice(serializers)
 }
 
+// SerializerType returns the unique ID used to serialize
+// a NetworkBlock with the serializer package.
 func (n *NetworkBlock) SerializerType() string {
 	return "github.com/unixpickle/weakai/rnn.NetworkBlock"
 }

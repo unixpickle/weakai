@@ -37,22 +37,6 @@ type Block interface {
 	ApplyBlockR(v autofunc.RVector, s []RState, in []autofunc.RResult) BlockRResult
 }
 
-// A State represents some internal, recurrent state.
-// For instance, it might represent the current contents
-// of LSTM blocks.
-type State interface{}
-
-// A StateGrad represents the gradient of a loss value
-// with respect to a given State.
-type StateGrad interface{}
-
-// An RState is like a State, but with information about
-// second derivatives with respect to some variable R.
-type RState interface{}
-
-// An RStateGrad is like a StateGrad, but for an RState.
-type RStateGrad interface{}
-
 // A BlockResult represents the output of a Block.
 type BlockResult interface {
 	// Outputs returns the vector outputs of the block.

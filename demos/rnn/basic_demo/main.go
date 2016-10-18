@@ -49,9 +49,9 @@ func main() {
 	net := rnn.StackedBlock{lstm, outBlock}
 
 	gradienter := &sgd.RMSProp{
-		Gradienter: &seqtoseq.BPTT{
+		Gradienter: &seqtoseq.SeqFuncGradienter{
+			SeqFunc:  &rnn.BlockSeqFunc{B: net},
 			Learner:  net,
-			Block:    net,
 			CostFunc: neuralnet.SigmoidCECost{},
 			MaxLanes: 1,
 		},

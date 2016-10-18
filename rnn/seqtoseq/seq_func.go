@@ -2,16 +2,19 @@ package seqtoseq
 
 import (
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/seqfunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
-	"github.com/unixpickle/weakai/rnn"
 )
 
-// A SeqFuncGradienter computes gradients of a SeqFunc
-// for sample sets full of Sequence objects.
+// A Gradienter is an sgd.RGradienter which works on a
+// seqfunc.RFunc for sample sets of Sequence objects.
+//
+// After an instance is used once, it should never be
+// reused with different parameters.
 type SeqFuncGradienter struct {
-	SeqFunc  rnn.SeqFunc
+	SeqFunc  seqfunc.RFunc
 	Learner  sgd.Learner
 	CostFunc neuralnet.CostFunc
 
@@ -56,16 +59,11 @@ func (s *SeqFuncGradienter) makeHelper() *neuralnet.GradHelper {
 
 func (s *SeqFuncGradienter) runBatch(g autofunc.Gradient, set sgd.SampleSet) {
 	seqs := sampleSetSlice(set)
-	seqIns := make([][]autofunc.Result, len(seqs))
-	for i, seq := range seqs {
-		ins := make([]autofunc.Result, len(seq.Inputs))
-		for j, x := range seq.Inputs {
-			ins[j] = &autofunc.Variable{Vector: x}
-		}
-		seqIns[i] = ins
+	var seqIns [][]linalg.Vector
+	for _, s := range seqs {
+		seqIns = append(seqIns, s.Inputs)
 	}
-
-	output := s.SeqFunc.BatchSeqs(seqIns)
+	output := s.SeqFunc.ApplySeqs(seqfunc.ConstResult(seqIns))
 
 	upstream := make([][]linalg.Vector, len(seqIns))
 	for i, outSeq := range output.OutputSeqs() {
@@ -78,30 +76,17 @@ func (s *SeqFuncGradienter) runBatch(g autofunc.Gradient, set sgd.SampleSet) {
 		upstream[i] = us
 	}
 
-	output.Gradient(upstream, g)
+	output.PropagateGradient(upstream, g)
 }
 
 func (s *SeqFuncGradienter) runBatchR(rv autofunc.RVector, rg autofunc.RGradient,
 	g autofunc.Gradient, set sgd.SampleSet) {
 	seqs := sampleSetSlice(set)
-	seqIns := make([][]autofunc.RResult, len(seqs))
-	var zeroVec linalg.Vector
-	for i, seq := range seqs {
-		ins := make([]autofunc.RResult, len(seq.Inputs))
-		for j, x := range seq.Inputs {
-			variable := &autofunc.Variable{Vector: x}
-			if zeroVec == nil {
-				zeroVec = make(linalg.Vector, len(x))
-			}
-			ins[j] = &autofunc.RVariable{
-				Variable:   variable,
-				ROutputVec: zeroVec,
-			}
-		}
-		seqIns[i] = ins
+	seqIns := make([][]linalg.Vector, len(seqs))
+	for _, s := range seqs {
+		seqIns = append(seqIns, s.Inputs)
 	}
-
-	output := s.SeqFunc.BatchSeqsR(rv, seqIns)
+	output := s.SeqFunc.ApplySeqsR(rv, seqfunc.ConstRResult(seqIns))
 
 	upstream := make([][]linalg.Vector, len(seqIns))
 	upstreamR := make([][]linalg.Vector, len(seqIns))
@@ -118,5 +103,5 @@ func (s *SeqFuncGradienter) runBatchR(rv autofunc.RVector, rg autofunc.RGradient
 		upstreamR[i] = usR
 	}
 
-	output.RGradient(upstream, upstreamR, rg, g)
+	output.PropagateRGradient(upstream, upstreamR, rg, g)
 }

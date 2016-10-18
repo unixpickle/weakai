@@ -2,6 +2,7 @@ package seqtoseq
 
 import (
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/seqfunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
@@ -36,27 +37,23 @@ func TotalCostBlock(b rnn.Block, batchSize int, s sgd.SampleSet, c neuralnet.Cos
 	return cost
 }
 
-// TotalCostSeqFunc runs an rnn.SeqFunc on a set of
+// TotalCostSeqFunc runs a seqfunc.RFunc on a set of
 // Samples and evaluates the total output cost.
 //
 // The batchSize specifies how many samples to run in
 // batches while computing the cost.
-func TotalCostSeqFunc(f rnn.SeqFunc, batchSize int, s sgd.SampleSet,
+func TotalCostSeqFunc(f seqfunc.RFunc, batchSize int, s sgd.SampleSet,
 	c neuralnet.CostFunc) float64 {
 	var totalCost float64
 	for i := 0; i < s.Len(); i += batchSize {
-		var inSeqs [][]autofunc.Result
+		var inSeqs [][]linalg.Vector
 		var outSeqs [][]linalg.Vector
 		for j := i; j < i+batchSize && j < s.Len(); j++ {
 			seq := s.GetSample(j).(Sample)
-			inSeq := make([]autofunc.Result, len(seq.Inputs))
-			for k, in := range seq.Inputs {
-				inSeq[k] = &autofunc.Variable{Vector: in}
-			}
-			inSeqs = append(inSeqs, inSeq)
+			inSeqs = append(inSeqs, seq.Inputs)
 			outSeqs = append(outSeqs, seq.Outputs)
 		}
-		output := f.BatchSeqs(inSeqs)
+		output := f.ApplySeqs(seqfunc.ConstResult(inSeqs))
 		for j, actualSeq := range output.OutputSeqs() {
 			expectedSeq := outSeqs[j]
 			for k, actual := range actualSeq {

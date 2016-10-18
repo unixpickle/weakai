@@ -49,7 +49,7 @@ func main() {
 	net := rnn.StackedBlock{lstm, outBlock}
 
 	gradienter := &sgd.RMSProp{
-		Gradienter: &seqtoseq.SeqFuncGradienter{
+		Gradienter: &seqtoseq.Gradienter{
 			SeqFunc:  &rnn.BlockSeqFunc{B: net},
 			Learner:  net,
 			CostFunc: neuralnet.SigmoidCECost{},

@@ -9,18 +9,18 @@ import (
 )
 
 // A Gradienter is an sgd.RGradienter which works on a
-// seqfunc.RFunc for sample sets of Sequence objects.
+// seqfunc.RFunc for sample sets of Sequence objectg.
 //
 // After an instance is used once, it should never be
-// reused with different parameters.
-type SeqFuncGradienter struct {
+// reused with different parameterg.
+type Gradienter struct {
 	SeqFunc  seqfunc.RFunc
 	Learner  sgd.Learner
 	CostFunc neuralnet.CostFunc
 
 	// MaxLanes specifies the maximum number of lanes
 	// any BlockInput or BlockRInput may have at once
-	// while computing gradients.
+	// while computing gradientg.
 	// If this is 0, a reasonable default is used.
 	MaxLanes int
 
@@ -32,38 +32,38 @@ type SeqFuncGradienter struct {
 	helper *neuralnet.GradHelper
 }
 
-func (s *SeqFuncGradienter) Gradient(set sgd.SampleSet) autofunc.Gradient {
-	return s.makeHelper().Gradient(sortSeqs(set))
+func (g *Gradienter) Gradient(set sgd.SampleSet) autofunc.Gradient {
+	return g.makeHelper().Gradient(sortSeqs(set))
 }
 
-func (s *SeqFuncGradienter) RGradient(v autofunc.RVector,
+func (g *Gradienter) RGradient(v autofunc.RVector,
 	set sgd.SampleSet) (autofunc.Gradient, autofunc.RGradient) {
-	return s.makeHelper().RGradient(v, sortSeqs(set))
+	return g.makeHelper().RGradient(v, sortSeqs(set))
 }
 
-func (s *SeqFuncGradienter) makeHelper() *neuralnet.GradHelper {
-	if s.helper != nil {
-		s.helper.MaxConcurrency = s.MaxGoroutines
-		s.helper.MaxSubBatch = s.MaxLanes
-		return s.helper
+func (g *Gradienter) makeHelper() *neuralnet.GradHelper {
+	if g.helper != nil {
+		g.helper.MaxConcurrency = g.MaxGoroutines
+		g.helper.MaxSubBatch = g.MaxLanes
+		return g.helper
 	}
-	s.helper = &neuralnet.GradHelper{
-		MaxConcurrency: s.MaxGoroutines,
-		MaxSubBatch:    s.MaxLanes,
-		Learner:        s.Learner,
-		CompGrad:       s.runBatch,
-		CompRGrad:      s.runBatchR,
+	g.helper = &neuralnet.GradHelper{
+		MaxConcurrency: g.MaxGoroutines,
+		MaxSubBatch:    g.MaxLanes,
+		Learner:        g.Learner,
+		CompGrad:       g.runBatch,
+		CompRGrad:      g.runBatchR,
 	}
-	return s.helper
+	return g.helper
 }
 
-func (s *SeqFuncGradienter) runBatch(g autofunc.Gradient, set sgd.SampleSet) {
+func (g *Gradienter) runBatch(grad autofunc.Gradient, set sgd.SampleSet) {
 	seqs := sampleSetSlice(set)
 	var seqIns [][]linalg.Vector
 	for _, s := range seqs {
 		seqIns = append(seqIns, s.Inputs)
 	}
-	output := s.SeqFunc.ApplySeqs(seqfunc.ConstResult(seqIns))
+	output := g.SeqFunc.ApplySeqs(seqfunc.ConstResult(seqIns))
 
 	upstream := make([][]linalg.Vector, len(seqIns))
 	for i, outSeq := range output.OutputSeqs() {
@@ -71,22 +71,22 @@ func (s *SeqFuncGradienter) runBatch(g autofunc.Gradient, set sgd.SampleSet) {
 		expectedSeq := seqs[i].Outputs
 		for j, actual := range outSeq {
 			expected := expectedSeq[j]
-			us[j] = costFuncDeriv(s.CostFunc, expected, actual)
+			us[j] = costFuncDeriv(g.CostFunc, expected, actual)
 		}
 		upstream[i] = us
 	}
 
-	output.PropagateGradient(upstream, g)
+	output.PropagateGradient(upstream, grad)
 }
 
-func (s *SeqFuncGradienter) runBatchR(rv autofunc.RVector, rg autofunc.RGradient,
-	g autofunc.Gradient, set sgd.SampleSet) {
+func (g *Gradienter) runBatchR(rv autofunc.RVector, rg autofunc.RGradient,
+	grad autofunc.Gradient, set sgd.SampleSet) {
 	seqs := sampleSetSlice(set)
 	seqIns := make([][]linalg.Vector, len(seqs))
 	for _, s := range seqs {
 		seqIns = append(seqIns, s.Inputs)
 	}
-	output := s.SeqFunc.ApplySeqsR(rv, seqfunc.ConstRResult(seqIns))
+	output := g.SeqFunc.ApplySeqsR(rv, seqfunc.ConstRResult(seqIns))
 
 	upstream := make([][]linalg.Vector, len(seqIns))
 	upstreamR := make([][]linalg.Vector, len(seqIns))
@@ -97,11 +97,11 @@ func (s *SeqFuncGradienter) runBatchR(rv autofunc.RVector, rg autofunc.RGradient
 		expectedSeq := seqs[i].Outputs
 		for j, actual := range outSeq {
 			expected := expectedSeq[j]
-			us[j], usR[j] = costFuncRDeriv(s.CostFunc, expected, actual, rOutSeq[j])
+			us[j], usR[j] = costFuncRDeriv(g.CostFunc, expected, actual, rOutSeq[j])
 		}
 		upstream[i] = us
 		upstreamR[i] = usR
 	}
 
-	output.PropagateRGradient(upstream, upstreamR, rg, g)
+	output.PropagateRGradient(upstream, upstreamR, rg, grad)
 }

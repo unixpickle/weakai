@@ -57,7 +57,7 @@ func DeserializeBidirectional(d []byte) (*Bidirectional, error) {
 func (b *Bidirectional) ApplySeqs(in seqfunc.Result) seqfunc.Result {
 	return seqfunc.Pool(in, func(in seqfunc.Result) seqfunc.Result {
 		forward := b.Forward.ApplySeqs(in)
-		backward := seqfunc.Reverse(b.Backward.ApplySeqs(in))
+		backward := seqfunc.Reverse(b.Backward.ApplySeqs(seqfunc.Reverse(in)))
 		return b.Output.ApplySeqs(seqfunc.ConcatInner(forward, backward))
 	})
 }
@@ -66,7 +66,7 @@ func (b *Bidirectional) ApplySeqs(in seqfunc.Result) seqfunc.Result {
 func (b *Bidirectional) ApplySeqsR(rv autofunc.RVector, in seqfunc.RResult) seqfunc.RResult {
 	return seqfunc.PoolR(in, func(in seqfunc.RResult) seqfunc.RResult {
 		forward := b.Forward.ApplySeqsR(rv, in)
-		backward := seqfunc.ReverseR(b.Backward.ApplySeqsR(rv, in))
+		backward := seqfunc.ReverseR(b.Backward.ApplySeqsR(rv, seqfunc.ReverseR(in)))
 		return b.Output.ApplySeqsR(rv, seqfunc.ConcatInnerR(forward, backward))
 	})
 }

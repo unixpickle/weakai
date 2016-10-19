@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/autofunc/seqfunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
 	"github.com/unixpickle/weakai/rnn/seqtoseq"
@@ -17,10 +19,9 @@ const (
 	StepSize     = 1e-3
 	StateSize    = 40
 	HiddenSize   = 10
-	BatchSize    = 100
+	BatchSize    = 5
 	TrainingSize = 3000
 	TestingSize  = 100
-	Epochs       = 100
 )
 
 func main() {
@@ -40,25 +41,37 @@ func main() {
 	}
 	outNet.Randomize()
 	bd := &rnn.Bidirectional{
-		Forward:  &rnn.BlockSeqFunc{Block: rnn.NewGRU(2, StateSize)},
-		Backward: &rnn.BlockSeqFunc{Block: rnn.NewGRU(2, StateSize)},
+		Forward:  &rnn.BlockSeqFunc{B: rnn.NewGRU(2, StateSize)},
+		Backward: &rnn.BlockSeqFunc{B: rnn.NewGRU(2, StateSize)},
 		Output:   &rnn.NetworkSeqFunc{Network: outNet},
 	}
 	var samples []seqtoseq.Sample
+	var sampleSet sgd.SliceSampleSet
 	for i := 0; i < TrainingSize; i++ {
 		samples = append(samples, generateSequence())
+		sampleSet = append(sampleSet, samples[i])
 	}
-	for i := 0; i < Epochs; i++ {
-		fmt.Printf("%d epochs: cost=%f\n", i, totalCost(bd, samples))
-		for k := 0; k+BatchSize < len(samples); k += BatchSize {
-			sgdOnSequences(bd, samples[k:k+BatchSize])
-		}
+
+	g := &sgd.RMSProp{
+		Gradienter: &seqtoseq.Gradienter{
+			SeqFunc:  bd,
+			Learner:  bd,
+			CostFunc: neuralnet.DotCost{},
+		},
 	}
+
+	var i int
+	sgd.SGDInteractive(g, sampleSet, StepSize, BatchSize, func() bool {
+		fmt.Printf("%d epochs: cost=%f\n", i, totalCost(bd, sampleSet))
+		i++
+		return true
+	})
 
 	var testingCorrect, testingTotal int
 	for j := 0; j < TestingSize; j++ {
 		sample := generateSequence()
-		output := bd.BatchSeqs(inputResultsForSeq(sample)).OutputSeqs()[0]
+		inRes := seqfunc.ConstResult([][]linalg.Vector{sample.Inputs})
+		output := bd.ApplySeqs(inRes).OutputSeqs()[0]
 		for i, expected := range sample.Outputs {
 			actual := output[i]
 			if math.Abs(expected[0]-math.Exp(actual[0])) < 0.1 {
@@ -75,12 +88,13 @@ func main() {
 func sgdOnSequences(f *rnn.Bidirectional, s []seqtoseq.Sample) {
 	gradient := autofunc.NewGradient(f.Parameters())
 	for _, x := range s {
-		output := f.BatchSeqs(inputResultsForSeq(x))
+		inRes := seqfunc.ConstResult([][]linalg.Vector{x.Inputs})
+		output := f.ApplySeqs(inRes)
 		upstreamGrad := make([]linalg.Vector, len(x.Outputs))
 		for i, o := range x.Outputs {
 			upstreamGrad[i] = o.Copy().Scale(-1)
 		}
-		output.Gradient([][]linalg.Vector{upstreamGrad}, gradient)
+		output.PropagateGradient([][]linalg.Vector{upstreamGrad}, gradient)
 	}
 	for _, vec := range gradient {
 		for i, x := range vec {
@@ -120,21 +134,6 @@ func generateSequence() seqtoseq.Sample {
 	return seq
 }
 
-func totalCost(f *rnn.Bidirectional, s []seqtoseq.Sample) float64 {
-	var sum float64
-	for _, sample := range s {
-		output := f.BatchSeqs(inputResultsForSeq(sample))
-		for i, o := range sample.Outputs {
-			sum += o.Dot(output.OutputSeqs()[0][i])
-		}
-	}
-	return -sum
-}
-
-func inputResultsForSeq(s seqtoseq.Sample) [][]autofunc.Result {
-	var res []autofunc.Result
-	for _, x := range s.Inputs {
-		res = append(res, &autofunc.Variable{Vector: x})
-	}
-	return [][]autofunc.Result{res}
+func totalCost(f *rnn.Bidirectional, s sgd.SampleSet) float64 {
+	return seqtoseq.TotalCostSeqFunc(f, 10, s, neuralnet.DotCost{})
 }

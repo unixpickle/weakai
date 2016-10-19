@@ -84,29 +84,12 @@ func (g *GRU) StartRState(rv autofunc.RVector) RState {
 
 // PropagateStart propagates through the start state.
 func (g *GRU) PropagateStart(s []StateGrad, grad autofunc.Gradient) {
-	vec, ok := grad[g.initState]
-	if !ok {
-		return
-	}
-	for _, x := range s {
-		vec.Add(linalg.Vector(x.(VecStateGrad)))
-	}
+	PropagateVarState(g.initState, s, grad)
 }
 
 // PropagateStartR propagates through the start state.
 func (g *GRU) PropagateStartR(s []RStateGrad, rg autofunc.RGradient, grad autofunc.Gradient) {
-	if grad != nil {
-		if vec, ok := grad[g.initState]; ok {
-			for _, x := range s {
-				vec.Add(x.(VecRStateGrad).State)
-			}
-		}
-	}
-	if vec, ok := rg[g.initState]; ok {
-		for _, x := range s {
-			vec.Add(x.(VecRStateGrad).RState)
-		}
-	}
+	PropagateVarStateR(g.initState, s, rg, grad)
 }
 
 // ApplyBlock applies the block to an input.

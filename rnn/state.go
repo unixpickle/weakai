@@ -1,6 +1,9 @@
 package rnn
 
-import "github.com/unixpickle/num-analysis/linalg"
+import (
+	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/num-analysis/linalg"
+)
 
 // A State represents some internal, recurrent state.
 // For instance, it might represent the current contents
@@ -36,4 +39,32 @@ type VecRState struct {
 type VecRStateGrad struct {
 	State  linalg.Vector
 	RState linalg.Vector
+}
+
+// PropagateVarState is a helper to propagate a gradient
+// through a VecState that was derived from a variable.
+func PropagateVarState(v *autofunc.Variable, s []StateGrad, g autofunc.Gradient) {
+	if vec, ok := g[v]; ok {
+		for _, x := range s {
+			vec.Add(linalg.Vector(x.(VecStateGrad)))
+		}
+	}
+}
+
+// PropagateVarStateR is like PropagateVarState, but with
+// support for the r-operator.
+func PropagateVarStateR(v *autofunc.Variable, s []RStateGrad, rg autofunc.RGradient,
+	g autofunc.Gradient) {
+	if g != nil {
+		if vec, ok := g[v]; ok {
+			for _, x := range s {
+				vec.Add(x.(VecRStateGrad).State)
+			}
+		}
+	}
+	if vec, ok := rg[v]; ok {
+		for _, x := range s {
+			vec.Add(x.(VecRStateGrad).RState)
+		}
+	}
 }

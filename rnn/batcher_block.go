@@ -47,32 +47,16 @@ func (b *BatcherBlock) StartRState(rv autofunc.RVector) RState {
 
 // PropagateStart propagates a gradient through the start.
 func (b *BatcherBlock) PropagateStart(u []StateGrad, g autofunc.Gradient) {
-	if b.Start == nil || b.Start.Constant(g) {
-		return
-	}
-	outGrad := g[b.Start]
-	for _, x := range u {
-		outGrad.Add(linalg.Vector(x.(VecStateGrad)))
+	if b.Start != nil {
+		PropagateVarState(b.Start, u, g)
 	}
 }
 
 // PropagateStartR propagates a gradient through the start
 // with r-operator support.
 func (b *BatcherBlock) PropagateStartR(u []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient) {
-	if b.Start == nil {
-		return
-	}
-	if g != nil {
-		if outGrad := g[b.Start]; outGrad != nil {
-			for _, x := range u {
-				outGrad.Add(x.(VecRStateGrad).State)
-			}
-		}
-	}
-	if outRGrad := rg[b.Start]; outRGrad != nil {
-		for _, x := range u {
-			outRGrad.Add(x.(VecRStateGrad).RState)
-		}
+	if b.Start != nil {
+		PropagateVarStateR(b.Start, u, rg, g)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/unixpickle/autofunc/functest"
 	"github.com/unixpickle/autofunc/seqfunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/sgd"
 	"github.com/unixpickle/weakai/neuralnet"
 	"github.com/unixpickle/weakai/rnn"
 )
@@ -43,7 +44,7 @@ func TestBaselineOutput(t *testing.T) {
 				Start:     start,
 			},
 		}
-		seqs, rv := randBaselineTestSeqs(4 - stateSize)
+		seqs, rv := randBaselineTestSeqs(network, 4-stateSize)
 		rv[start] = make(linalg.Vector, len(start.Vector))
 		for i := range rv[start] {
 			rv[start][i] = rand.NormFloat64()
@@ -106,7 +107,7 @@ func TestBaselineChecks(t *testing.T) {
 				Start:     start,
 			},
 		}
-		seqs, rv := randBaselineTestSeqs(4 - stateSize)
+		seqs, rv := randBaselineTestSeqs(network, 4-stateSize)
 		rv[start] = make(linalg.Vector, len(start.Vector))
 		for i := range rv[start] {
 			rv[start][i] = rand.NormFloat64()
@@ -125,7 +126,7 @@ func TestBaselineChecks(t *testing.T) {
 	}
 }
 
-func randBaselineTestSeqs(inSize int) ([][]*autofunc.Variable, autofunc.RVector) {
+func randBaselineTestSeqs(l sgd.Learner, inSize int) ([][]*autofunc.Variable, autofunc.RVector) {
 	var seqs [][]*autofunc.Variable
 
 	// Empty sequences will help test for certain edge cases.
@@ -152,6 +153,13 @@ func randBaselineTestSeqs(inSize int) ([][]*autofunc.Variable, autofunc.RVector)
 
 	// Empty sequences will help test for certain edge cases.
 	seqs = append(seqs, nil)
+
+	for _, param := range l.Parameters() {
+		rv[param] = make(linalg.Vector, len(param.Vector))
+		for i := range rv[param] {
+			rv[param][i] = rand.NormFloat64()
+		}
+	}
 
 	return seqs, rv
 }

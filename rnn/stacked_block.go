@@ -64,31 +64,35 @@ func (s StackedBlock) StartRState(rv autofunc.RVector) RState {
 
 // PropagateStart back-propagates through all the child
 // Blocks.
-func (s StackedBlock) PropagateStart(upstream []StateGrad, g autofunc.Gradient) {
+func (s StackedBlock) PropagateStart(starts []State, u []StateGrad, g autofunc.Gradient) {
 	if len(s) == 0 {
 		panic("cannot use an empty StackedBlock")
 	}
 	for childIdx, child := range s {
 		var grad []StateGrad
-		for _, seqGrad := range upstream {
+		var subStarts []State
+		for i, seqGrad := range u {
 			grad = append(grad, seqGrad.([]StateGrad)[childIdx])
+			subStarts = append(subStarts, starts[i].([]State)[childIdx])
 		}
-		child.PropagateStart(grad, g)
+		child.PropagateStart(subStarts, grad, g)
 	}
 }
 
 // PropagateStartR is like PropagateStart.
-func (s StackedBlock) PropagateStartR(upstream []RStateGrad, rg autofunc.RGradient,
+func (s StackedBlock) PropagateStartR(starts []RState, u []RStateGrad, rg autofunc.RGradient,
 	g autofunc.Gradient) {
 	if len(s) == 0 {
 		panic("cannot use an empty StackedBlock")
 	}
 	for childIdx, child := range s {
 		var grad []RStateGrad
-		for _, seqGrad := range upstream {
+		var subStarts []RState
+		for i, seqGrad := range u {
 			grad = append(grad, seqGrad.([]RStateGrad)[childIdx])
+			subStarts = append(subStarts, starts[i].([]RState)[childIdx])
 		}
-		child.PropagateStartR(grad, rg, g)
+		child.PropagateStartR(subStarts, grad, rg, g)
 	}
 }
 

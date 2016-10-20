@@ -47,14 +47,14 @@ func (s *StateOutBlock) StartRState(rv autofunc.RVector) RState {
 }
 
 // PropagateStart propagates through the start state.
-func (s *StateOutBlock) PropagateStart(u []StateGrad, g autofunc.Gradient) {
-	s.Block.PropagateStart(u, g)
+func (s *StateOutBlock) PropagateStart(s1 []State, u []StateGrad, g autofunc.Gradient) {
+	s.Block.PropagateStart(s1, u, g)
 }
 
 // PropagateStartR propagates through the start state.
-func (s *StateOutBlock) PropagateStartR(u []RStateGrad, rg autofunc.RGradient,
+func (s *StateOutBlock) PropagateStartR(s1 []RState, u []RStateGrad, rg autofunc.RGradient,
 	g autofunc.Gradient) {
-	s.Block.PropagateStartR(u, rg, g)
+	s.Block.PropagateStartR(s1, u, rg, g)
 }
 
 // ApplyBlock applies the block to an input.

@@ -39,6 +39,7 @@ func DeserializeBlockSeqFunc(d []byte) (*BlockSeqFunc, error) {
 func (b *BlockSeqFunc) ApplySeqs(in seqfunc.Result) seqfunc.Result {
 	res := &blockSeqFuncResult{
 		B:      b.B,
+		Start:  make([]State, len(in.OutputSeqs())),
 		Input:  in,
 		InPool: make([][]*autofunc.Variable, len(in.OutputSeqs())),
 		Output: make([][]linalg.Vector, len(in.OutputSeqs())),
@@ -47,6 +48,7 @@ func (b *BlockSeqFunc) ApplySeqs(in seqfunc.Result) seqfunc.Result {
 	inStates := map[int]State{}
 	for i := range in.OutputSeqs() {
 		inStates[i] = b.B.StartState()
+		res.Start[i] = inStates[i]
 	}
 	for t := 0; t < maxLen; t++ {
 		var stateIn []State
@@ -82,6 +84,7 @@ func (b *BlockSeqFunc) ApplySeqsR(rv autofunc.RVector, in seqfunc.RResult) seqfu
 	res := &blockSeqFuncRResult{
 		B:       b.B,
 		Input:   in,
+		Start:   make([]RState, len(in.OutputSeqs())),
 		InPool:  make([][]*autofunc.Variable, len(in.OutputSeqs())),
 		Output:  make([][]linalg.Vector, len(in.OutputSeqs())),
 		ROutput: make([][]linalg.Vector, len(in.OutputSeqs())),
@@ -90,6 +93,7 @@ func (b *BlockSeqFunc) ApplySeqsR(rv autofunc.RVector, in seqfunc.RResult) seqfu
 	inStates := map[int]RState{}
 	for i := range in.OutputSeqs() {
 		inStates[i] = b.B.StartRState(rv)
+		res.Start[i] = inStates[i]
 	}
 	for t := 0; t < maxLen; t++ {
 		var stateIn []RState
@@ -156,6 +160,7 @@ func (b *BlockSeqFunc) Serialize() ([]byte, error) {
 
 type blockSeqFuncResult struct {
 	B        Block
+	Start    []State
 	Input    seqfunc.Result
 	InPool   [][]*autofunc.Variable
 	Output   [][]linalg.Vector
@@ -198,7 +203,7 @@ func (b *blockSeqFuncResult) PropagateGradient(u [][]linalg.Vector, g autofunc.G
 	for _, x := range upstreamMap {
 		startUpstream = append(startUpstream, x)
 	}
-	b.B.PropagateStart(startUpstream, g)
+	b.B.PropagateStart(b.Start, startUpstream, g)
 
 	downstream := make([][]linalg.Vector, len(b.InPool))
 	for i, poolSeq := range b.InPool {
@@ -213,6 +218,7 @@ func (b *blockSeqFuncResult) PropagateGradient(u [][]linalg.Vector, g autofunc.G
 
 type blockSeqFuncRResult struct {
 	B        Block
+	Start    []RState
 	Input    seqfunc.RResult
 	InPool   [][]*autofunc.Variable
 	Output   [][]linalg.Vector
@@ -269,7 +275,7 @@ func (b *blockSeqFuncRResult) PropagateRGradient(u, uR [][]linalg.Vector, rg aut
 	for _, x := range upstreamMap {
 		startUpstream = append(startUpstream, x)
 	}
-	b.B.PropagateStartR(startUpstream, rg, g)
+	b.B.PropagateStartR(b.Start, startUpstream, rg, g)
 
 	downstream := make([][]linalg.Vector, len(b.InPool))
 	downstreamR := make([][]linalg.Vector, len(b.InPool))

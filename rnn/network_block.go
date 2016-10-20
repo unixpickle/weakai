@@ -74,14 +74,14 @@ func (n *NetworkBlock) StartRState(rv autofunc.RVector) RState {
 }
 
 // PropagateStart propagates through the start state.
-func (n *NetworkBlock) PropagateStart(u []StateGrad, g autofunc.Gradient) {
-	n.batcherBlock.PropagateStart(u, g)
+func (n *NetworkBlock) PropagateStart(s []State, u []StateGrad, g autofunc.Gradient) {
+	n.batcherBlock.PropagateStart(s, u, g)
 }
 
 // PropagateStartR propagates through the start state.
-func (n *NetworkBlock) PropagateStartR(u []RStateGrad, rg autofunc.RGradient,
+func (n *NetworkBlock) PropagateStartR(s []RState, u []RStateGrad, rg autofunc.RGradient,
 	g autofunc.Gradient) {
-	n.batcherBlock.PropagateStartR(u, rg, g)
+	n.batcherBlock.PropagateStartR(s, u, rg, g)
 }
 
 // ApplyBlock applies the block to an input.

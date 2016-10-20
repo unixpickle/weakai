@@ -17,12 +17,14 @@ type Block interface {
 
 	// PropagateStart performs back-propagation through the
 	// start state.
-	PropagateStart(s []StateGrad, g autofunc.Gradient)
+	// It takes the list of start states, their upstream
+	// gradients, and the output gradient.
+	PropagateStart(s []State, u []StateGrad, g autofunc.Gradient)
 
 	// PropagateStartR is like PropagateStart, but for an
 	// RStateGrad.
 	// The g argument may be nil.
-	PropagateStartR(r []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient)
+	PropagateStartR(s []RState, u []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient)
 
 	// ApplyBlock applies the block to a batch of inputs.
 	// The result is valid so long as neither the inputs

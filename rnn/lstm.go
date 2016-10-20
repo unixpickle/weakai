@@ -103,7 +103,7 @@ func (l *LSTM) StartRState(rv autofunc.RVector) RState {
 
 // PropagateStart performs back-propagation through the
 // start state.
-func (l *LSTM) PropagateStart(s []StateGrad, g autofunc.Gradient) {
+func (l *LSTM) PropagateStart(_ []State, s []StateGrad, g autofunc.Gradient) {
 	if vec, ok := g[l.initState]; ok {
 		for _, x := range s {
 			vec[:len(vec)/2].Add(linalg.Vector(x.(lstmState).Internal))
@@ -114,7 +114,8 @@ func (l *LSTM) PropagateStart(s []StateGrad, g autofunc.Gradient) {
 
 // PropagateStartR is like PropagateStart but with
 // RStateGrads.
-func (l *LSTM) PropagateStartR(s []RStateGrad, rg autofunc.RGradient, g autofunc.Gradient) {
+func (l *LSTM) PropagateStartR(_ []RState, s []RStateGrad, rg autofunc.RGradient,
+	g autofunc.Gradient) {
 	if g != nil {
 		if vec, ok := g[l.initState]; ok {
 			for _, x := range s {

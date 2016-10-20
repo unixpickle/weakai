@@ -83,12 +83,13 @@ func (g *GRU) StartRState(rv autofunc.RVector) RState {
 }
 
 // PropagateStart propagates through the start state.
-func (g *GRU) PropagateStart(s []StateGrad, grad autofunc.Gradient) {
+func (g *GRU) PropagateStart(_ []State, s []StateGrad, grad autofunc.Gradient) {
 	PropagateVarState(g.initState, s, grad)
 }
 
 // PropagateStartR propagates through the start state.
-func (g *GRU) PropagateStartR(s []RStateGrad, rg autofunc.RGradient, grad autofunc.Gradient) {
+func (g *GRU) PropagateStartR(_ []RState, s []RStateGrad, rg autofunc.RGradient,
+	grad autofunc.Gradient) {
 	PropagateVarStateR(g.initState, s, rg, grad)
 }
 

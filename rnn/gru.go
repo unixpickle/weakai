@@ -95,14 +95,10 @@ func (g *GRU) PropagateStartR(_ []RState, s []RStateGrad, rg autofunc.RGradient,
 
 // ApplyBlock applies the block to an input.
 func (g *GRU) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
-	var stateVars []*autofunc.Variable
-	var stateRes []autofunc.Result
+	stateVars, stateRes := PoolVecStates(s)
 	var gateInputs []autofunc.Result
-	for i, x := range s {
-		stateVar := &autofunc.Variable{Vector: linalg.Vector(x.(VecState))}
-		stateVars = append(stateVars, stateVar)
-		stateRes = append(stateRes, stateVar)
-		gateInputs = append(gateInputs, in[i], stateVar)
+	for i, x := range stateRes {
+		gateInputs = append(gateInputs, in[i], x)
 	}
 	n := len(in)
 
@@ -137,19 +133,10 @@ func (g *GRU) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
 
 // ApplyBlockR applies the block to an input.
 func (g *GRU) ApplyBlockR(rv autofunc.RVector, s []RState, in []autofunc.RResult) BlockRResult {
-	var stateVars []*autofunc.Variable
-	var stateRes []autofunc.RResult
+	stateVars, stateRes := PoolVecRStates(s)
 	var gateInputs []autofunc.RResult
-	for i, x := range s {
-		stateVar := &autofunc.Variable{Vector: linalg.Vector(x.(VecRState).State)}
-		stateVars = append(stateVars, stateVar)
-
-		stateVarR := &autofunc.RVariable{
-			Variable:   stateVar,
-			ROutputVec: x.(VecRState).RState,
-		}
-		stateRes = append(stateRes, stateVarR)
-		gateInputs = append(gateInputs, in[i], stateVarR)
+	for i, x := range stateRes {
+		gateInputs = append(gateInputs, in[i], x)
 	}
 	n := len(in)
 
@@ -254,18 +241,9 @@ func (g *gruResult) PropagateGradient(u []linalg.Vector, s []StateGrad,
 	for i, uVec := range u {
 		downstream[i*cells : (i+1)*cells].Add(uVec)
 	}
-	for _, v := range g.InStates {
-		grad[v] = make(linalg.Vector, len(v.Vector))
-	}
-
-	g.Output.PropagateGradient(downstream, grad)
-
-	stateDown := make([]StateGrad, len(g.InStates))
-	for i, v := range g.InStates {
-		stateDown[i] = VecStateGrad(grad[v])
-		delete(grad, v)
-	}
-	return stateDown
+	return PropagateVecStatePool(grad, g.InStates, func() {
+		g.Output.PropagateGradient(downstream, grad)
+	})
 }
 
 type gruRResult struct {
@@ -295,9 +273,6 @@ func (g *gruRResult) PropagateRGradient(u, uR []linalg.Vector, s []RStateGrad,
 	if len(g.InStates) == 0 {
 		return nil
 	}
-	if grad == nil {
-		grad = autofunc.Gradient{}
-	}
 	downstream := make(linalg.Vector, len(g.Output.Output()))
 	downstreamR := make(linalg.Vector, len(g.Output.Output()))
 	cells := len(downstream) / len(g.InStates)
@@ -312,20 +287,9 @@ func (g *gruRResult) PropagateRGradient(u, uR []linalg.Vector, s []RStateGrad,
 		downstream[i*cells : (i+1)*cells].Add(uVec)
 		downstreamR[i*cells : (i+1)*cells].Add(uR[i])
 	}
-	for _, v := range g.InStates {
-		grad[v] = make(linalg.Vector, len(v.Vector))
-		rg[v] = make(linalg.Vector, len(v.Vector))
-	}
-
-	g.Output.PropagateRGradient(downstream, downstreamR, rg, grad)
-
-	stateDown := make([]RStateGrad, len(g.InStates))
-	for i, v := range g.InStates {
-		stateDown[i] = VecRStateGrad{State: grad[v], RState: rg[v]}
-		delete(grad, v)
-		delete(rg, v)
-	}
-	return stateDown
+	return PropagateVecRStatePool(rg, grad, g.InStates, func() {
+		g.Output.PropagateRGradient(downstream, downstreamR, rg, grad)
+	})
 }
 
 func splitVectors(in linalg.Vector, n int) []linalg.Vector {

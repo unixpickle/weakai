@@ -32,9 +32,9 @@ func NewGRU(inputSize, hiddenSize int) *GRU {
 	sigmoid := &neuralnet.Sigmoid{}
 	res := &GRU{
 		hiddenSize: hiddenSize,
-		inputValue: newLSTMGate(inputSize, hiddenSize, hiddenSize, htan),
-		resetGate:  newLSTMGate(inputSize, hiddenSize, hiddenSize, sigmoid),
-		updateGate: newLSTMGate(inputSize, hiddenSize, hiddenSize, sigmoid),
+		inputValue: newLSTMGate(inputSize, hiddenSize, false, htan),
+		resetGate:  newLSTMGate(inputSize, hiddenSize, false, sigmoid),
+		updateGate: newLSTMGate(inputSize, hiddenSize, false, sigmoid),
 		initState:  &autofunc.Variable{Vector: make(linalg.Vector, hiddenSize)},
 	}
 	return res

@@ -3,6 +3,8 @@ package rnn
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/rand"
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
@@ -40,10 +42,10 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 	sigmoid := &neuralnet.Sigmoid{}
 	res := &LSTM{
 		hiddenSize:   hiddenSize,
-		inputValue:   newLSTMGate(inputSize, hiddenSize*2, hiddenSize, htan),
-		inputGate:    newLSTMGate(inputSize, hiddenSize*2, hiddenSize, sigmoid),
-		rememberGate: newLSTMGate(inputSize, hiddenSize*2, hiddenSize, sigmoid),
-		outputGate:   newLSTMGate(inputSize, hiddenSize*2, hiddenSize, sigmoid),
+		inputValue:   newLSTMGate(inputSize, hiddenSize, true, htan),
+		inputGate:    newLSTMGate(inputSize, hiddenSize, true, sigmoid),
+		rememberGate: newLSTMGate(inputSize, hiddenSize, true, sigmoid),
+		outputGate:   newLSTMGate(inputSize, hiddenSize, true, sigmoid),
 		initState:    &autofunc.Variable{Vector: make(linalg.Vector, hiddenSize*2)},
 	}
 	res.prioritizeRemembering()
@@ -146,7 +148,7 @@ func (l *LSTM) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
 			internalPool = append(internalPool, internalVar)
 			lastOutPool = append(lastOutPool, lastOutVar)
 
-			weavedInputs = append(weavedInputs, in[i], internalVar, lastOutVar)
+			weavedInputs = append(weavedInputs, in[i], lastOutVar, internalVar)
 			internalResults = append(internalResults, internalVar)
 		}
 
@@ -162,7 +164,7 @@ func (l *LSTM) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
 		return autofunc.Pool(newState, func(newState autofunc.Result) autofunc.Result {
 			var newWeaved []autofunc.Result
 			for i, state := range autofunc.Split(len(in), newState) {
-				newWeaved = append(newWeaved, in[i], state, lastOutPool[i])
+				newWeaved = append(newWeaved, in[i], lastOutPool[i], state)
 			}
 			newGateIn := autofunc.Concat(newWeaved...)
 			outGate := l.outputGate.Batch(newGateIn, len(in))
@@ -207,7 +209,7 @@ func (l *LSTM) ApplyBlockR(rv autofunc.RVector, s []RState, in []autofunc.RResul
 			}
 
 			lastOutPoolR = append(lastOutPoolR, lastOutR)
-			weavedInputs = append(weavedInputs, in[i], internalR, lastOutR)
+			weavedInputs = append(weavedInputs, in[i], lastOutR, internalR)
 			internalResults = append(internalResults, internalR)
 		}
 
@@ -223,7 +225,7 @@ func (l *LSTM) ApplyBlockR(rv autofunc.RVector, s []RState, in []autofunc.RResul
 		return autofunc.PoolR(newState, func(newState autofunc.RResult) autofunc.RResult {
 			var newWeaved []autofunc.RResult
 			for i, state := range autofunc.SplitR(len(in), newState) {
-				newWeaved = append(newWeaved, in[i], state, lastOutPoolR[i])
+				newWeaved = append(newWeaved, in[i], lastOutPoolR[i], state)
 			}
 			newGateIn := autofunc.ConcatR(newWeaved...)
 			outGate := l.outputGate.BatchR(rv, newGateIn, len(in))
@@ -308,18 +310,25 @@ type lstmRState struct {
 
 type lstmGate struct {
 	Dense      *neuralnet.DenseLayer
+	Peephole   *autofunc.Variable
 	Activation neuralnet.Layer
 }
 
-func newLSTMGate(inputSize, inHidden, outHidden int, activation neuralnet.Layer) *lstmGate {
+func newLSTMGate(inputSize, hidden int, peephole bool, activation neuralnet.Layer) *lstmGate {
 	res := &lstmGate{
 		Dense: &neuralnet.DenseLayer{
-			InputCount:  inputSize + inHidden,
-			OutputCount: outHidden,
+			InputCount:  inputSize + hidden,
+			OutputCount: hidden,
 		},
 		Activation: activation,
 	}
 	res.Dense.Randomize()
+	if peephole {
+		res.Peephole = &autofunc.Variable{Vector: make(linalg.Vector, hidden)}
+		for i := 0; i < hidden; i++ {
+			res.Peephole.Vector[i] = rand.NormFloat64()
+		}
+	}
 	return res
 }
 
@@ -328,27 +337,78 @@ func deserializeLSTMGate(d []byte) (*lstmGate, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(list) != 2 {
+	if len(list) != 2 && len(list) != 3 {
 		return nil, errors.New("invalid slice length for LSTM gate")
 	}
 	dense, ok := list[0].(*neuralnet.DenseLayer)
 	activ, ok1 := list[1].(neuralnet.Layer)
 	if !ok || !ok1 {
-		return nil, errors.New("invalid types for list elements")
+		return nil, errors.New("invalid types for LSTM gate slice")
 	}
-	return &lstmGate{Dense: dense, Activation: activ}, nil
+	res := &lstmGate{Dense: dense, Activation: activ}
+	if len(list) == 3 {
+		peephole, ok := list[2].(serializer.Bytes)
+		if !ok {
+			return nil, errors.New("invalid types for LSTM gate slice")
+		}
+		if err := json.Unmarshal(peephole, &res.Peephole); err != nil {
+			return nil, fmt.Errorf("bad peephole data: %s", err)
+		}
+	}
+	return res, nil
 }
 
 func (l *lstmGate) Batch(in autofunc.Result, n int) autofunc.Result {
-	return l.Activation.Apply(l.Dense.Batch(in, n))
+	if l.Peephole == nil {
+		return l.Activation.Apply(l.Dense.Batch(in, n))
+	}
+	return autofunc.Pool(in, func(in autofunc.Result) autofunc.Result {
+		vecSize := len(in.Output()) / n
+		var weightedInputs []autofunc.Result
+		var peepholed []autofunc.Result
+		for i := 0; i < n; i++ {
+			start := vecSize * i
+			weightedEnd := start + vecSize - len(l.Peephole.Vector)
+			weightedInputs = append(weightedInputs, autofunc.Slice(in, start, weightedEnd))
+			peepholeMe := autofunc.Slice(in, weightedEnd, (i+1)*vecSize)
+			peepholed = append(peepholed, autofunc.Mul(l.Peephole, peepholeMe))
+		}
+		weighted := l.Dense.Batch(autofunc.Concat(weightedInputs...), n)
+		return l.Activation.Apply(autofunc.Add(autofunc.Concat(peepholed...), weighted))
+	})
 }
 
-func (l *lstmGate) BatchR(v autofunc.RVector, in autofunc.RResult, n int) autofunc.RResult {
-	return l.Activation.ApplyR(v, l.Dense.BatchR(v, in, n))
+func (l *lstmGate) BatchR(rv autofunc.RVector, in autofunc.RResult, n int) autofunc.RResult {
+	if l.Peephole == nil {
+		return l.Activation.ApplyR(rv, l.Dense.BatchR(rv, in, n))
+	}
+	return autofunc.PoolR(in, func(in autofunc.RResult) autofunc.RResult {
+		vecSize := len(in.Output()) / n
+		var weightedInputs []autofunc.RResult
+		var peepholed []autofunc.RResult
+		peephole := autofunc.NewRVariable(l.Peephole, rv)
+		for i := 0; i < n; i++ {
+			start := vecSize * i
+			weightedEnd := start + vecSize - len(l.Peephole.Vector)
+			weightedInputs = append(weightedInputs, autofunc.SliceR(in, start, weightedEnd))
+			peepholeMe := autofunc.SliceR(in, weightedEnd, (i+1)*vecSize)
+			peepholed = append(peepholed, autofunc.MulR(peephole, peepholeMe))
+		}
+		weighted := l.Dense.BatchR(rv, autofunc.ConcatR(weightedInputs...), n)
+		joinedPeep := autofunc.ConcatR(peepholed...)
+		return l.Activation.ApplyR(rv, autofunc.AddR(joinedPeep, weighted))
+	})
 }
 
 func (l *lstmGate) Serialize() ([]byte, error) {
 	slist := []serializer.Serializer{l.Dense, l.Activation}
+	if l.Peephole != nil {
+		data, err := json.Marshal(l.Peephole)
+		if err != nil {
+			return nil, err
+		}
+		slist = append(slist, serializer.Bytes(data))
+	}
 	return serializer.SerializeSlice(slist)
 }
 

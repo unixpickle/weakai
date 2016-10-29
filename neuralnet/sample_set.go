@@ -18,7 +18,7 @@ type VectorSample struct {
 
 // Hash generates a randomly-distributed hash based on
 // the vector data.
-func (v *VectorSample) Hash() []byte {
+func (v VectorSample) Hash() []byte {
 	return sgd.HashVectors(v.Input, v.Output)
 }
 

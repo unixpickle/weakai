@@ -18,7 +18,7 @@ type Sample struct {
 }
 
 // Hash returns a randomly-distributed hash of the sample.
-func (s *Sample) Hash() []byte {
+func (s Sample) Hash() []byte {
 	allVecs := make([]linalg.Vector, len(s.Inputs)+len(s.Outputs))
 	copy(allVecs, s.Inputs)
 	copy(allVecs[len(s.Inputs):], s.Outputs)

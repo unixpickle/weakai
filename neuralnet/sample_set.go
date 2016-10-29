@@ -16,6 +16,12 @@ type VectorSample struct {
 	Output linalg.Vector
 }
 
+// Hash generates a randomly-distributed hash based on
+// the vector data.
+func (v *VectorSample) Hash() []byte {
+	return sgd.HashVectors(v.Input, v.Output)
+}
+
 // VectorSampleSet creates an sgd.SampleSet of
 // VectorSamples given a slice of inputs and a
 // slice of corresponding outputs.

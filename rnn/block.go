@@ -29,6 +29,9 @@ type Block interface {
 	// ApplyBlock applies the block to a batch of inputs.
 	// The result is valid so long as neither the inputs
 	// nor the Block are changed.
+	//
+	// The input slice must be non-empty.
+	// It is not possible to apply a block to zero inputs.
 	ApplyBlock(s []State, in []autofunc.Result) BlockResult
 
 	// ApplyBlockR is like ApplyBlock, but with support for

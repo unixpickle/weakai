@@ -96,7 +96,10 @@ func (b *BlockChecker) testNilUpstream(t *testing.T) {
 			[]autofunc.Result{b.Input[0][0]})
 		g1 := autofunc.NewGradient(b.Vars)
 		initLen1 := len(g1)
-		out.PropagateGradient(nil, nil, g1)
+		c := len(out.PropagateGradient(nil, nil, g1))
+		if c != 1 {
+			t.Errorf("expected %d downstream states, got %d", 1, c)
+		}
 
 		g2 := autofunc.NewGradient(b.Vars)
 		initLen2 := len(g2)
@@ -105,7 +108,10 @@ func (b *BlockChecker) testNilUpstream(t *testing.T) {
 			zeroUpstream[i] = make(linalg.Vector, len(x))
 		}
 		nilStateUpstream := make([]rnn.StateGrad, len(out.States()))
-		out.PropagateGradient(zeroUpstream, nilStateUpstream, g2)
+		c = len(out.PropagateGradient(zeroUpstream, nilStateUpstream, g2))
+		if c != 1 {
+			t.Errorf("expected %d downstream states, got %d", 1, c)
+		}
 
 		if len(g1) != initLen1 {
 			t.Errorf("all nil gradient length changed from %d to %d", initLen1, len(g1))
@@ -131,7 +137,10 @@ func (b *BlockChecker) testNilUpstreamR(t *testing.T) {
 		g1 := autofunc.NewGradient(b.Vars)
 		rg1 := autofunc.NewRGradient(b.Vars)
 		initLen1 := len(g1)
-		out.PropagateRGradient(nil, nil, nil, rg1, g1)
+		c := len(out.PropagateRGradient(nil, nil, nil, rg1, g1))
+		if c != 1 {
+			t.Errorf("expected %d downstream states, got %d", 1, c)
+		}
 		g2 := autofunc.NewGradient(b.Vars)
 		rg2 := autofunc.NewRGradient(b.Vars)
 		initLen2 := len(g2)
@@ -141,7 +150,10 @@ func (b *BlockChecker) testNilUpstreamR(t *testing.T) {
 			zeroUpstream[i] = make(linalg.Vector, len(x))
 		}
 		nilStateUpstream := make([]rnn.RStateGrad, len(out.RStates()))
-		out.PropagateRGradient(zeroUpstream, zeroUpstream, nilStateUpstream, rg2, g2)
+		c = len(out.PropagateRGradient(zeroUpstream, zeroUpstream, nilStateUpstream, rg2, g2))
+		if c != 1 {
+			t.Errorf("expected %d downstream states, got %d", 1, c)
+		}
 
 		if len(g1) != initLen1 {
 			t.Errorf("all nil gradient length changed from %d to %d", initLen1, len(g1))

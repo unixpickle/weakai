@@ -441,8 +441,10 @@ func (l *lstmResult) States() []State {
 func (l *lstmResult) PropagateGradient(u []linalg.Vector, s []StateGrad,
 	g autofunc.Gradient) []StateGrad {
 	n := len(l.OutputVecs)
-	if n == 0 || (u == nil && s == nil) {
+	if n == 0 {
 		return nil
+	} else if u == nil && s == nil {
+		s = make([]StateGrad, n)
 	}
 	cellCount := len(l.OutputVecs[0])
 
@@ -514,8 +516,10 @@ func (l *lstmRResult) RStates() []RState {
 func (l *lstmRResult) PropagateRGradient(u, uR []linalg.Vector, s []RStateGrad,
 	rg autofunc.RGradient, g autofunc.Gradient) []RStateGrad {
 	n := len(l.OutputVecs)
-	if n == 0 || (u == nil && s == nil) {
+	if n == 0 {
 		return nil
+	} else if u == nil && s == nil {
+		s = make([]RStateGrad, n)
 	}
 	cellCount := len(l.OutputVecs[0])
 

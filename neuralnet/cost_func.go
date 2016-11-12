@@ -100,6 +100,39 @@ func (m *meanSquaredResult) PropagateGradient(upstream linalg.Vector, grad autof
 	}
 }
 
+// AbsCost implements the L1 cost.
+// In other words, it computes the sum of the absolute
+// differences between actual and expected values.
+type AbsCost struct{}
+
+func (_ AbsCost) Cost(x linalg.Vector, a autofunc.Result) autofunc.Result {
+	xVar := &autofunc.Variable{Vector: x.Copy().Scale(-1)}
+	diff := autofunc.Add(xVar, a)
+	mask := &autofunc.Variable{Vector: make(linalg.Vector, len(x))}
+	for i, val := range diff.Output() {
+		if val < 0 {
+			mask.Vector[i] = -1
+		} else {
+			mask.Vector[i] = 1
+		}
+	}
+	return autofunc.SumAll(autofunc.Mul(mask, diff))
+}
+
+func (_ AbsCost) CostR(v autofunc.RVector, x linalg.Vector, a autofunc.RResult) autofunc.RResult {
+	xVar := autofunc.NewRVariable(&autofunc.Variable{Vector: x.Copy().Scale(-1)}, v)
+	diff := autofunc.AddR(xVar, a)
+	mask := &autofunc.Variable{Vector: make(linalg.Vector, len(x))}
+	for i, val := range diff.Output() {
+		if val < 0 {
+			mask.Vector[i] = -1
+		} else {
+			mask.Vector[i] = 1
+		}
+	}
+	return autofunc.SumAllR(autofunc.MulR(autofunc.NewRVariable(mask, v), diff))
+}
+
 // CrossEntropyCost computes the cost using the
 // definition of cross entropy.
 type CrossEntropyCost struct{}

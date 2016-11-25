@@ -323,6 +323,7 @@ func newLSTMGate(inputSize, hidden int, peephole bool, activation neuralnet.Laye
 		Activation: activation,
 	}
 	res.Dense.Randomize()
+	res.Dense.Biases.Var.Vector.Scale(0)
 	if peephole {
 		res.Peephole = &autofunc.Variable{Vector: make(linalg.Vector, hidden)}
 		for i := 0; i < hidden; i++ {

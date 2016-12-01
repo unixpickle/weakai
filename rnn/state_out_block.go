@@ -41,7 +41,7 @@ func (s *StateOutBlock) StartState() State {
 	return s.Block.StartState()
 }
 
-// StartStateR returns the wrapped Block's start state.
+// StartRState returns the wrapped Block's start state.
 func (s *StateOutBlock) StartRState(rv autofunc.RVector) RState {
 	return s.Block.StartRState(rv)
 }

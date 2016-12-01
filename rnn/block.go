@@ -12,7 +12,7 @@ type Block interface {
 	// StartState returns the initial state for the Block.
 	StartState() State
 
-	// StartStateR is like StartState but for an RState.
+	// StartRState is like StartState but for an RState.
 	StartRState(rv autofunc.RVector) RState
 
 	// PropagateStart performs back-propagation through the

@@ -76,7 +76,7 @@ func (g *GRU) StartState() State {
 	return VecState(g.initState.Vector)
 }
 
-// StartStateR is like StartState but with r-operators.
+// StartRState is like StartState but with r-operators.
 func (g *GRU) StartRState(rv autofunc.RVector) RState {
 	resVar := autofunc.NewRVariable(g.initState, rv)
 	return VecRState{State: resVar.Output(), RState: resVar.ROutput()}

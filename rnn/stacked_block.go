@@ -40,9 +40,7 @@ func DeserializeStackedBlock(d []byte) (StackedBlock, error) {
 // StartState generates a start state which encapsulates
 // the start states of all the nested blocks.
 func (s StackedBlock) StartState() State {
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
+	s.assertNotEmpty()
 	var res []State
 	for _, x := range s {
 		res = append(res, x.StartState())
@@ -52,9 +50,7 @@ func (s StackedBlock) StartState() State {
 
 // StartRState is like StartState.
 func (s StackedBlock) StartRState(rv autofunc.RVector) RState {
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
+	s.assertNotEmpty()
 	var res []RState
 	for _, b := range s {
 		res = append(res, b.StartRState(rv))
@@ -65,9 +61,7 @@ func (s StackedBlock) StartRState(rv autofunc.RVector) RState {
 // PropagateStart back-propagates through all the child
 // Blocks.
 func (s StackedBlock) PropagateStart(starts []State, u []StateGrad, g autofunc.Gradient) {
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
+	s.assertNotEmpty()
 	for childIdx, child := range s {
 		var grad []StateGrad
 		var subStarts []State
@@ -82,9 +76,7 @@ func (s StackedBlock) PropagateStart(starts []State, u []StateGrad, g autofunc.G
 // PropagateStartR is like PropagateStart.
 func (s StackedBlock) PropagateStartR(starts []RState, u []RStateGrad, rg autofunc.RGradient,
 	g autofunc.Gradient) {
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
+	s.assertNotEmpty()
 	for childIdx, child := range s {
 		var grad []RStateGrad
 		var subStarts []RState
@@ -97,9 +89,7 @@ func (s StackedBlock) PropagateStartR(starts []RState, u []RStateGrad, rg autofu
 }
 
 func (s StackedBlock) ApplyBlock(states []State, in []autofunc.Result) BlockResult {
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
+	s.assertNotEmpty()
 	res := &stackedBlockResult{
 		Depth: len(s),
 		Pools: make([][]*autofunc.Variable, len(in)),
@@ -135,12 +125,7 @@ func (s StackedBlock) ApplyBlock(states []State, in []autofunc.Result) BlockResu
 
 func (s StackedBlock) ApplyBlockR(v autofunc.RVector, states []RState,
 	in []autofunc.RResult) BlockRResult {
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
-	if len(s) == 0 {
-		panic("cannot use an empty StackedBlock")
-	}
+	s.assertNotEmpty()
 	res := &stackedBlockRResult{
 		Depth: len(s),
 		Pools: make([][]*autofunc.Variable, len(in)),
@@ -207,6 +192,12 @@ func (s StackedBlock) Serialize() ([]byte, error) {
 
 func (s StackedBlock) SerializerType() string {
 	return "github.com/unixpickle/weakai/rnn.StackedBlock"
+}
+
+func (s StackedBlock) assertNotEmpty() {
+	if len(s) == 0 {
+		panic("cannot use an empty StackedBlock")
+	}
 }
 
 type stackedBlockResult struct {

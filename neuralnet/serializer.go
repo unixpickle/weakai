@@ -19,6 +19,7 @@ const (
 	serializerTypeDropoutLayer      = serializerTypePrefix + "DropoutLayer"
 	serializerTypeVecRescaleLayer   = serializerTypePrefix + "VecRescaleLayer"
 	serializerTypeGaussNoiseLayer   = serializerTypePrefix + "GaussNoiseLayer"
+	serializerTypeResidualLayer     = serializerTypePrefix + "ResidualLayer"
 )
 
 func init() {
@@ -58,4 +59,6 @@ func init() {
 		DeserializeVecRescaleLayer)
 	serializer.RegisterTypedDeserializer(serializerTypeGaussNoiseLayer,
 		DeserializeGaussNoiseLayer)
+	serializer.RegisterTypedDeserializer(serializerTypeResidualLayer,
+		DeserializeResidualLayer)
 }

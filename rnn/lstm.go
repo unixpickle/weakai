@@ -251,7 +251,9 @@ func (l *LSTM) ApplyBlockR(rv autofunc.RVector, s []RState, in []autofunc.RResul
 // following order: input weights, input biases,
 // input gate weights, input gate biases, remember
 // gate weights, remember gate biases, output gate
-// weights, output gate biases, init state biases.
+// weights, output gate biases, init state biases,
+// input peephole, input gate peephole, remember gate
+// peephole, output gate peephole.
 func (l *LSTM) Parameters() []*autofunc.Variable {
 	return []*autofunc.Variable{
 		l.inputValue.Dense.Weights.Data,
@@ -263,6 +265,10 @@ func (l *LSTM) Parameters() []*autofunc.Variable {
 		l.outputGate.Dense.Weights.Data,
 		l.outputGate.Dense.Biases.Var,
 		l.initState,
+		l.inputValue.Peephole,
+		l.inputGate.Peephole,
+		l.rememberGate.Peephole,
+		l.outputGate.Peephole,
 	}
 }
 

@@ -136,6 +136,12 @@ func (l *LSTM) PropagateStartR(_ []RState, s []RStateGrad, rg autofunc.RGradient
 
 // ApplyBlock applies the LSTM to a batch of inputs.
 func (l *LSTM) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
+	for _, x := range in {
+		if len(x.Output()) != l.inputSize() {
+			panic(fmt.Sprintf("bad input length %d (expected %d)",
+				len(x.Output()), l.inputSize()))
+		}
+	}
 	var internalPool, lastOutPool []*autofunc.Variable
 	res := autofunc.PoolAll(in, func(in []autofunc.Result) autofunc.Result {
 		var weavedInputs []autofunc.Result
@@ -186,6 +192,12 @@ func (l *LSTM) ApplyBlock(s []State, in []autofunc.Result) BlockResult {
 // ApplyBlockR is like ApplyBlock, but with support for
 // the R operator.
 func (l *LSTM) ApplyBlockR(rv autofunc.RVector, s []RState, in []autofunc.RResult) BlockRResult {
+	for _, x := range in {
+		if len(x.Output()) != l.inputSize() {
+			panic(fmt.Sprintf("bad input length %d (expected %d)",
+				len(x.Output()), l.inputSize()))
+		}
+	}
 	var internalPool, lastOutPool []*autofunc.Variable
 	res := autofunc.PoolAllR(in, func(in []autofunc.RResult) autofunc.RResult {
 		var lastOutPoolR []*autofunc.RVariable
@@ -300,6 +312,10 @@ func (l *LSTM) prioritizeRemembering() {
 	for i := range rememberBiases {
 		rememberBiases[i] = initialRememberBias
 	}
+}
+
+func (l *LSTM) inputSize() int {
+	return l.inputGate.Dense.InputCount - l.inputGate.Dense.OutputCount
 }
 
 type lstmState struct {

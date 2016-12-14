@@ -29,6 +29,14 @@ type DenseLayer struct {
 	Biases  *autofunc.LinAdd
 }
 
+// NewDenseLayer creates a randomized DenseLayer with the
+// supplied input and output sizes.
+func NewDenseLayer(in, out int) *DenseLayer {
+	res := &DenseLayer{InputCount: in, OutputCount: out}
+	res.Randomize()
+	return res
+}
+
 func DeserializeDenseLayer(data []byte) (*DenseLayer, error) {
 	// Backwards-compatible JSON-based layer data.
 	if len(data) == 0 || data[0] != denseLayerDataVersion {

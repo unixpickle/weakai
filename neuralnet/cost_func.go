@@ -36,6 +36,33 @@ func TotalCost(c CostFunc, layer autofunc.Func, s sgd.SampleSet) float64 {
 	return totalCost
 }
 
+// TotalCostBatcher is like TotalCost, but it applies a
+// batcher to multiple inputs at once.
+// If batchSize is 0, the full sample set will be applied
+// at once.
+func TotalCostBatcher(c CostFunc, b autofunc.Batcher, s sgd.SampleSet, batchSize int) float64 {
+	var totalCost float64
+	i := 0
+	for i < s.Len() {
+		bs := batchSize
+		if bs == 0 || bs > s.Len()-i {
+			bs = s.Len() - i
+		}
+		var input, desired linalg.Vector
+		for j := 0; j < bs; j++ {
+			sample := s.GetSample(j + i).(VectorSample)
+			input = append(input, sample.Input...)
+			desired = append(desired, sample.Output...)
+		}
+		inVar := &autofunc.Variable{Vector: input}
+		result := b.Batch(inVar, bs)
+		costOut := c.Cost(desired, result)
+		totalCost += costOut.Output()[0]
+		i += bs
+	}
+	return totalCost
+}
+
 // MeanSquaredCost computes the cost as ||a-x||^2
 // where a is the actual output and x is the desired
 // output.

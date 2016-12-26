@@ -168,3 +168,23 @@ func (_ HyperbolicTangent) Serialize() ([]byte, error) {
 func (_ HyperbolicTangent) SerializerType() string {
 	return serializerTypeHyperbolicTangent
 }
+
+type Sin struct {
+	autofunc.Sin
+}
+
+func (_ Sin) Batch(inputs autofunc.Result, n int) autofunc.Result {
+	return Sin{}.Apply(inputs)
+}
+
+func (_ Sin) BatchR(v autofunc.RVector, inputs autofunc.RResult, n int) autofunc.RResult {
+	return Sin{}.ApplyR(v, inputs)
+}
+
+func (_ Sin) SerializerType() string {
+	return serializerTypeSin
+}
+
+func (_ Sin) Serialize() ([]byte, error) {
+	return []byte{}, nil
+}

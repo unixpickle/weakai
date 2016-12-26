@@ -6,6 +6,7 @@ const (
 	serializerTypePrefix            = "github.com/unixpickle/weakai/neuralnet."
 	serializerTypeHyperbolicTangent = serializerTypePrefix + "HyperbolicTangent"
 	serializerTypeSigmoid           = serializerTypePrefix + "Sigmoid"
+	serializerTypeSin               = serializerTypePrefix + "Sin"
 	serializerTypeBorderLayer       = serializerTypePrefix + "BorderLayer"
 	serializerTypeUnstackLayer      = serializerTypePrefix + "UnstackLayer"
 	serializerTypeConvLayer         = serializerTypePrefix + "ConvLayer"
@@ -34,6 +35,10 @@ func init() {
 	serializer.RegisterDeserializer(serializerTypeHyperbolicTangent,
 		func(d []byte) (serializer.Serializer, error) {
 			return &HyperbolicTangent{}, nil
+		})
+	serializer.RegisterDeserializer(serializerTypeSin,
+		func(d []byte) (serializer.Serializer, error) {
+			return &Sin{}, nil
 		})
 	serializer.RegisterTypedDeserializer(serializerTypeConvLayer,
 		DeserializeConvLayer)

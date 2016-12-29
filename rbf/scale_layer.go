@@ -62,19 +62,20 @@ func NewScaleLayerShared(scale float64) *ScaleLayer {
 // the number of components specified when initializing
 // the ScaleLayer.
 func (s *ScaleLayer) Apply(in autofunc.Result) autofunc.Result {
+	sc := negAbs(in)
 	if len(s.scale.Vector) == 1 {
-		return autofunc.ScaleFirst(in, s.scale)
+		return autofunc.ScaleFirst(in, sc)
 	} else {
 		if len(in.Output()) != len(s.scale.Vector) {
 			panic("unexpected component count")
 		}
-		return autofunc.Mul(in, s.scale)
+		return autofunc.Mul(in, sc)
 	}
 }
 
 // ApplyR is like Apply but for RResults.
 func (s *ScaleLayer) ApplyR(rv autofunc.RVector, in autofunc.RResult) autofunc.RResult {
-	sc := autofunc.NewRVariable(s.scale, rv)
+	sc := negAbsR(autofunc.NewRVariable(s.scale, rv))
 	if len(s.scale.Vector) == 1 {
 		return autofunc.ScaleFirstR(in, sc)
 	} else {
@@ -102,4 +103,31 @@ func (s *ScaleLayer) SerializerType() string {
 // Serialize serializes the layer.
 func (s *ScaleLayer) Serialize() ([]byte, error) {
 	return s.scale.Serialize()
+}
+
+func negAbs(in autofunc.Result) autofunc.Result {
+	sign := make(linalg.Vector, len(in.Output()))
+	for i, x := range in.Output() {
+		if x > 0 {
+			sign[i] = -1
+		} else {
+			sign[i] = 1
+		}
+	}
+	return autofunc.Mul(in, &autofunc.Variable{Vector: sign})
+}
+
+func negAbsR(in autofunc.RResult) autofunc.RResult {
+	sign := make(linalg.Vector, len(in.Output()))
+	for i, x := range in.Output() {
+		if x > 0 {
+			sign[i] = -1
+		} else {
+			sign[i] = 1
+		}
+	}
+	return autofunc.MulR(in, &autofunc.RVariable{
+		Variable:   &autofunc.Variable{Vector: sign},
+		ROutputVec: make(linalg.Vector, len(sign)),
+	})
 }

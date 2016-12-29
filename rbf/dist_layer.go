@@ -66,7 +66,7 @@ func NewDistLayerSamples(inCount, outCount int, s sgd.SampleSet) *DistLayer {
 	var centers []linalg.Vector
 	for i := 0; i < outCount; i++ {
 		if len(indices) == 0 {
-			indices := make([]int, s.Len())
+			indices = make([]int, s.Len())
 			for i := range indices {
 				indices[i] = i
 			}

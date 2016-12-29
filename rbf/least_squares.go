@@ -47,7 +47,7 @@ func LeastSquares(n *Network, s sgd.SampleSet, bs int) *neuralnet.DenseLayer {
 		copy(mat.Data[i*mat.Cols:], res.Output())
 	}
 
-	outMat := linalg.NewMatrix(s.Len(), len(outData)/mat.Cols)
+	outMat := linalg.NewMatrix(s.Len(), len(outData)/s.Len())
 	outMat.Data = outData
 
 	solver := leastsquares.NewSolver(mat)

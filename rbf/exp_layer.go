@@ -49,7 +49,7 @@ func (e *ExpLayer) ApplyR(rv autofunc.RVector, in autofunc.RResult) autofunc.RRe
 }
 
 // SerializerType returns the unique ID used to serialize
-// an ExpLayer.
+// an ExpLayer with the serializer package.
 func (e *ExpLayer) SerializerType() string {
 	return "github.com/unixpickle/weakai/rbf.ExpLayer"
 }

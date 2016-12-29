@@ -94,7 +94,7 @@ func (s *ScaleLayer) Parameters() []*autofunc.Variable {
 }
 
 // SerializerType returns the unique ID used to serialize
-// a ScaleLayer.
+// a ScaleLayer with the serializer package.
 func (s *ScaleLayer) SerializerType() string {
 	return "github.com/unixpickle/weakai/rbf.ScaleLayer"
 }

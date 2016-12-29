@@ -6,6 +6,8 @@ import (
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/sgd"
+	"github.com/unixpickle/weakai/neuralnet"
 )
 
 func init() {
@@ -35,15 +37,48 @@ func DeserializeDistLayer(d []byte) (*DistLayer, error) {
 // components are sampled from a normal random variable,
 // scaled by scale.
 func NewDistLayer(inCount, outCount int, scale float64) *DistLayer {
+	var vec linalg.Vector
+	if scale > 0 {
+		vec = linalg.RandVector(inCount * outCount).Scale(scale)
+	} else {
+		vec = make(linalg.Vector, inCount*outCount)
+	}
 	res := &DistLayer{
 		outputCount: outCount,
-		centers: &autofunc.Variable{
-			Vector: make(linalg.Vector, inCount*outCount),
-		},
+		centers:     &autofunc.Variable{Vector: vec},
 	}
-	for i := range res.centers.Vector {
-		res.centers.Vector[i] = rand.NormFloat64() * scale
+	return res
+}
+
+// NewDistLayerSamples creates a DistLayer by sampling
+// centers from an sgd.SampleSet of neuralnet.VectorSample
+// objects.
+//
+// If there are more centers than samples, then the
+// resulting layer will have duplicate centers.
+// Duplicate centers will break certain things, like using
+// a psuedo-inverse for the last layer of the network.
+func NewDistLayerSamples(inCount, outCount int, s sgd.SampleSet) *DistLayer {
+	if s.Len() == 0 {
+		panic("no samples to use as centers")
 	}
+	var indices []int
+	var centers []linalg.Vector
+	for i := 0; i < outCount; i++ {
+		if len(indices) == 0 {
+			indices := make([]int, s.Len())
+			for i := range indices {
+				indices[i] = i
+			}
+		}
+		j := rand.Intn(len(indices))
+		idx := indices[j]
+		indices[j] = indices[len(indices)-1]
+		indices = indices[:len(indices)-1]
+		centers = append(centers, s.GetSample(idx).(neuralnet.VectorSample).Input)
+	}
+	res := NewDistLayer(inCount, outCount, 0)
+	res.SetCenters(centers)
 	return res
 }
 

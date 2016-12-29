@@ -62,7 +62,7 @@ func NewScaleLayerShared(scale float64) *ScaleLayer {
 // the number of components specified when initializing
 // the ScaleLayer.
 func (s *ScaleLayer) Apply(in autofunc.Result) autofunc.Result {
-	sc := negAbs(in)
+	sc := negAbs(s.scale)
 	if len(s.scale.Vector) == 1 {
 		return autofunc.ScaleFirst(in, sc)
 	} else {

@@ -13,6 +13,7 @@ Here are the packages I've created for AI:
  * [boosting](boosting) - AdaBoost and (more generally) gradient boosting.
  * [idtrees](idtrees) - identification trees and random forests.
  * [svm](svm) - an implementation of Support Vector Machines, complete with my own solver. I am no expert at numerical analysis or quadratic optimization, but my solver works fairly well on medium-sized problems.
+ * [rnf](rnf) - Radial Basis Function networks based on [neuralnet](neuralnet).
  * [rbm](rbm) - Restricted Boltzmann Machine sampler and trainer.
  * [evolution](evolution) - a simplistic, not particularly practical implementation of artificial evolution.
  * [demos](demos) - mostly older demos of the stuff in this repository. See the [projects below](#Projects-which-use-this) for more interesting demos.

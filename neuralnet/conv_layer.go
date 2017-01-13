@@ -3,12 +3,36 @@ package neuralnet
 import (
 	"encoding/json"
 	"math/rand"
+	"sync"
 
 	"github.com/gonum/blas"
+	"github.com/gonum/blas/blas32"
 	"github.com/gonum/blas/blas64"
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
 )
+
+var conv32Bit bool
+var conv32BitLock sync.RWMutex
+
+// ConvLayer32Bit returns whether or not the ConvLayer
+// will use blas32 rather than blas64.
+// By default, this is false.
+// It can be changed via SetConvLayer32Bit.
+func ConvLayer32Bit() bool {
+	conv32BitLock.RLock()
+	res := conv32Bit
+	conv32BitLock.RUnlock()
+	return res
+}
+
+// SetConvLayer32Bit sets whether or not ConvLayer should
+// use blas32 instead of blas64 for its computations.
+func SetConvLayer32Bit(b bool) {
+	conv32BitLock.Lock()
+	conv32Bit = b
+	conv32BitLock.Unlock()
+}
 
 // ConvLayer is a convolutional layer for
 // a neural network.
@@ -146,7 +170,13 @@ func (c *ConvLayer) Batch(in autofunc.Result, n int) autofunc.Result {
 	for i := 0; i < n; i++ {
 		subIn := in.Output()[i*inSize : (i+1)*inSize]
 		subOut := res.OutputVec[i*outSize : (i+1)*outSize]
-		c.convolve(subIn, c.outputToTensor(subOut))
+		if ConvLayer32Bit() {
+			tempOut := make([]float32, len(subOut))
+			c.convolve32(subIn, c.outputToTensor32(tempOut))
+			copy(subOut, cast64(tempOut))
+		} else {
+			c.convolve(subIn, c.outputToTensor(subOut))
+		}
 	}
 	return res
 }
@@ -217,6 +247,30 @@ func (c *ConvLayer) convolve(in linalg.Vector, out *Tensor3) {
 	}
 }
 
+func (c *ConvLayer) convolve32(in linalg.Vector, out *tensor32) {
+	inMat := c.inputToMatrix32(cast32(in))
+	filterMat := blas32.General{
+		Rows:   c.FilterCount,
+		Cols:   inMat.Cols,
+		Stride: inMat.Stride,
+		Data:   cast32(c.FilterVar.Vector),
+	}
+	outMat := blas32.General{
+		Rows:   out.Width * out.Height,
+		Cols:   out.Depth,
+		Stride: out.Depth,
+		Data:   out.Data,
+	}
+	blas32.Gemm(blas.NoTrans, blas.Trans, 1, inMat, filterMat, 0, outMat)
+
+	biasVec := blas32.Vector{Inc: 1, Data: cast32(c.Biases.Vector)}
+	for i := 0; i < len(out.Data); i += outMat.Cols {
+		outRow := out.Data[i : i+outMat.Cols]
+		outVec := blas32.Vector{Inc: 1, Data: outRow}
+		blas32.Axpy(len(outRow), 1, biasVec, outVec)
+	}
+}
+
 func (c *ConvLayer) convolveR(v autofunc.RVector, in, inR linalg.Vector, out *Tensor3) {
 	inMat := c.inputToMatrix(in)
 	inMatR := c.inputToMatrix(inR)
@@ -281,6 +335,34 @@ func (c *ConvLayer) outputToTensor(out linalg.Vector) *Tensor3 {
 	}
 }
 
+func (c *ConvLayer) inputToTensor32(in []float32) *tensor32 {
+	return &tensor32{
+		Width:  c.InputWidth,
+		Height: c.InputHeight,
+		Depth:  c.InputDepth,
+		Data:   in,
+	}
+}
+
+func (c *ConvLayer) inputToMatrix32(in []float32) blas32.General {
+	inTensor := c.inputToTensor32(in)
+	return blas32.General{
+		Rows:   c.OutputWidth() * c.OutputHeight(),
+		Cols:   c.FilterWidth * c.FilterHeight * c.InputDepth,
+		Stride: c.FilterWidth * c.FilterHeight * c.InputDepth,
+		Data:   inTensor.ToCol(c.FilterWidth, c.FilterHeight, c.Stride),
+	}
+}
+
+func (c *ConvLayer) outputToTensor32(out []float32) *tensor32 {
+	return &tensor32{
+		Width:  c.OutputWidth(),
+		Height: c.OutputHeight(),
+		Depth:  c.OutputDepth(),
+		Data:   out,
+	}
+}
+
 type convLayerResult struct {
 	OutputVec linalg.Vector
 	Input     autofunc.Result
@@ -319,7 +401,11 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 			subDownstream = inputDownstream[i*subDownstreamSize : (i+1)*subDownstreamSize]
 		}
 		subInput := c.Input.Output()[i*subDownstreamSize : (i+1)*subDownstreamSize]
-		c.propagateSingle(subInput, subUpstream, subDownstream, grad)
+		if ConvLayer32Bit() {
+			c.propagateSingle32(subInput, subUpstream, subDownstream, grad)
+		} else {
+			c.propagateSingle(subInput, subUpstream, subDownstream, grad)
+		}
 	}
 
 	if !c.Input.Constant(grad) {
@@ -374,6 +460,44 @@ func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vec
 			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
 			c.Layer.FilterHeight, c.Layer.Stride)
 		copy(downstream, flattened.Data)
+	}
+}
+
+func (c *convLayerResult) propagateSingle32(input, upstream, downstream linalg.Vector,
+	grad autofunc.Gradient) {
+	upstreamMat := blas32.General{
+		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
+		Cols:   c.Layer.OutputDepth(),
+		Stride: c.Layer.OutputDepth(),
+		Data:   cast32(upstream),
+	}
+
+	inMatrix := c.Layer.inputToMatrix32(cast32(input))
+
+	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
+		destMat := blas32.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   cast32(filterGrad),
+		}
+		blas32.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrix, 1, destMat)
+		copy(filterGrad, cast64(destMat.Data))
+	}
+
+	if downstream != nil {
+		inDeriv := inMatrix
+		filterMat := blas32.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   cast32(c.Layer.FilterVar.Vector),
+		}
+		blas32.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 0, inDeriv)
+		flattened := newTensor32Col(c.Layer.InputWidth, c.Layer.InputHeight,
+			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
+			c.Layer.FilterHeight, c.Layer.Stride)
+		copy(downstream, cast64(flattened.Data))
 	}
 }
 
@@ -540,4 +664,20 @@ func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, d
 		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMatR, inMatrix, 1, destMat)
 		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrixR, 1, destMat)
 	}
+}
+
+func cast32(f64 []float64) []float32 {
+	res := make([]float32, len(f64))
+	for i, x := range f64 {
+		res[i] = float32(x)
+	}
+	return res
+}
+
+func cast64(f32 []float32) []float64 {
+	res := make([]float64, len(f32))
+	for i, x := range f32 {
+		res[i] = float64(x)
+	}
+	return res
 }

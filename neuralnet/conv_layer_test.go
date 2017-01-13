@@ -34,69 +34,73 @@ func TestConvDimensions(t *testing.T) {
 }
 
 func TestConvForward(t *testing.T) {
-	network, input, _ := convLayerTestInfo()
+	convTestBothSizes(t, func(t *testing.T) {
+		network, input, _ := convLayerTestInfo()
 
-	actualConvs := network[0].Apply(input).Output()
-	expectedConvs := []float64{
-		3.175686000, 3.016690000, 2.517999000, 2.025792000,
-		3.110512000, 2.324176000, 4.029134000, 3.228145000,
-		3.488844000, 2.623714000, 3.571243000, 2.241387000,
-	}
+		actualConvs := network[0].Apply(input).Output()
+		expectedConvs := []float64{
+			3.175686000, 3.016690000, 2.517999000, 2.025792000,
+			3.110512000, 2.324176000, 4.029134000, 3.228145000,
+			3.488844000, 2.623714000, 3.571243000, 2.241387000,
+		}
 
-	if len(expectedConvs) != len(actualConvs) {
-		t.Fatalf("unexpected layer output size: %d (expected %d)",
-			len(actualConvs), len(expectedConvs))
-	}
+		if len(expectedConvs) != len(actualConvs) {
+			t.Fatalf("unexpected layer output size: %d (expected %d)",
+				len(actualConvs), len(expectedConvs))
+		}
+	})
 }
 
 func TestConvBackward(t *testing.T) {
-	layer, input, outGrad := convLayerTestInfo()
+	convTestBothSizes(t, func(t *testing.T) {
+		layer, input, outGrad := convLayerTestInfo()
 
-	actualGrad := autofunc.NewGradient(append(layer.Parameters(), input))
-	layer.Apply(input).PropagateGradient(outGrad, actualGrad)
+		actualGrad := autofunc.NewGradient(append(layer.Parameters(), input))
+		layer.Apply(input).PropagateGradient(outGrad, actualGrad)
 
-	convLayer := layer[0].(*ConvLayer)
-	expectedGrad := autofunc.Gradient{
-		convLayer.FilterVar: []float64{
-			9.181420449e-02, 6.070772494e-02, 4.831743717e-02, 6.140456075e-02,
-			4.619374891e-02, 9.677697371e-02, 5.711791144e-02, 5.124701355e-02,
-			8.690832544e-02, 2.255616739e-02, 9.041001878e-02, 4.383411433e-02,
-			1.725619176e-01, 1.501485079e-01, 1.396596513e-01, 8.822688174e-02,
-			1.043560711e-01, 1.851411351e-01, 1.769153948e-01, 1.366024735e-01,
-			1.678136736e-01, 6.694391158e-02, 1.517132408e-01, 8.335992965e-02,
-		},
-		convLayer.Biases: []float64{1.333355836e-01, 2.790278869e-01},
-		input: []float64{
-			1.346240470e-02, 1.840140585e-02, 1.830078429e-02, 3.341979500e-02, 4.527417587e-02, 6.139417717e-02, 6.285708549e-02, 1.122305051e-01, 0, 0,
-			2.692730031e-02, 1.193745091e-02, 2.396698285e-02, 3.739434288e-02, 8.890665566e-02, 4.124498873e-02, 8.115978953e-02, 1.253480957e-01, 0, 0,
-			3.633179008e-02, 3.105761526e-02, 5.291576339e-02, 3.939048624e-02, 8.488640888e-02, 7.725933595e-02, 6.877644332e-02, 5.033669814e-02, 0, 0,
-			7.172645109e-03, 2.625700212e-02, 3.193879788e-02, 3.368514841e-02, 2.737903811e-02, 6.263677753e-03, 1.786440555e-02, 3.198290875e-02, 0, 0,
-			2.969143512e-02, 4.797023692e-02, 3.826207676e-02, 6.320548619e-02, 4.395410081e-02, 5.088142526e-02, 2.968988521e-02, 6.090264241e-02, 0, 0,
-			5.255802153e-02, 1.594788029e-02, 3.863840312e-02, 6.542970202e-02, 6.192735934e-02, 6.301981015e-03, 3.169670830e-02, 6.425452037e-02, 0, 0,
-			4.337086165e-02, 3.224390653e-02, 3.146379199e-02, 1.187088457e-02, 5.068287349e-02, 3.269456802e-02, 3.291436767e-02, 1.194641079e-02, 0, 0,
-		},
-	}
-	varNames := map[*autofunc.Variable]string{
-		convLayer.FilterVar: "filters",
-		convLayer.Biases:    "biases",
-		input:               "input",
-	}
-
-	for variable, expected := range expectedGrad {
-		name := varNames[variable]
-		actual := actualGrad[variable]
-		if len(expected) != len(actual) {
-			t.Errorf("variable %s: expected len %d got len %d",
-				name, len(expected), len(actual))
-			continue
+		convLayer := layer[0].(*ConvLayer)
+		expectedGrad := autofunc.Gradient{
+			convLayer.FilterVar: []float64{
+				9.181420449e-02, 6.070772494e-02, 4.831743717e-02, 6.140456075e-02,
+				4.619374891e-02, 9.677697371e-02, 5.711791144e-02, 5.124701355e-02,
+				8.690832544e-02, 2.255616739e-02, 9.041001878e-02, 4.383411433e-02,
+				1.725619176e-01, 1.501485079e-01, 1.396596513e-01, 8.822688174e-02,
+				1.043560711e-01, 1.851411351e-01, 1.769153948e-01, 1.366024735e-01,
+				1.678136736e-01, 6.694391158e-02, 1.517132408e-01, 8.335992965e-02,
+			},
+			convLayer.Biases: []float64{1.333355836e-01, 2.790278869e-01},
+			input: []float64{
+				1.346240470e-02, 1.840140585e-02, 1.830078429e-02, 3.341979500e-02, 4.527417587e-02, 6.139417717e-02, 6.285708549e-02, 1.122305051e-01, 0, 0,
+				2.692730031e-02, 1.193745091e-02, 2.396698285e-02, 3.739434288e-02, 8.890665566e-02, 4.124498873e-02, 8.115978953e-02, 1.253480957e-01, 0, 0,
+				3.633179008e-02, 3.105761526e-02, 5.291576339e-02, 3.939048624e-02, 8.488640888e-02, 7.725933595e-02, 6.877644332e-02, 5.033669814e-02, 0, 0,
+				7.172645109e-03, 2.625700212e-02, 3.193879788e-02, 3.368514841e-02, 2.737903811e-02, 6.263677753e-03, 1.786440555e-02, 3.198290875e-02, 0, 0,
+				2.969143512e-02, 4.797023692e-02, 3.826207676e-02, 6.320548619e-02, 4.395410081e-02, 5.088142526e-02, 2.968988521e-02, 6.090264241e-02, 0, 0,
+				5.255802153e-02, 1.594788029e-02, 3.863840312e-02, 6.542970202e-02, 6.192735934e-02, 6.301981015e-03, 3.169670830e-02, 6.425452037e-02, 0, 0,
+				4.337086165e-02, 3.224390653e-02, 3.146379199e-02, 1.187088457e-02, 5.068287349e-02, 3.269456802e-02, 3.291436767e-02, 1.194641079e-02, 0, 0,
+			},
 		}
-		for i, x := range expected {
-			a := actual[i]
-			if math.Abs(x-a) > 1e-6 {
-				t.Errorf("variable %s: value %d: expected %f got %f", name, i, x, a)
+		varNames := map[*autofunc.Variable]string{
+			convLayer.FilterVar: "filters",
+			convLayer.Biases:    "biases",
+			input:               "input",
+		}
+
+		for variable, expected := range expectedGrad {
+			name := varNames[variable]
+			actual := actualGrad[variable]
+			if len(expected) != len(actual) {
+				t.Errorf("variable %s: expected len %d got len %d",
+					name, len(expected), len(actual))
+				continue
+			}
+			for i, x := range expected {
+				a := actual[i]
+				if math.Abs(x-a) > 1e-6 {
+					t.Errorf("variable %s: value %d: expected %f got %f", name, i, x, a)
+				}
 			}
 		}
-	}
+	})
 }
 
 func TestConvLayerSerialize(t *testing.T) {
@@ -150,94 +154,111 @@ func TestConvLayerSerialize(t *testing.T) {
 }
 
 func TestConvLayerRProp(t *testing.T) {
-	layer := &ConvLayer{
-		FilterCount:  4,
-		FilterWidth:  2,
-		FilterHeight: 3,
-		Stride:       2,
-		InputWidth:   5,
-		InputHeight:  7,
-		InputDepth:   2,
-	}
-	layer.Randomize()
-
-	input := make(linalg.Vector, 5*7*2)
-	for i := range input {
-		input[i] = rand.Float64()*2 - 1
-	}
-	inVar := &autofunc.Variable{input}
-
-	variables := append(layer.Parameters(), inVar)
-	rVector := autofunc.RVector{}
-	for _, variable := range variables {
-		rVector[variable] = make(linalg.Vector, len(variable.Vector))
-		for i := range rVector[variable] {
-			rVector[variable][i] = rand.Float64()*2 - 1
+	convTestBothSizes(t, func(t *testing.T) {
+		layer := &ConvLayer{
+			FilterCount:  4,
+			FilterWidth:  2,
+			FilterHeight: 3,
+			Stride:       2,
+			InputWidth:   5,
+			InputHeight:  7,
+			InputDepth:   2,
 		}
-	}
-	funcTest := &functest.RFuncChecker{
-		F:     layer,
-		Vars:  variables,
-		Input: inVar,
-		RV:    rVector,
-	}
-	funcTest.FullCheck(t)
+		layer.Randomize()
+
+		input := make(linalg.Vector, 5*7*2)
+		for i := range input {
+			input[i] = rand.Float64()*2 - 1
+		}
+		inVar := &autofunc.Variable{input}
+
+		variables := append(layer.Parameters(), inVar)
+		rVector := autofunc.RVector{}
+		for _, variable := range variables {
+			rVector[variable] = make(linalg.Vector, len(variable.Vector))
+			for i := range rVector[variable] {
+				rVector[variable][i] = rand.Float64()*2 - 1
+			}
+		}
+		funcTest := &functest.RFuncChecker{
+			F:     layer,
+			Vars:  variables,
+			Input: inVar,
+			RV:    rVector,
+		}
+		funcTest.FullCheck(t)
+	})
 }
 
 func TestConvLayerBatch(t *testing.T) {
-	layer := &ConvLayer{
-		FilterCount:  3,
-		FilterWidth:  2,
-		FilterHeight: 4,
-		Stride:       2,
-		InputHeight:  17,
-		InputWidth:   19,
-		InputDepth:   5,
-	}
-	layer.Randomize()
+	convTestBothSizes(t, func(t *testing.T) {
+		layer := &ConvLayer{
+			FilterCount:  3,
+			FilterWidth:  2,
+			FilterHeight: 4,
+			Stride:       2,
+			InputHeight:  17,
+			InputWidth:   19,
+			InputDepth:   5,
+		}
+		layer.Randomize()
 
-	n := 3
-	batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
-	for i := range batchInput {
-		batchInput[i] = rand.NormFloat64()
-	}
-	batchRes := &autofunc.Variable{Vector: batchInput}
+		n := 3
+		batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
+		for i := range batchInput {
+			batchInput[i] = rand.NormFloat64()
+		}
+		batchRes := &autofunc.Variable{Vector: batchInput}
 
-	testBatcher(t, layer, batchRes, n, []*autofunc.Variable{batchRes, layer.Biases,
-		layer.FilterVar})
+		testBatcher(t, layer, batchRes, n, []*autofunc.Variable{batchRes, layer.Biases,
+			layer.FilterVar})
+	})
 }
 
 func TestConvLayerBatchR(t *testing.T) {
-	layer := &ConvLayer{
-		FilterCount:  3,
-		FilterWidth:  2,
-		FilterHeight: 4,
-		Stride:       2,
-		InputHeight:  17,
-		InputWidth:   19,
-		InputDepth:   5,
-	}
-	layer.Randomize()
-
-	n := 3
-	batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
-	for i := range batchInput {
-		batchInput[i] = rand.NormFloat64()
-	}
-	batchRes := &autofunc.Variable{Vector: batchInput}
-
-	params := []*autofunc.Variable{batchRes, layer.Biases, layer.FilterVar}
-
-	rVec := autofunc.RVector{}
-	for _, param := range params {
-		vec := make(linalg.Vector, len(param.Vector))
-		for i := range vec {
-			vec[i] = rand.NormFloat64()
+	convTestBothSizes(t, func(t *testing.T) {
+		layer := &ConvLayer{
+			FilterCount:  3,
+			FilterWidth:  2,
+			FilterHeight: 4,
+			Stride:       2,
+			InputHeight:  17,
+			InputWidth:   19,
+			InputDepth:   5,
 		}
-		rVec[param] = vec
-	}
+		layer.Randomize()
 
-	testRBatcher(t, rVec, layer, autofunc.NewRVariable(batchRes, rVec), n, params)
+		n := 3
+		batchInput := make(linalg.Vector, n*layer.InputWidth*layer.InputHeight*layer.InputDepth)
+		for i := range batchInput {
+			batchInput[i] = rand.NormFloat64()
+		}
+		batchRes := &autofunc.Variable{Vector: batchInput}
+
+		params := []*autofunc.Variable{batchRes, layer.Biases, layer.FilterVar}
+
+		rVec := autofunc.RVector{}
+		for _, param := range params {
+			vec := make(linalg.Vector, len(param.Vector))
+			for i := range vec {
+				vec[i] = rand.NormFloat64()
+			}
+			rVec[param] = vec
+		}
+
+		testRBatcher(t, rVec, layer, autofunc.NewRVariable(batchRes, rVec), n, params)
+	})
+}
+
+func convTestBothSizes(t *testing.T, f func(t *testing.T)) {
+	t.Run("float32", func(t *testing.T) {
+		SetConvLayer32Bit(true)
+		f(t)
+	})
+	t.Run("float64", func(t *testing.T) {
+		SetConvLayer32Bit(false)
+		f(t)
+	})
 }
 
 func BenchmarkShallowConvLayer(b *testing.B) {

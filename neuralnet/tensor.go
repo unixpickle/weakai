@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/gonum/blas/blas32"
 	"github.com/gonum/blas/blas64"
 	"github.com/unixpickle/num-analysis/linalg"
 )
@@ -202,6 +203,144 @@ func (t *Tensor3) MulAdd(x, y int, t1 *Tensor3, s float64) {
 			targetVec := blas64.Vector{Inc: 1, Data: target}
 			sourceVec := blas64.Vector{Inc: 1, Data: source}
 			blas64.Axpy(rowSize, s, sourceVec, targetVec)
+		}
+	}
+}
+
+type tensor32 struct {
+	Width  int
+	Height int
+	Depth  int
+	Data   []float32
+}
+
+func newTensor32(width, height, depth int) *tensor32 {
+	return &tensor32{
+		Width:  width,
+		Height: height,
+		Depth:  depth,
+		Data:   make([]float32, width*height*depth),
+	}
+}
+
+func newTensor32Col(width, height, depth int, col []float32,
+	convWidth, convHeight, convStride int) *tensor32 {
+	res := newTensor32(width, height, depth)
+	w := 1 + (width-convWidth)/convStride
+	h := 1 + (height-convHeight)/convStride
+	if w < 0 || h < 0 {
+		return res
+	}
+	tempTensor := &tensor32{
+		Width:  convWidth,
+		Height: convHeight,
+		Depth:  depth,
+	}
+	convSize := tempTensor.Width * tempTensor.Height * tempTensor.Depth
+	var idx int
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			tempTensor.Data = col[idx : idx+convSize]
+			res.MulAdd(x*convStride, y*convStride, tempTensor, 1)
+			idx += convSize
+		}
+	}
+	return res
+}
+
+func (t *tensor32) Get(x, y, z int) float32 {
+	return t.Data[(x+y*t.Width)*t.Depth+z]
+}
+
+func (t *tensor32) Set(x, y, z int, val float32) {
+	t.Data[(x+y*t.Width)*t.Depth+z] = val
+}
+
+func (t *tensor32) ToCol(width, height, stride int) []float32 {
+	w := 1 + (t.Width-width)/stride
+	h := 1 + (t.Height-height)/stride
+	if w < 0 || h < 0 {
+		return nil
+	}
+	resVec := make([]float32, w*h*width*height*t.Depth)
+	destTensor := &tensor32{
+		Width:  width,
+		Height: height,
+		Depth:  t.Depth,
+		Data:   resVec,
+	}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			t.Crop(x*stride, y*stride, destTensor)
+			destTensor.Data = destTensor.Data[width*height*t.Depth:]
+		}
+	}
+	return resVec
+}
+
+func (t *tensor32) Crop(x, y int, dest *tensor32) {
+	if t.Depth != dest.Depth {
+		panic("depths must match")
+	} else if x+dest.Width > t.Width || y+dest.Height > t.Height {
+		panic("cropped region goes out of bounds")
+	}
+
+	outData := dest.Data
+	rowSize := dest.Width * dest.Depth
+	for subY := 0; subY < dest.Height; subY++ {
+		start := ((y+subY)*t.Width + x) * t.Depth
+		end := start + rowSize
+		copy(outData, t.Data[start:end])
+		outData = outData[rowSize:]
+	}
+}
+
+func (t *tensor32) MulAdd(x, y int, t1 *tensor32, s float32) {
+	if t.Depth != t1.Depth {
+		panic("depths must match")
+	}
+
+	var sourceStartX, targetStartX int
+	if x > 0 {
+		targetStartX = x
+	} else {
+		sourceStartX = -x
+	}
+
+	var sourceStartY, targetStartY int
+	if y > 0 {
+		targetStartY = y
+	} else {
+		sourceStartY = -y
+	}
+
+	yCount := t.Height - targetStartY
+	xCount := t.Width - targetStartX
+
+	if sourceLimit := t1.Height - sourceStartY; sourceLimit < yCount {
+		yCount = sourceLimit
+	}
+	if sourceLimit := t1.Width - sourceStartX; sourceLimit < xCount {
+		xCount = sourceLimit
+	}
+
+	if rowSize := xCount * t.Depth; rowSize < minOptimizeTensorRowSize {
+		for y := 0; y < yCount; y++ {
+			for x := 0; x < xCount; x++ {
+				for z := 0; z < t.Depth; z++ {
+					val1 := t.Get(x+targetStartX, y+targetStartY, z)
+					val2 := t1.Get(x+sourceStartX, y+sourceStartY, z)
+					t.Set(x+targetStartX, y+targetStartY, z, val1+(val2*s))
+				}
+			}
+		}
+	} else {
+		for y := 0; y < yCount; y++ {
+			target := t.Data[((y+targetStartY)*t.Width+targetStartX)*t.Depth:]
+			source := t1.Data[((y+sourceStartY)*t1.Width+sourceStartX)*t1.Depth:]
+			targetVec := blas32.Vector{Inc: 1, Data: target}
+			sourceVec := blas32.Vector{Inc: 1, Data: source}
+			blas32.Axpy(rowSize, s, sourceVec, targetVec)
 		}
 	}
 }

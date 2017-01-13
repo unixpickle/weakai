@@ -349,8 +349,20 @@ func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vec
 		Data:   upstream,
 	}
 
+	inMatrix := c.Layer.inputToMatrix(input)
+
+	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
+		destMat := blas64.General{
+			Rows:   len(c.Layer.Filters),
+			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
+			Data:   filterGrad,
+		}
+		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrix, 1, destMat)
+	}
+
 	if downstream != nil {
-		inDeriv := c.Layer.inputToMatrix(input)
+		inDeriv := inMatrix
 		filterMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
@@ -362,17 +374,6 @@ func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vec
 			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
 			c.Layer.FilterHeight, c.Layer.Stride)
 		copy(downstream, flattened.Data)
-	}
-
-	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
-		inMatrix := c.Layer.inputToMatrix(input)
-		destMat := blas64.General{
-			Rows:   len(c.Layer.Filters),
-			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
-			Stride: c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
-			Data:   filterGrad,
-		}
-		blas64.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrix, 1, destMat)
 	}
 }
 

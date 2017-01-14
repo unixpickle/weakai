@@ -2,6 +2,7 @@ package neuralnet
 
 import (
 	"encoding/json"
+	"math"
 	"math/rand"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/gonum/blas/blas64"
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/tensor"
 )
 
 var conv32Bit bool
@@ -46,7 +48,7 @@ type ConvLayer struct {
 	InputHeight int
 	InputDepth  int
 
-	Filters []*Tensor3
+	Filters []*tensor.Float64
 	Biases  *autofunc.Variable
 
 	// FilterVar must contain the data for all of the
@@ -111,7 +113,7 @@ func (c *ConvLayer) Randomize() {
 			Vector: make(linalg.Vector, weightCount),
 		}
 		for i := 0; i < c.FilterCount; i++ {
-			filter := &Tensor3{
+			filter := &tensor.Float64{
 				Width:  c.FilterWidth,
 				Height: c.FilterHeight,
 				Depth:  c.InputDepth,
@@ -125,7 +127,10 @@ func (c *ConvLayer) Randomize() {
 		c.Biases = &autofunc.Variable{Vector: biasVec}
 	}
 	for i, filter := range c.Filters {
-		filter.Randomize()
+		coeff := math.Sqrt(3.0 / float64(len(filter.Data)))
+		for i := range filter.Data {
+			filter.Data[i] = coeff * ((rand.Float64() * 2) - 1)
+		}
 		c.Biases.Vector[i] = (rand.Float64() * 2) - 1
 	}
 }
@@ -167,18 +172,28 @@ func (c *ConvLayer) Batch(in autofunc.Result, n int) autofunc.Result {
 		N:         n,
 		Layer:     c,
 	}
-	var tempOut []float32
+
+	dims := c.im2ColDims()
+
 	if ConvLayer32Bit() {
-		tempOut = make([]float32, outSize)
-	}
-	for i := 0; i < n; i++ {
-		subIn := in.Output()[i*inSize : (i+1)*inSize]
-		subOut := res.OutputVec[i*outSize : (i+1)*outSize]
-		if tempOut != nil {
-			c.convolve32(subIn, c.outputToTensor32(tempOut))
+		tempOut := make([]float32, outSize)
+		tempIn := make([]float32, dims.MatrixSize())
+		i2c := tensor.NewIm2Col32(dims)
+		for i := 0; i < n; i++ {
+			subIn := in.Output()[i*inSize : (i+1)*inSize]
+			subOut := res.OutputVec[i*outSize : (i+1)*outSize]
+			inMat := c.inputToMatrix32(cast32(subIn), i2c, tempIn)
+			c.convolve32(inMat, c.outputToTensor32(tempOut))
 			cast64InPlace(subOut, tempOut)
-		} else {
-			c.convolve(subIn, c.outputToTensor(subOut))
+		}
+	} else {
+		tempIn := make([]float64, dims.MatrixSize())
+		i2c := tensor.NewIm2Col64(dims)
+		for i := 0; i < n; i++ {
+			subIn := in.Output()[i*inSize : (i+1)*inSize]
+			subOut := res.OutputVec[i*outSize : (i+1)*outSize]
+			inMat := c.inputToMatrix(subIn, i2c, tempIn)
+			c.convolve(inMat, c.outputToTensor(subOut))
 		}
 	}
 	return res
@@ -203,14 +218,22 @@ func (c *ConvLayer) BatchR(rv autofunc.RVector, in autofunc.RResult,
 		N:          n,
 		Layer:      c,
 	}
+
+	dims := c.im2ColDims()
+	tempIn := make([]float64, dims.MatrixSize())
+	tempInR := make([]float64, dims.MatrixSize())
+	i2c := tensor.NewIm2Col64(dims)
+
 	for i := 0; i < n; i++ {
 		subIn := in.Output()[i*inSize : (i+1)*inSize]
 		subOut := res.OutputVec[i*outSize : (i+1)*outSize]
-		c.convolve(subIn, c.outputToTensor(subOut))
+		inMat := c.inputToMatrix(subIn, i2c, tempIn)
+		c.convolve(inMat, c.outputToTensor(subOut))
 
 		subInR := in.ROutput()[i*inSize : (i+1)*inSize]
 		subOutR := res.ROutputVec[i*outSize : (i+1)*outSize]
-		c.convolveR(rv, subIn, subInR, c.outputToTensor(subOutR))
+		inMatR := c.inputToMatrix(subInR, i2c, tempInR)
+		c.convolveR(rv, inMat, inMatR, c.outputToTensor(subOutR))
 	}
 	return res
 }
@@ -226,8 +249,19 @@ func (c *ConvLayer) SerializerType() string {
 	return serializerTypeConvLayer
 }
 
-func (c *ConvLayer) convolve(in linalg.Vector, out *Tensor3) {
-	inMat := c.inputToMatrix(in)
+func (c *ConvLayer) im2ColDims() *tensor.Im2ColDims {
+	return &tensor.Im2ColDims{
+		ImageWidth:  c.InputWidth,
+		ImageHeight: c.InputHeight,
+		ImageDepth:  c.InputDepth,
+
+		FilterWidth:  c.FilterWidth,
+		FilterHeight: c.FilterHeight,
+		FilterStride: c.Stride,
+	}
+}
+
+func (c *ConvLayer) convolve(inMat blas64.General, out *tensor.Float64) {
 	filterMat := blas64.General{
 		Rows:   c.FilterCount,
 		Cols:   inMat.Cols,
@@ -250,8 +284,7 @@ func (c *ConvLayer) convolve(in linalg.Vector, out *Tensor3) {
 	}
 }
 
-func (c *ConvLayer) convolve32(in linalg.Vector, out *tensor32) {
-	inMat := c.inputToMatrix32(cast32(in))
+func (c *ConvLayer) convolve32(inMat blas32.General, out *tensor.Float32) {
 	filterMat := blas32.General{
 		Rows:   c.FilterCount,
 		Cols:   inMat.Cols,
@@ -274,9 +307,8 @@ func (c *ConvLayer) convolve32(in linalg.Vector, out *tensor32) {
 	}
 }
 
-func (c *ConvLayer) convolveR(v autofunc.RVector, in, inR linalg.Vector, out *Tensor3) {
-	inMat := c.inputToMatrix(in)
-	inMatR := c.inputToMatrix(inR)
+func (c *ConvLayer) convolveR(v autofunc.RVector, inMat, inMatR blas64.General,
+	out *tensor.Float64) {
 	filterMat := blas64.General{
 		Rows:   c.FilterCount,
 		Cols:   inMat.Cols,
@@ -310,8 +342,8 @@ func (c *ConvLayer) convolveR(v autofunc.RVector, in, inR linalg.Vector, out *Te
 	}
 }
 
-func (c *ConvLayer) inputToTensor(in linalg.Vector) *Tensor3 {
-	return &Tensor3{
+func (c *ConvLayer) inputToTensor(in linalg.Vector) *tensor.Float64 {
+	return &tensor.Float64{
 		Width:  c.InputWidth,
 		Height: c.InputHeight,
 		Depth:  c.InputDepth,
@@ -319,18 +351,19 @@ func (c *ConvLayer) inputToTensor(in linalg.Vector) *Tensor3 {
 	}
 }
 
-func (c *ConvLayer) inputToMatrix(in linalg.Vector) blas64.General {
-	inTensor := c.inputToTensor(in)
+func (c *ConvLayer) inputToMatrix(in linalg.Vector, i2c tensor.Im2Col64,
+	data []float64) blas64.General {
+	i2c.ToMatrix(data, c.inputToTensor(in))
 	return blas64.General{
 		Rows:   c.OutputWidth() * c.OutputHeight(),
 		Cols:   c.FilterWidth * c.FilterHeight * c.InputDepth,
 		Stride: c.FilterWidth * c.FilterHeight * c.InputDepth,
-		Data:   inTensor.ToCol(c.FilterWidth, c.FilterHeight, c.Stride),
+		Data:   data,
 	}
 }
 
-func (c *ConvLayer) outputToTensor(out linalg.Vector) *Tensor3 {
-	return &Tensor3{
+func (c *ConvLayer) outputToTensor(out linalg.Vector) *tensor.Float64 {
+	return &tensor.Float64{
 		Width:  c.OutputWidth(),
 		Height: c.OutputHeight(),
 		Depth:  c.OutputDepth(),
@@ -338,8 +371,8 @@ func (c *ConvLayer) outputToTensor(out linalg.Vector) *Tensor3 {
 	}
 }
 
-func (c *ConvLayer) inputToTensor32(in []float32) *tensor32 {
-	return &tensor32{
+func (c *ConvLayer) inputToTensor32(in []float32) *tensor.Float32 {
+	return &tensor.Float32{
 		Width:  c.InputWidth,
 		Height: c.InputHeight,
 		Depth:  c.InputDepth,
@@ -347,18 +380,19 @@ func (c *ConvLayer) inputToTensor32(in []float32) *tensor32 {
 	}
 }
 
-func (c *ConvLayer) inputToMatrix32(in []float32) blas32.General {
-	inTensor := c.inputToTensor32(in)
+func (c *ConvLayer) inputToMatrix32(in []float32, i2c tensor.Im2Col32,
+	data []float32) blas32.General {
+	i2c.ToMatrix(data, c.inputToTensor32(in))
 	return blas32.General{
 		Rows:   c.OutputWidth() * c.OutputHeight(),
 		Cols:   c.FilterWidth * c.FilterHeight * c.InputDepth,
 		Stride: c.FilterWidth * c.FilterHeight * c.InputDepth,
-		Data:   inTensor.ToCol(c.FilterWidth, c.FilterHeight, c.Stride),
+		Data:   data,
 	}
 }
 
-func (c *ConvLayer) outputToTensor32(out []float32) *tensor32 {
-	return &tensor32{
+func (c *ConvLayer) outputToTensor32(out []float32) *tensor.Float32 {
+	return &tensor.Float32{
 		Width:  c.OutputWidth(),
 		Height: c.OutputHeight(),
 		Depth:  c.OutputDepth(),
@@ -395,6 +429,19 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 		inputDownstream = make(linalg.Vector, len(c.Input.Output()))
 	}
 
+	dims := c.Layer.im2ColDims()
+	var i2c32 tensor.Im2Col32
+	var i2c64 tensor.Im2Col64
+	var matScratch32 []float32
+	var matScratch64 []float64
+	if ConvLayer32Bit() {
+		i2c32 = tensor.NewIm2Col32(dims)
+		matScratch32 = make([]float32, dims.MatrixSize())
+	} else {
+		i2c64 = tensor.NewIm2Col64(dims)
+		matScratch64 = make([]float64, dims.MatrixSize())
+	}
+
 	subUpstreamSize := len(upstream) / c.N
 	subDownstreamSize := len(c.Input.Output()) / c.N
 	for i := 0; i < c.N; i++ {
@@ -404,10 +451,12 @@ func (c *convLayerResult) PropagateGradient(upstream linalg.Vector, grad autofun
 			subDownstream = inputDownstream[i*subDownstreamSize : (i+1)*subDownstreamSize]
 		}
 		subInput := c.Input.Output()[i*subDownstreamSize : (i+1)*subDownstreamSize]
-		if ConvLayer32Bit() {
-			c.propagateSingle32(subInput, subUpstream, subDownstream, grad)
+		if i2c32 != nil {
+			c.propagateSingle32(subInput, subUpstream, subDownstream, grad,
+				i2c32, matScratch32)
 		} else {
-			c.propagateSingle(subInput, subUpstream, subDownstream, grad)
+			c.propagateSingle(subInput, subUpstream, subDownstream, grad,
+				i2c64, matScratch64)
 		}
 	}
 
@@ -430,7 +479,7 @@ func (c *convLayerResult) propagateBiases(upstream linalg.Vector, grad autofunc.
 }
 
 func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vector,
-	grad autofunc.Gradient) {
+	grad autofunc.Gradient, i2c tensor.Im2Col64, matScratch []float64) {
 	upstreamMat := blas64.General{
 		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
 		Cols:   c.Layer.OutputDepth(),
@@ -438,7 +487,7 @@ func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vec
 		Data:   upstream,
 	}
 
-	inMatrix := c.Layer.inputToMatrix(input)
+	inMatrix := c.Layer.inputToMatrix(input, i2c, matScratch)
 
 	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
 		destMat := blas64.General{
@@ -459,15 +508,13 @@ func (c *convLayerResult) propagateSingle(input, upstream, downstream linalg.Vec
 			Data:   c.Layer.FilterVar.Vector,
 		}
 		blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 0, inDeriv)
-		flattened := NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
-			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
-			c.Layer.FilterHeight, c.Layer.Stride)
+		flattened := i2c.ToImage(inDeriv.Data)
 		copy(downstream, flattened.Data)
 	}
 }
 
 func (c *convLayerResult) propagateSingle32(input, upstream, downstream linalg.Vector,
-	grad autofunc.Gradient) {
+	grad autofunc.Gradient, i2c tensor.Im2Col32, matScratch []float32) {
 	upstreamMat := blas32.General{
 		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
 		Cols:   c.Layer.OutputDepth(),
@@ -475,7 +522,7 @@ func (c *convLayerResult) propagateSingle32(input, upstream, downstream linalg.V
 		Data:   cast32(upstream),
 	}
 
-	inMatrix := c.Layer.inputToMatrix32(cast32(input))
+	inMatrix := c.Layer.inputToMatrix32(cast32(input), i2c, matScratch)
 
 	if filterGrad, ok := grad[c.Layer.FilterVar]; ok {
 		destMat := blas32.General{
@@ -497,9 +544,7 @@ func (c *convLayerResult) propagateSingle32(input, upstream, downstream linalg.V
 			Data:   cast32(c.Layer.FilterVar.Vector),
 		}
 		blas32.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 0, inDeriv)
-		flattened := newTensor32Col(c.Layer.InputWidth, c.Layer.InputHeight,
-			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
-			c.Layer.FilterHeight, c.Layer.Stride)
+		flattened := i2c.ToImage(inDeriv.Data)
 		cast64InPlace(downstream, flattened.Data)
 	}
 }
@@ -553,6 +598,11 @@ func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 		inputDownstreamR = make(linalg.Vector, len(c.Input.Output()))
 	}
 
+	dims := c.Layer.im2ColDims()
+	i2c := tensor.NewIm2Col64(dims)
+	matScratch := make([]float64, dims.MatrixSize())
+	matScratchR := make([]float64, dims.MatrixSize())
+
 	subUpstreamSize := len(upstream) / c.N
 	subDownstreamSize := len(c.Input.Output()) / c.N
 	for i := 0; i < c.N; i++ {
@@ -566,7 +616,8 @@ func (c *convLayerRResult) PropagateRGradient(upstream, upstreamR linalg.Vector,
 		subInput := c.Input.Output()[i*subDownstreamSize : (i+1)*subDownstreamSize]
 		subInputR := c.Input.ROutput()[i*subDownstreamSize : (i+1)*subDownstreamSize]
 		c.propagateSingle(subInput, subInputR, subUpstream, subUpstreamR,
-			subDownstream, subDownstreamR, rgrad, grad)
+			subDownstream, subDownstreamR, rgrad, grad, i2c, matScratch,
+			matScratchR)
 	}
 
 	if !c.Input.Constant(rgrad, grad) {
@@ -599,7 +650,8 @@ func (c *convLayerRResult) propagateBiases(upstream, upstreamR linalg.Vector,
 }
 
 func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, downstream,
-	downstreamR linalg.Vector, rgrad autofunc.RGradient, grad autofunc.Gradient) {
+	downstreamR linalg.Vector, rgrad autofunc.RGradient, grad autofunc.Gradient,
+	i2c tensor.Im2Col64, matScratch, matScratchR []float64) {
 	upstreamMat := blas64.General{
 		Rows:   c.Layer.OutputWidth() * c.Layer.OutputHeight(),
 		Cols:   c.Layer.OutputDepth(),
@@ -614,7 +666,9 @@ func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, d
 	}
 
 	if downstream != nil {
-		inDeriv := c.Layer.inputToMatrix(input)
+		// TODO: don't bother doing a full im2col here,
+		// since we overwrite it anyway.
+		inDeriv := c.Layer.inputToMatrix(input, i2c, matScratch)
 		filterMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,
@@ -622,9 +676,7 @@ func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, d
 			Data:   c.Layer.FilterVar.Vector,
 		}
 		blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 0, inDeriv)
-		flattened := NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
-			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
-			c.Layer.FilterHeight, c.Layer.Stride)
+		flattened := i2c.ToImage(inDeriv.Data)
 		copy(downstream, flattened.Data)
 
 		blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMatR, filterMat, 0, inDeriv)
@@ -632,9 +684,7 @@ func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, d
 			filterMat.Data = c.FiltersR
 			blas64.Gemm(blas.NoTrans, blas.NoTrans, 1, upstreamMat, filterMat, 1, inDeriv)
 		}
-		flattened = NewTensor3Col(c.Layer.InputWidth, c.Layer.InputHeight,
-			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
-			c.Layer.FilterHeight, c.Layer.Stride)
+		flattened = i2c.ToImage(inDeriv.Data)
 		copy(downstreamR, flattened.Data)
 	}
 
@@ -643,7 +693,7 @@ func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, d
 
 	var inMatrix blas64.General
 	if hasFilterGrad || hasFilterRGrad {
-		inMatrix = c.Layer.inputToMatrix(input)
+		inMatrix = c.Layer.inputToMatrix(input, i2c, matScratch)
 	}
 
 	if hasFilterGrad {
@@ -657,7 +707,7 @@ func (c *convLayerRResult) propagateSingle(input, inputR, upstream, upstreamR, d
 	}
 
 	if hasFilterRGrad {
-		inMatrixR := c.Layer.inputToMatrix(inputR)
+		inMatrixR := c.Layer.inputToMatrix(inputR, i2c, matScratchR)
 		destMat := blas64.General{
 			Rows:   len(c.Layer.Filters),
 			Cols:   c.Layer.FilterWidth * c.Layer.FilterHeight * c.Layer.InputDepth,

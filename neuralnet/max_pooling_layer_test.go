@@ -8,6 +8,7 @@ import (
 	"github.com/unixpickle/autofunc/functest"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/tensor"
 )
 
 func TestMaxPoolingDimensions(t *testing.T) {
@@ -87,7 +88,7 @@ func TestMaxPoolingBackward(t *testing.T) {
 		0.5648, 0.3950, 0.7001, 0.3238, 0.3235, 0.4789, 0.4206, 0.0502, 0.3165, 0.2146, 0.5393, 0.9277, 0.4361, 0.1530, 0.3192, 0.9463, 0.0317, 0.3078, 0.8892, 0.0508,
 	}
 
-	downstreamGrad := NewTensor3(4, 4, 2)
+	downstreamGrad := tensor.NewFloat64(4, 4, 2)
 	for i := range downstreamGrad.Data {
 		downstreamGrad.Data[i] = rand.Float64()*2 - 1
 	}

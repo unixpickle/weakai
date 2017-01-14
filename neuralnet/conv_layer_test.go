@@ -10,6 +10,7 @@ import (
 	"github.com/unixpickle/autofunc/functest"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
+	"github.com/unixpickle/tensor"
 )
 
 func TestConvDimensions(t *testing.T) {
@@ -298,7 +299,8 @@ func benchmarkConvLayer(b *testing.B, layer *ConvLayer) {
 		upstreams := make(chan linalg.Vector, parallelism)
 		grads := make(chan autofunc.Gradient, parallelism)
 		for i := 0; i < parallelism; i++ {
-			testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
+			testInput := tensor.NewFloat64(layer.InputWidth, layer.InputHeight,
+				layer.InputDepth)
 			for i := range testInput.Data {
 				testInput.Data[i] = rand.NormFloat64()
 			}
@@ -321,7 +323,7 @@ func benchmarkConvLayer(b *testing.B, layer *ConvLayer) {
 
 func benchmarkConvLayerForward(b *testing.B, layer *ConvLayer) {
 	layer.Randomize()
-	testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
+	testInput := tensor.NewFloat64(layer.InputWidth, layer.InputHeight, layer.InputDepth)
 	for i := range testInput.Data {
 		testInput.Data[i] = rand.NormFloat64()
 	}
@@ -334,7 +336,7 @@ func benchmarkConvLayerForward(b *testing.B, layer *ConvLayer) {
 
 func benchmarkConvLayerBackward(b *testing.B, layer *ConvLayer) {
 	layer.Randomize()
-	testInput := NewTensor3(layer.InputWidth, layer.InputHeight, layer.InputDepth)
+	testInput := tensor.NewFloat64(layer.InputWidth, layer.InputHeight, layer.InputDepth)
 	for i := range testInput.Data {
 		testInput.Data[i] = rand.NormFloat64()
 	}

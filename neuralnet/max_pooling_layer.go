@@ -6,6 +6,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/tensor"
 )
 
 // A MaxPoolingLayer reduces the width and height
@@ -131,7 +132,7 @@ func (m *MaxPoolingLayer) SerializerType() string {
 	return serializerTypeMaxPoolingLayer
 }
 
-func (m *MaxPoolingLayer) evaluate(in *Tensor3, out *Tensor3) poolChoiceMap {
+func (m *MaxPoolingLayer) evaluate(in *tensor.Float64, out *tensor.Float64) poolChoiceMap {
 	choices := newPoolChoiceMap(m.OutputWidth(), m.OutputHeight(), m.InputDepth)
 	for y := 0; y < out.Height; y++ {
 		poolY := y * m.YSpan
@@ -155,8 +156,8 @@ func (m *MaxPoolingLayer) evaluate(in *Tensor3, out *Tensor3) poolChoiceMap {
 	return choices
 }
 
-func (m *MaxPoolingLayer) inputTensor(inVec linalg.Vector) *Tensor3 {
-	return &Tensor3{
+func (m *MaxPoolingLayer) inputTensor(inVec linalg.Vector) *tensor.Float64 {
+	return &tensor.Float64{
 		Width:  m.InputWidth,
 		Height: m.InputHeight,
 		Depth:  m.InputDepth,
@@ -164,8 +165,8 @@ func (m *MaxPoolingLayer) inputTensor(inVec linalg.Vector) *Tensor3 {
 	}
 }
 
-func (m *MaxPoolingLayer) outputTensor(outVec linalg.Vector) *Tensor3 {
-	return &Tensor3{
+func (m *MaxPoolingLayer) outputTensor(outVec linalg.Vector) *tensor.Float64 {
+	return &tensor.Float64{
 		Width:  m.OutputWidth(),
 		Height: m.OutputHeight(),
 		Depth:  m.InputDepth,
@@ -247,7 +248,7 @@ func (m *maxPoolingRResult) PropagateRGradient(upstream, upstreamR linalg.Vector
 	m.Input.PropagateRGradient(downstream, downstreamR, rgrad, grad)
 }
 
-func maxInput(t *Tensor3, x1, x2, y1, y2, z int) (value float64, bestX, bestY int) {
+func maxInput(t *tensor.Float64, x1, x2, y1, y2, z int) (value float64, bestX, bestY int) {
 	value = math.Inf(-1)
 	for x := x1; x <= x2; x++ {
 		for y := y1; y <= y2; y++ {
@@ -277,7 +278,7 @@ func newPoolChoiceMap(width, height, depth int) poolChoiceMap {
 	return res
 }
 
-func (p poolChoiceMap) ForwardPropagate(in *Tensor3, out *Tensor3) {
+func (p poolChoiceMap) ForwardPropagate(in *tensor.Float64, out *tensor.Float64) {
 	for y, list := range p {
 		for x, list1 := range list {
 			for z, point := range list1 {
@@ -288,7 +289,7 @@ func (p poolChoiceMap) ForwardPropagate(in *Tensor3, out *Tensor3) {
 	}
 }
 
-func (p poolChoiceMap) BackPropagate(downstream *Tensor3, upstream *Tensor3) {
+func (p poolChoiceMap) BackPropagate(downstream *tensor.Float64, upstream *tensor.Float64) {
 	for y, list := range p {
 		for x, list1 := range list {
 			for z, point := range list1 {

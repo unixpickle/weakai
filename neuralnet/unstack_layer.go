@@ -5,6 +5,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/tensor"
 )
 
 // UnstackLayer unstacks input tensors.
@@ -65,13 +66,13 @@ func (u *UnstackLayer) unstack(inVec linalg.Vector) linalg.Vector {
 		panic("InverseStride^2 must divide InputDepth")
 	}
 
-	input := &Tensor3{
+	input := &tensor.Float64{
 		Width:  u.InputWidth,
 		Height: u.InputHeight,
 		Depth:  u.InputDepth,
 		Data:   inVec,
 	}
-	output := NewTensor3(u.InputWidth*u.InverseStride,
+	output := tensor.NewFloat64(u.InputWidth*u.InverseStride,
 		u.InputHeight*u.InverseStride,
 		u.InputDepth/(u.InverseStride*u.InverseStride))
 
@@ -92,14 +93,14 @@ func (u *UnstackLayer) unstack(inVec linalg.Vector) linalg.Vector {
 }
 
 func (u *UnstackLayer) stack(inVec linalg.Vector) linalg.Vector {
-	unstacked := &Tensor3{
+	unstacked := &tensor.Float64{
 		Width:  u.InputWidth * u.InverseStride,
 		Height: u.InputHeight * u.InverseStride,
 		Depth:  u.InputDepth / (u.InverseStride * u.InverseStride),
 		Data:   inVec,
 	}
 
-	stacked := NewTensor3(u.InputWidth, u.InputHeight, u.InputDepth)
+	stacked := tensor.NewFloat64(u.InputWidth, u.InputHeight, u.InputDepth)
 
 	for y := 0; y < stacked.Height; y++ {
 		unstackedY := y * u.InverseStride

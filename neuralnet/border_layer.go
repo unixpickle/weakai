@@ -5,6 +5,7 @@ import (
 
 	"github.com/unixpickle/autofunc"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/tensor"
 )
 
 // A BorderLayer adds padding around its input tensor,
@@ -55,13 +56,13 @@ func (b *BorderLayer) SerializerType() string {
 }
 
 func (b *BorderLayer) addBorder(tensorVec linalg.Vector) linalg.Vector {
-	inTensor := &Tensor3{
+	inTensor := &tensor.Float64{
 		Width:  b.InputWidth,
 		Height: b.InputHeight,
 		Depth:  b.InputDepth,
 		Data:   tensorVec,
 	}
-	outTensor := NewTensor3(b.InputWidth+b.LeftBorder+b.RightBorder,
+	outTensor := tensor.NewFloat64(b.InputWidth+b.LeftBorder+b.RightBorder,
 		b.InputHeight+b.TopBorder+b.BottomBorder, b.InputDepth)
 	for y := 0; y < inTensor.Height; y++ {
 		insetY := y + b.TopBorder
@@ -77,8 +78,8 @@ func (b *BorderLayer) addBorder(tensorVec linalg.Vector) linalg.Vector {
 }
 
 func (b *BorderLayer) removeBorder(tensorVec linalg.Vector) linalg.Vector {
-	outTensor := NewTensor3(b.InputWidth, b.InputHeight, b.InputDepth)
-	inTensor := &Tensor3{
+	outTensor := tensor.NewFloat64(b.InputWidth, b.InputHeight, b.InputDepth)
+	inTensor := &tensor.Float64{
 		Width:  b.InputWidth + b.LeftBorder + b.RightBorder,
 		Height: b.InputHeight + b.TopBorder + b.BottomBorder,
 		Depth:  b.InputDepth,

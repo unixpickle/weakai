@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/unixpickle/weakai/neuralnet"
+	"github.com/unixpickle/tensor"
 )
 
-func ImageTensor(img image.Image) *neuralnet.Tensor3 {
-	res := neuralnet.NewTensor3(img.Bounds().Dx(), img.Bounds().Dy(), 3)
+func ImageTensor(img image.Image) *tensor.Float64 {
+	res := tensor.NewFloat64(img.Bounds().Dx(), img.Bounds().Dy(), 3)
 	for y := 0; y < res.Height; y++ {
 		for x := 0; x < res.Width; x++ {
 			r, g, b, _ := img.At(x+img.Bounds().Min.X, y+img.Bounds().Min.Y).RGBA()
@@ -23,7 +23,7 @@ func ImageTensor(img image.Image) *neuralnet.Tensor3 {
 	return res
 }
 
-func ImageFromTensor(t *neuralnet.Tensor3) image.Image {
+func ImageFromTensor(t *tensor.Float64) image.Image {
 	res := image.NewRGBA(image.Rect(0, 0, t.Width, t.Height))
 
 	for y := 0; y < t.Height; y++ {

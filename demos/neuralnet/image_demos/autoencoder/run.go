@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/unixpickle/autofunc"
+	"github.com/unixpickle/tensor"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -43,7 +44,7 @@ func Run() {
 
 	res := network.Apply(&autofunc.Variable{Vector: ImageTensor(inputImage).Data})
 
-	tensor := &neuralnet.Tensor3{
+	tensor := &tensor.Float64{
 		Width:  inputImage.Bounds().Dx(),
 		Height: inputImage.Bounds().Dy(),
 		Depth:  3,

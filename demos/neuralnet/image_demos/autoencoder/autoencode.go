@@ -8,6 +8,7 @@ import (
 
 	"github.com/unixpickle/hessfree"
 	"github.com/unixpickle/num-analysis/linalg"
+	"github.com/unixpickle/tensor"
 	"github.com/unixpickle/weakai/neuralnet"
 )
 
@@ -28,7 +29,7 @@ func Autoencode(images <-chan image.Image) (neuralnet.Network, error) {
 
 	log.Print("Reading images...")
 
-	tensors := []*neuralnet.Tensor3{ImageTensor(firstImage)}
+	tensors := []*tensor.Float64{ImageTensor(firstImage)}
 	for img := range images {
 		if img.Bounds().Dx() != width || img.Bounds().Dy() != height {
 			log.Printf("Image size %d,%d does not match %d,%d",

@@ -167,13 +167,16 @@ func (c *ConvLayer) Batch(in autofunc.Result, n int) autofunc.Result {
 		N:         n,
 		Layer:     c,
 	}
+	var tempOut []float32
+	if ConvLayer32Bit() {
+		tempOut = make([]float32, outSize)
+	}
 	for i := 0; i < n; i++ {
 		subIn := in.Output()[i*inSize : (i+1)*inSize]
 		subOut := res.OutputVec[i*outSize : (i+1)*outSize]
-		if ConvLayer32Bit() {
-			tempOut := make([]float32, len(subOut))
+		if tempOut != nil {
 			c.convolve32(subIn, c.outputToTensor32(tempOut))
-			copy(subOut, cast64(tempOut))
+			cast64InPlace(subOut, tempOut)
 		} else {
 			c.convolve(subIn, c.outputToTensor(subOut))
 		}
@@ -482,7 +485,7 @@ func (c *convLayerResult) propagateSingle32(input, upstream, downstream linalg.V
 			Data:   cast32(filterGrad),
 		}
 		blas32.Gemm(blas.Trans, blas.NoTrans, 1, upstreamMat, inMatrix, 1, destMat)
-		copy(filterGrad, cast64(destMat.Data))
+		cast64InPlace(filterGrad, destMat.Data)
 	}
 
 	if downstream != nil {
@@ -497,7 +500,7 @@ func (c *convLayerResult) propagateSingle32(input, upstream, downstream linalg.V
 		flattened := newTensor32Col(c.Layer.InputWidth, c.Layer.InputHeight,
 			c.Layer.InputDepth, inDeriv.Data, c.Layer.FilterWidth,
 			c.Layer.FilterHeight, c.Layer.Stride)
-		copy(downstream, cast64(flattened.Data))
+		cast64InPlace(downstream, flattened.Data)
 	}
 }
 
@@ -676,8 +679,12 @@ func cast32(f64 []float64) []float32 {
 
 func cast64(f32 []float32) []float64 {
 	res := make([]float64, len(f32))
-	for i, x := range f32 {
-		res[i] = float64(x)
-	}
+	cast64InPlace(res, f32)
 	return res
+}
+
+func cast64InPlace(dest []float64, f32 []float32) {
+	for i, x := range f32 {
+		dest[i] = float64(x)
+	}
 }

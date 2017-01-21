@@ -13,15 +13,24 @@ import (
 // of Goroutines to use during tree generation.
 // If maxGos is 0, then GOMAXPROCS is used.
 func ID3(samples []Sample, attrs []Attr, maxGos int) *Tree {
+	return LimitedID3(samples, attrs, maxGos, -1)
+}
+
+// LimitedID3 is like ID3, but it will never produce a
+// tree deeper than maxDepth.
+// The depth of the tree is counted as the number of
+// branches needed to get to a leaf.
+// Thus, a tree with no branches has depth 0.
+func LimitedID3(samples []Sample, attrs []Attr, maxGos, maxDepth int) *Tree {
 	if maxGos == 0 {
 		maxGos = runtime.GOMAXPROCS(0)
 	}
 	baseEntropy := newEntropyCounter(samples).Entropy()
-	return id3(samples, attrs, maxGos, baseEntropy)
+	return id3(samples, attrs, maxGos, maxDepth, baseEntropy)
 }
 
-func id3(samples []Sample, attrs []Attr, maxGos int, entropy float64) *Tree {
-	if entropy == 0 {
+func id3(samples []Sample, attrs []Attr, maxGos, maxDepth int, entropy float64) *Tree {
+	if entropy == 0 || maxDepth == 0 {
 		return createLeaf(samples)
 	}
 
@@ -64,9 +73,9 @@ func id3(samples []Sample, attrs []Attr, maxGos int, entropy float64) *Tree {
 	}
 
 	if bestSplit.Threshold != nil {
-		less := id3(bestSplit.NumSplitSamples[0], attrs, maxGos,
+		less := id3(bestSplit.NumSplitSamples[0], attrs, maxGos, maxDepth-1,
 			bestSplit.NumSplitEntropies[0])
-		greater := id3(bestSplit.NumSplitSamples[1], attrs, maxGos,
+		greater := id3(bestSplit.NumSplitSamples[1], attrs, maxGos, maxDepth-1,
 			bestSplit.NumSplitEntropies[1])
 		return &Tree{
 			Attr: bestSplit.Attr,
@@ -83,7 +92,7 @@ func id3(samples []Sample, attrs []Attr, maxGos int, entropy float64) *Tree {
 		ValSplit: ValSplit{},
 	}
 	for class, samples := range bestSplit.ValSplitSamples {
-		tree := id3(samples, attrs, maxGos, bestSplit.ValSplitEntropies[class])
+		tree := id3(samples, attrs, maxGos, maxDepth-1, bestSplit.ValSplitEntropies[class])
 		res.ValSplit[class] = tree
 	}
 	return res

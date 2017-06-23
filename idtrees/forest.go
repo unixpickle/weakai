@@ -1,6 +1,9 @@
 package idtrees
 
-import "math/rand"
+import (
+	"math"
+	"math/rand"
+)
 
 // A TreeGen generates decision trees which classify
 // a set of samples using a set of attributes.
@@ -19,7 +22,7 @@ type Forest []*Tree
 func BuildForest(n int, samples []Sample, attrs []Attr,
 	nSamples, nAttrs int, g TreeGen) Forest {
 	if nAttrs == 0 {
-		nAttrs = int(float64(len(attrs)) + 0.5)
+		nAttrs = int(math.Sqrt(float64(len(attrs))) + 0.5)
 	}
 	sampleCopy := make([]Sample, len(samples))
 	attrCopy := make([]Attr, len(attrs))
